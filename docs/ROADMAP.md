@@ -126,7 +126,7 @@ Found while checking that everything built so far really works (14 Nov 2026), an
 | Resetting the sample did not finish on a clean folder | The loader posted the map to an address that only works when the map exists |
 | Counts drifted after several "Fix all" and reset rounds (758 ready instead of 710) | Old versions stayed in AEM's history. The loader removes the sample's folders first |
 
-Still open from that check: after the sample is reset, "Repaired" rows kept in the browser for edits at the source stay in the list until the browser tab is closed.
+Fixed on 15 Nov 2026: after the sample was reset, the "Repaired" list kept in the browser stayed, and a click on one of its rows said "Given asset id or path are invalid". When the server has no report for a map, the panel now forgets the list it kept for that map. What stays: an editor tab that was open during the reset still holds files under their old ids and must be reloaded; the loader says so when it ends.
 
 Seen first, fixed later the same day:
 
