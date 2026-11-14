@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import refcheck  # noqa: E402
 import refheal  # noqa: E402
+import audit  # noqa: E402
 import refplan  # noqa: E402
 
 TOPIC = '<topic id="t"><title>Using it</title><body>%s</body></topic>'
@@ -544,6 +545,39 @@ class RememberedFindings(unittest.TestCase):
         self.assertEqual(cache, {})
 
 
+class KeyFindingsAfterFixAll(unittest.TestCase):
+    """A finding about a key rests on the maps' key definitions, not on every character of the maps."""
+
+    MAP = ('<map><keydef keys="warnings-lib" href="GUID-w.dita"/><keydef keys="limits" href="GUID-l.dita#l/%s"/>'
+           '<topicref href="GUID-t.dita"/></map>')
+    TOPIC = '<topic id="t"><title>T</title><body><note conkeyref="warnings/slow"/></body></topic>'
+
+    def session(self, map_xml, cache):
+        files = [{"id": "GUID-m", "path": "/d/a.ditamap", "xml": map_xml, "previous": []},
+                 {"id": "GUID-w", "path": "/d/w.dita", "previous": [],
+                  "xml": '<topic id="w"><title>W</title><body><note id="slow">Slow.</note></body></topic>'},
+                 {"id": "GUID-t", "path": "/d/t.dita", "xml": self.TOPIC, "previous": []}]
+        return refplan.Session(files, log=lambda message: None, cache=cache)
+
+    def group(self, session):
+        return next(g for g in session.current["groups"].values() if g["refs"][0]["attribute"] == "conkeyref")
+
+    def test_a_repaired_fragment_elsewhere_in_the_map_keeps_the_finding(self):
+        before, after = self.session(self.MAP % "old", {}), self.session(self.MAP % "new", {})
+        self.assertEqual(before._fingerprint(before.current["repo"], self.group(before)),
+                         after._fingerprint(after.current["repo"], self.group(after)))
+
+    def test_a_changed_key_definition_makes_it_old(self):
+        before = self.session(self.MAP % "old", {})
+        after = self.session((self.MAP % "old").replace('keys="warnings-lib"', 'keys="warnings-lib warnings-old"'), {})
+        self.assertNotEqual(before._fingerprint(before.current["repo"], self.group(before)),
+                            after._fingerprint(after.current["repo"], self.group(after)))
+
+    def test_key_definitions_are_read_whatever_the_order_of_attributes(self):
+        self.assertEqual(refplan._key_definitions('<map><keydef href="a.dita#a/b" keys="y x"/><topicref href="t.dita"/></map>'),
+                         [["x y", "a.dita"]])
+
+
 class RememberedDecisions(unittest.TestCase):
     """What the planner decided is kept between checks and used again, without asking it, while
     everything it saw for a broken target is the same."""
@@ -587,6 +621,16 @@ class RememberedDecisions(unittest.TestCase):
         self.assertEqual(session.replay(), 0)
         self.assertIsNone(session.current["groups"]["r1-g1"]["decision"])
 
+    def test_the_same_finding_in_other_words_is_the_same_finding(self):
+        cache = {}
+        self.first_check(cache)
+        again = self.session(cache)
+        group = again.current["groups"]["r1-g1"]
+        self.found(group)
+        group["known"]["reason"] = "The note was divided into two notes."
+        again._settle(again.current["repo"], group)
+        self.assertIsNotNone(again._earlier_decision(group))
+
     def test_code_checks_a_remembered_decision_again(self):
         cache = {}
         first = self.first_check(cache)
@@ -599,6 +643,50 @@ class RememberedDecisions(unittest.TestCase):
     def test_an_evaluation_without_a_cache_always_asks_the_planner(self):
         session = refplan.Session(self.files(), log=lambda message: None)
         self.assertEqual(session.replay(), 0)
+
+
+class AuditRecord(unittest.TestCase):
+    """Every reference an author changed is kept with who accepted it, and can be downloaded."""
+
+    ENTRY = {"file": "/d/t1.dita", "location": "Line 4", "attribute": "conref", "was": "GUID-lib.dita#lib/backup",
+             "now": "GUID-lib.dita#lib/retention", "action": "repair", "settled_by": "AI finder agent",
+             "reason": "The note was split.", "text_before": "Kept for 30 days.", "text_after": "Backups are kept for 30 days."}
+
+    def setUp(self):
+        import tempfile
+        self.path = os.path.join(tempfile.mkdtemp(), "audit.jsonl")
+
+    def test_a_change_is_kept_with_who_accepted_it_and_when(self):
+        self.assertEqual(audit.record("/d/a.ditamap", "maria", [self.ENTRY], self.path, now=0), 1)
+        row = audit.entries(path=self.path)[0]
+        self.assertEqual((row["accepted_by"], row["map"], row["now"]), ("maria", "/d/a.ditamap", "GUID-lib.dita#lib/retention"))
+        self.assertTrue(row["when"].startswith("1970-01-01T"))
+
+    def test_the_record_only_grows_and_is_read_per_map(self):
+        audit.record("/d/a.ditamap", "maria", [self.ENTRY], self.path)
+        audit.record("/d/b.ditamap", "li", [dict(self.ENTRY, action="reference removed", now="")], self.path)
+        self.assertEqual(len(audit.entries(path=self.path)), 2)
+        self.assertEqual([r["accepted_by"] for r in audit.entries("/d/b.ditamap", self.path)], ["li"])
+        self.assertEqual(audit.summary(audit.entries(path=self.path))["by_action"], {"repair": 1, "reference removed": 1})
+
+    def test_an_entry_without_a_reference_is_not_a_record_and_no_name_is_said_so(self):
+        self.assertEqual(audit.record("/d/a.ditamap", "", [{"file": "/d/t1.dita"}, "x", self.ENTRY], self.path), 1)
+        self.assertEqual(audit.entries(path=self.path)[0]["accepted_by"], "not reported")
+        self.assertEqual(audit.record("/d/a.ditamap", "maria", None, self.path), 0)
+
+    def test_the_download_has_one_line_per_reference_and_no_formulas(self):
+        audit.record("/d/a.ditamap", "maria", [dict(self.ENTRY, reason='=HYPERLINK("x"), said "so"')], self.path)
+        lines = audit.as_csv(audit.entries(path=self.path)).splitlines()
+        self.assertEqual(lines[0].split(","), list(audit.FIELDS))
+        self.assertEqual(len(lines), 2)
+        self.assertIn("\"'=HYPERLINK(\"\"x\"\"), said \"\"so\"\"\"", lines[1])
+
+    def test_a_broken_line_does_not_hide_the_rest(self):
+        audit.record("/d/a.ditamap", "maria", [self.ENTRY], self.path)
+        with open(self.path, "a", encoding="utf-8") as handle:
+            handle.write('{"file": "/d/cut\n')
+        audit.record("/d/a.ditamap", "maria", [self.ENTRY], self.path)
+        self.assertEqual(len(audit.entries(path=self.path)), 2)
 
 
 class LiveView(unittest.TestCase):

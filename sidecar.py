@@ -8,6 +8,8 @@
     POST /feedback    an author accepted a repair, or took an earlier answer back
     POST /applied     what "Fix all" wrote
     GET  /progress    what the agents are doing right now; ?map=<path> for one map's check
+    POST /audit       the references an author changed, and who accepted them
+    GET  /audit       the audit record; ?map=<path>, &format=csv for a download
     GET  /memory      what the planner remembers of authors' answers
     GET  /health
 
@@ -91,12 +93,40 @@ def serve(port, model=None):
             elif self.path == "/memory":
                 import refplan
                 self.send_json(200, refplan.load_memory())
+            elif self.path.split("?")[0] == "/audit":
+                # The audit record of one map (or of all): ?map=<path>&format=csv for a download.
+                import audit
+                query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+                rows = audit.entries((query.get("map") or [None])[0])
+                if (query.get("format") or ["json"])[0] == "csv":
+                    data = ("\ufeff" + audit.as_csv(rows)).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Content-Type", "text/csv; charset=utf-8")
+                    self.send_header("Content-Disposition", "attachment; filename=\"reference-repairs-audit.csv\"")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                else:
+                    self.send_json(200, {"summary": audit.summary(rows), "entries": rows})
             elif self.path == "/health":
                 self.send_json(200, {"status": "ok"})
             else:
                 self.send_json(404, {"error": "not found"})
 
         def do_POST(self):
+            if self.path == "/audit":
+                # From the editor: the references an author just changed, and who that author is.
+                try:
+                    import audit
+                    length = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(length).decode("utf-8"))
+                    stored = audit.record(body.get("map"), body.get("accepted_by"), body.get("entries"))
+                    _log("audit record: %d references added" % stored)
+                    self.send_json(200, {"recorded": stored})
+                except (ValueError, AttributeError, TypeError) as exc:
+                    self.send_json(400, {"error": str(exc)})
+                return
             if self.path in ("/feedback", "/applied"):
                 # From the editor, as text/plain so the browser needs no preflight request.
                 #   /feedback  an author accepted a repair ("rejected": the candidates passed over),

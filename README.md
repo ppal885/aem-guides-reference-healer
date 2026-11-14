@@ -41,7 +41,7 @@ python3 refcheck.py samples/ref-demo/v2
 python3 refheal.py samples/ref-demo/v2
 ```
 
-The first runs the 64 tests (no network, no model). The second lists the 11 broken references of the small sample. The third repairs them with the fixed pipeline and writes a report and a patch to `out-refs/`.
+The first runs the 73 tests (no network, no model). The second lists the 11 broken references of the small sample. The third repairs them with the fixed pipeline and writes a report and a patch to `out-refs/`.
 
 The evaluations call the model and take minutes:
 
@@ -205,7 +205,8 @@ What keeps it safe:
 - **Repair or ask is decided on a fact, not on how sure the model sounded.** For an answer of a finder agent, code compares the text the reference showed before (from the previous version) with the text at the new target. Word for word the same: repaired. Any difference: the author is asked, with both texts. Where the texts cannot be read, a second run of the finder must name the same target without doubt.
 - **The reviewer runs on another model** than the finder (`REFHEAL_REVIEWER_MODEL`; by default Sonnet reviews what the default model found). Both are Claude models.
 - **It remembers what its agents found.** A finding is kept (`out/agent-findings.json`) and used again while the broken value, the text behind it and the file or maps it lives in are unchanged. A check after "Fix all" then pays only for the planner.
-- **It remembers what the planner decided.** A decision is kept with everything the planner saw for that broken target (value, number of references, the finding, the ways out, an author's answer). While all of that is the same, the next check uses the decision again without asking the planner, and code checks it again as it does a fresh one. One changed target in a round and the planner is asked for that round. Kept for 7 days; delete `out/agent-findings.json` to start fresh.
+- **It remembers what the planner decided.** A decision is kept with everything the planner saw for that broken target (value, number of references, the target and verdict of the finding, the ways out, an author's answer). While all of that is the same, the next check uses the decision again without asking the planner, and code checks it again as it does a fresh one. One changed target in a round and the planner is asked for that round. Kept for 7 days; delete `out/agent-findings.json` to start fresh.
+- **It keeps an audit record.** Whatever an author applies from the panel ("Fix all", "Apply to all N", "Replace link", a candidate, a way out) is recorded per reference: when, who was signed in, file and place, what the reference was and became, what settled it (version history, which agent), the reason, and the text before and after. "Download audit record" in the "Repaired" list gives it as a CSV file (`GET /audit?map=…&format=csv`). Checked in AEM on 14 Nov 2026: after one "Fix all" the record had 710 references in 220 files, and for 710 of 710 the new value was in the file in AEM, last modified by the same user. The record is what the editor reported to the sidecar on this machine; it is not tamper-proof, and AEM's versions stay the authority. A second approver is not built.
 - **One answer per reference where two pieces could be meant.** When a finder returns two candidates, one more model call reads the sentence around every reference and proposes the candidate that topic needs. Such a group is always for review.
 - **A budget.** Finder agents take the 40 broken targets with the most references per check (`REFHEAL_MAX_GROUPS`); the rest say so in their row and wait for the next check, which reuses what is already found.
 - **It learns from the author.** An accepted repair is stored and used in the next check without asking. The rename behind it is stored too, so the same old target reached through another attribute (an `xref` to an element whose `conref` was answered) needs no second question. Candidates the author passed over are not proposed again. "Forget this answer" in the compare box takes an answer back.
@@ -223,7 +224,7 @@ What keeps it safe:
 | The fixed pipeline on the same 1,251 references (`planeval.py --mode pipeline`) | 0 wrong, 0 missed. Applied 895, 949 and 895. 70 to 74 s per run. | `eval/refs/pipeline-eval.json` |
 | Nine references with two plausible targets each (`rankeval.py`, 2 runs) | The right target was proposed first for **9 of 9** in both runs; none was applied without asking. With one answer per broken target it was 8 of 9: two topics shared one old target and meant different pieces. | `eval/refs/rank-eval.json`, `rank-eval-one-answer-per-target.json` |
 | Two checks in a row inside AEM (348 broken references, 11 targets for finder agents) | First check 135 s. Second check **55 s**: all 11 findings reused, only the planner ran. (Before the planner's decisions were remembered; see the next row.) | [docs/RUN.md](docs/RUN.md) |
-| Three checks in a row inside AEM on the unchanged sample (1,251 broken references, 34 targets), 14 Nov 2026 | First check **163 s** (the planner decided). Second **13 s** and third **11 s**: every finding and every planner decision reused, no model call; the report was the same (710 repairs, 432 to review, 109 gone). Not measured: the check after a "Fix all", where the remaining targets should be reused in the same way. | [docs/RUN.md](docs/RUN.md) |
+| Three checks in a row inside AEM on the unchanged sample (1,251 broken references, 34 targets), 14 Nov 2026 | First check **163 s** (the planner decided). Second **13 s** and third **11 s**: every finding and every planner decision reused, no model call; the report was the same (710 repairs, 432 to review, 109 gone). After "Fix all" (710 repairs written, 541 references left) the next check took **15 s**, again without a model call. | [docs/RUN.md](docs/RUN.md) |
 | The planner on the public DITA-OT docs with 15 seeded breaks (`refeval.py --mode planner`, 319 files) | 15 of 15 right, none wrong: 12 by rewriting references, 3 key renames by one edit at the source. **It took 47 minutes**: handed over as plain files, 475 references count as broken (most point at files the build generates), in 388 groups, and each group without a repair got a finder agent. | `eval/refs/real-docs-planner-eval.json` |
 | 32 references that are broken in the public DITA-OT docs (pipeline) | 14 repaired, 7 to review, 6 without a repair (27 groups) | [docs/EVAL-REFS.md](docs/EVAL-REFS.md) |
 | 15 seeded breaks with a known answer (pipeline) | 15 right | [docs/EVAL-REFS.md](docs/EVAL-REFS.md) |
@@ -247,6 +248,7 @@ Read the limits before quoting these:
 |---|---|
 | `refcheck.py` | Index of files, ids, keys and references; finds what does not resolve. Works on a folder or on files sent by a server (AEM's GUID file names included). |
 | `refplan.py` | The planner agent, its tools and its memory of author answers. This is what AEM calls. |
+| `audit.py` | The audit record: appends what an author applied, reads it back, writes the CSV. No model. |
 | `wayout.py` | What can be done about a reference whose content is gone: put it back, keep the text, remove the references. No model. |
 | `planeval.py` | Runs the planner (or with `--mode pipeline` the fixed pipeline) several times on the large sample and scores every answer against the known right one. |
 | `rankeval.py` | Scores the ranking on `samples/rank-demo`: nine references with two plausible targets each. |
@@ -257,7 +259,7 @@ Read the limits before quoting these:
 | `reporthtml.py` | Shared pieces of the HTML report `refheal.py` writes. |
 | `samples/` | `ref-demo` (8 files, 11 broken references), `gen_large.py` (writes the 225-file sample, with content for internal readers and a DITAVAL), `gen_rank.py` (nine two-candidate cases), `load_large_demo.sh` (loads or resets the large sample in the local AEM and gives its "AEM Sites" output the DITAVAL filter), `set_output_filter.py`. |
 | `eval/` | Saved inputs and answers of the evaluations. |
-| `tests/` | `python3 -m unittest discover -s tests` (64 tests, no network, no model). |
+| `tests/` | `python3 -m unittest discover -s tests` (73 tests, no network, no model). |
 | `docs/` | `RUN.md` start and demo steps, `DEMO.md` the 5-minute script, `EVAL-REFS.md` the evaluation on public documentation. |
 
 ## Product code
@@ -267,7 +269,7 @@ On local branches named `garage/fact-conflict-rule` (the name is left over from 
 | Repository | What changed |
 |---|---|
 | `~/starling`, `core/content-health` | `BrokenLinkValidationRule` sends the map's files and their previous versions to `ReferenceRepairAdvisor` and attaches repairs, source fixes and the planner's plan to its findings. Findings carry `suggestedValue`, `suggestionType`, `suggestionLabel`, `suggestionSource`. It also sends AEM's own list of broken references and the files outside the map that use the changed files. The module's unit tests pass. |
-| `~/xmleditor` | Report rows show the repair, who settled it (planner, finder agent, version history, rule) and "Replace link". A bar above the rows gives the counts, the "AI repair plan" and "Fix all". The compare box applies a candidate, remembers the ones passed over and can forget an earlier answer; "Fix all" reports what it wrote to the sidecar. Type-check and the 599 Content Health tests pass. |
+| `~/xmleditor` | Report rows show the repair, who settled it (planner, finder agent, version history, rule) and "Replace link". A bar above the rows gives the counts, the "AI repair plan" and "Fix all". The compare box applies a candidate, remembers the ones passed over and can forget an earlier answer; "Fix all" reports what it wrote to the sidecar. Type-check and the 604 Content Health tests pass. |
 
 The rules reach the agent through a local HTTP sidecar. A product version would call the Guides AI service instead.
 
