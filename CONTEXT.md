@@ -26,6 +26,7 @@ Judging criteria, in the organisers' words: agentic workflow (task decomposition
 | 14 Nov | **The agent does not start by itself when someone renames an id or key.** It runs from a Health check only | The owner decided against it ("ye to nhi karenge"). Do not build or propose a rename-time trigger |
 | 14 Nov | The "Fix all" button keeps the product's plain blue style; only the AI entry point looks like the product's AI Assistant button | The owner asked for it |
 | 14 Nov | Repairs in topics are written as the editor's own Track Changes marks | The owner's idea; every repair is then visible in the document and can be accepted or rejected there |
+| 15 Nov | **No Track Changes marks.** Repairs and ways out are written plainly | The owner: with marks the manual work is the same (220 topics to open and accept), and the audit record already says what changed. Do not bring the marks back unasked
 | 14 Nov | Everything shown in the editor uses the editor's own components, icons and highlight | "Editor UI se consistent honi chahiye" |
 | 14 Nov | **External (web) links are out.** The rule that checked them, its repair agent, its evaluation and its documents were removed from all three code bases | The owner: not impactful enough for the idea. Do not bring it back unasked |
 
@@ -62,7 +63,7 @@ AEM Guides, Content Health job
         v
   editor, Health check panel (TypeScript)
      live list of agents at work, plan, rows with repair and source, compare box with candidates
-     and per-output counts, Fix all / Apply to all / Replace link, Repaired list, Track Changes marks
+     and per-output counts, Fix all / Apply to all / Replace link, Repaired list, audit record
 ```
 
 What the agent keeps between checks, in `out/` next to the sidecar (not in git):
@@ -122,7 +123,7 @@ Each of these cost time. They are facts about the local AEM on 14 Nov 2026, not 
 8. **The Guides far must be installed after the SDK's first start.** Before it, the repository breaks.
 9. **Feature flag overrides need `dxml.publishing.local.dev.mode=true`.**
 10. **Build with the `aemaacs` profile**, or the bundle stays "Installed".
-11. **The editor's highlight holds one element at a time.** Marking every repair in a topic at once is done through Track Changes marks instead: `<?tcx-delete content="…" reviewer reviewid time?>` and `<?tcx-insert-start …?>…<?tcx-insert-end?>`.
+11. **The editor's highlight holds one element at a time.** The "Repaired" list opens one repaired reference at a time for that reason. (Marking every repair in a topic at once was done through Track Changes marks until 15 Nov 2026; their format is `<?tcx-delete content="…" reviewer reviewid time?>` and `<?tcx-insert-start …?>…<?tcx-insert-end?>`, in case it is needed again.)
 12. **Output presets come from `/bin/guides/presets?mapPath=…&type=PATH`** (`localPresets`, `globalPresets`), each with `ditaValType`, `ditaValPathList`, `cpName`. Reading the map's `jcr:content/presets` node returns nothing for the default presets.
 14. **A repaired file that is open in a tab keeps showing its old content**, and saving that tab undoes the repair. The repair closes the tab, as the editor's own Find and Replace in files does, and leaves a file with unsaved edits alone.
 15. **Uploading a new asset to `folder/.createasset.html` fails** (the asset would be named `folder//file`); it only works when the asset exists. The loader posts to `folder.createasset.html` for files at the top.
@@ -141,14 +142,14 @@ Read the "Measured" table and the limits in the README. The short version, to ke
 
 ## State on 14 Nov 2026
 
-- Tests: 77 here, 626 in the editor's Content Health folders, and the Java module's tests pass.
+- Tests: 77 here, 628 in the editor's Content Health folders, and the Java module's tests pass.
 - The local AEM holds `/content/dam/large-demo` (after a "Fix all": 492 findings left), `/content/dam/large-demo-outside`, `/content/dam/ref-demo`.
 - All four capabilities of the idea text have been seen working inside AEM.
 
 ## Open, in the order it would help a customer
 
 1. **Content that was deleted** (109 references in the sample): built on 14 Nov 2026. `wayout.py` works out the possible ways (put it back, keep the text in the topics, remove the references), the planner suggests one, the author applies it from the compare box (`way_out.ts`). Removing is never offered for safety content. Open: the planner's suggestion is not scored by an evaluation yet (three removed pieces are too few to call it measured), and a way out that was applied is not remembered for the next check.
-2. **A switch to write repairs without Track Changes marks** is missing. (Accept and Reject on the marks were tried on 14 Nov 2026 in the editor's "Tracked changes" panel: Reject put the old, broken reference back and removed the repaired one; Accept kept the repaired one. Both leave the topic with unsaved edits, as any edit does.)
+2. **Track Changes marks**: removed on 15 Nov 2026; repairs are written plainly (`element_edit.ts`, `fix_all.ts`). Open: not checked how a topic that already holds an author's own tracked change publishes after a repair in it; an element that holds such a change is not taken out or replaced.
 3. **The second check took 55 seconds**: done on 14 Nov 2026. The planner's decisions are remembered per broken target (`Session.replay`, `_decision_key` in `refplan.py`), resting on the facts of a finding, not its wording; a finding about a key rests on the maps' key definitions, not the whole map. In AEM: an unchanged map 11 to 13 s, the check after "Fix all" 15 s, both without a model call. Open: a decision the planner would make differently today stays for 7 days unless what it saw changes.
 4. **Audit record**: built on 14 Nov 2026 (`audit.py`, editor `audit.ts`, button "Download audit record"). Open: a second approver; the record lives in `out/audit-log.jsonl` on the sidecar's machine and takes the user's name from the browser, so it is a prototype of the report, not evidence that holds up by itself; edits at the source made by "Fix all" were not checked in the record.
 4. **Scale.** The budget of 40 targets per check is unit-tested only. References to files a build generates count as broken when content comes as plain files.

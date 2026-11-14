@@ -167,13 +167,13 @@ In the editor's Health check panel, each broken reference comes with one of thre
 | Repair to review | A target was found, with a stated doubt | Read the doubt, then "Replace link" |
 | No repair found | The content is gone. The row says what it was and suggests a way out | Open the row: put the piece back (one edit), keep the text in the topics, or remove the references |
 
-**When the content is gone, the agent does not stop at "broken".** It works out which ways out are possible and the planner suggests one, with its reason. The author chooses, and every way is written as Track Changes marks:
+**When the content is gone, the agent does not stop at "broken".** It works out which ways out are possible and the planner suggests one, with its reason. The author chooses:
 
 | Way out | What is written | When the planner suggests it |
 |---|---|---|
-| Put it back | The piece from the previous version goes back where it lived, as one tracked insertion in the shared file. References that pointed at a renamed key follow it | The removal looks like a mistake, or the piece is safety content |
+| Put it back | The piece from the previous version goes back where it lived, as one edit in the shared file. References that pointed at a renamed key follow it | The removal looks like a mistake, or the piece is safety content |
 | Keep the text in the topics | Each reference is replaced by the text itself, without its id | The shared piece should stay removed but the topics still need the sentence |
-| Remove the references | Each reference is taken out, as a tracked deletion | The text is out of date |
+| Remove the references | Each reference is taken out | The text is out of date |
 
 **Safety content** (a `note` of type warning, danger or caution, or a hazard statement): removing its references is not offered, and code refuses that decision if the planner makes it. One piece is often reached in two ways (by conref and through a key); putting it back settles the rows of both.
 
@@ -199,7 +199,7 @@ What keeps it safe:
 - Code checks each decision: a repair must have passed the reviewer, an edit at the source must not break a reference that works, a finder may only name targets a tool showed it, and a conref target must be the same element type.
 - If the planner fails or stops early, undecided groups get the cautious default (repair when proven, otherwise ask the author).
 - The report shows what the planner did and why, in short plain steps (the "AI repair plan" button).
-- **Every repair in a topic is written as a tracked change**, in the format of the editor's own Track Changes: the old element as a deletion, the repaired one as an insertion, under the name of what settled it ("AI finder agent", "Version history"). The author sees each repair in the document and accepts or rejects it with the editor's review tools. Seen in AEM on 48 references; a check afterwards (388 findings, as expected) did not trip over the marks. Maps, and ids or key names put back, are rewritten plainly.
+- **Repairs are written plainly, without Track Changes marks** (decided on 15 Nov 2026). They were first written as tracked deletions and insertions; that left 220 topics to open and accept, which is the manual work the repair was meant to save. What changed is on record three other ways: the audit record (what it was, what it became, who accepted it), the "Repaired" list, which opens each changed reference in the editor with the editor's own outline around it, and a new version of every changed file, to go back to. Read back from AEM after one "Fix all": 710 of 710 references repaired in 220 files, none with a mark.
 - The report keeps a "Repaired (N)" list. Selecting a row opens the topic at that element with the editor's own outline around it. A report that is older than a repair no longer lists the repaired reference.
 - While a check runs, the panel shows the agents at work as a list, in the same list and with the same icons as the results: one row per step, a spinner while an agent works, a tick with its answer when it is done.
 - **Repair or ask is decided on a fact, not on how sure the model sounded.** For an answer of a finder agent, code compares the text the reference showed before (from the previous version) with the text at the new target. Word for word the same: repaired. Any difference: the author is asked, with both texts. Where the texts cannot be read, a second run of the finder must name the same target without doubt.
@@ -274,7 +274,7 @@ On local branches named `garage/reference-healer`. Nothing is pushed.
 | Repository | What changed |
 |---|---|
 | `~/starling`, `core/content-health` | `BrokenLinkValidationRule` sends the map's files and their previous versions to `ReferenceRepairAdvisor` and attaches repairs, source fixes and the planner's plan to its findings. Findings carry `suggestedValue`, `suggestionType`, `suggestionLabel`, `suggestionSource`. It also sends AEM's own list of broken references and the files outside the map that use the changed files. The module's unit tests pass. |
-| `~/xmleditor` | Report rows show the repair, who settled it (planner, finder agent, version history, rule) and "Replace link". A bar above the rows gives the counts, the "AI repair plan" and "Fix all". The compare box applies a candidate, remembers the ones passed over and can forget an earlier answer; "Fix all" reports what it wrote to the sidecar. Type-check and the 626 Content Health tests pass (and the editor's whole suite, 25,570 tests, on 15 Nov 2026). |
+| `~/xmleditor` | Report rows show the repair, who settled it (planner, finder agent, version history, rule) and "Replace link". A bar above the rows gives the counts, the "AI repair plan" and "Fix all". The compare box applies a candidate, remembers the ones passed over and can forget an earlier answer; "Fix all" reports what it wrote to the sidecar. Type-check and the 628 Content Health tests pass (and the editor's whole suite, 25,570 tests, on 15 Nov 2026). |
 
 The rules reach the agent through a local HTTP sidecar. A product version would call the Guides AI service instead.
 

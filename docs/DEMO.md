@@ -44,7 +44,7 @@ What is left: the references the planner asked about and the ones with nothing t
 
 ## 4b. Content that is gone (45 s)
 
-Open a "No repair found" row. The planner suggests a way out and says why: for the paragraph about the old settings page ("until the end of the year") it suggests removing the 63 references; for the caution note it suggests putting it back, and removing is not offered because it is safety content. Press "Put it back (1 edit)" twice: one tracked insertion in `warnings.dita`, and the rows of both ways that reach the note leave the list.
+Open a "No repair found" row. The planner suggests a way out and says why: for the paragraph about the old settings page ("until the end of the year") it suggests removing the 63 references; for the caution note it suggests putting it back, and removing is not offered because it is safety content. Press "Put it back (1 edit)" twice: one edit in `warnings.dita`, and the rows of both ways that reach the note leave the list.
 
 ## 4c. The record (20 s)
 
@@ -60,6 +60,7 @@ The planner cannot write to the repository; it works on a copy, and a person pre
 
 ## If asked
 
+- **Why are the repairs not tracked changes?** They were. 220 topics then had to be opened and accepted, which is the work this was meant to save. The audit record, the "Repaired" list and a version per file say what changed.
 - **Is this in the product?** It runs in a local AEM built from a branch: inside the real Content Health job, in the real report panel, with the real editor. It is a prototype, not reviewed or merged.
 - **What does the planner add over a fixed pipeline?** Not accuracy on this sample: the fixed pipeline also made no wrong repair, in half the time. The planner adds the plan with reasons, the re-check on a copy, the memory of answers, and the look back at what the last "Fix all" did.
 - **Why did it ask about 432?** It repairs by itself only when the text at the new target is word for word what the reference showed before. Any change of wording is a question, with both texts.

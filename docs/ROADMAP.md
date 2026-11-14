@@ -22,7 +22,7 @@ The question asked was: think like a technical writer at a company such as KONE,
 | Equipment: "If I fix 220 topics, do I pay to translate 220 topics again?" | Not considered | The planner does not weigh translation cost when it chooses between rewriting references and one edit at the source |
 | Standards: "Is this reference broken in the release we published in May, or only in the working copy?" | The check runs on the map as it is now | No baseline or release awareness |
 | Standards: "The key for a term was renamed. Which other standards books use it?" | Files outside the map that point into the changed files are counted | Other maps are named, not repaired; keys used across maps are not followed |
-| Bank: "Show the auditor every reference that was changed, who accepted it, and the evidence" | Each repair is a version with a comment, and a Track Changes mark with who settled it | No report of it; no second approver; "who" is the agent's name, not the person who pressed the button |
+| Bank: "Show the auditor every reference that was changed, who accepted it, and the evidence" | Each repair is a version with a comment, and a line in the audit record with who settled it and who accepted it | No report of it; no second approver; "who" is the agent's name, not the person who pressed the button |
 | All three: "The content is gone. What do I do now?" | "No repair found", with the old text | The agent stops where the writer's work starts |
 
 ## The plan, in the order it would help
@@ -92,7 +92,7 @@ Needs: the editor knows the signed-in user; the sidecar gets it with the feedbac
 - Condition presets, `ditavalref` and flagging in the per-output counts.
 - ~~The planner's decisions remembered like the findings~~ Built on 14 Nov 2026: a second check of an unchanged map takes 11 to 13 s in AEM instead of 55, and the check after "Fix all" 15 s.
 - The 40-target budget tried on a set with hundreds of targets.
-- A switch to write repairs without Track Changes marks, for teams that do not use them.
+- ~~A switch to write repairs without Track Changes marks~~ Decided on 15 Nov 2026: no marks at all; the audit record, the "Repaired" list and the versions say what changed.
 
 ## Not planned, on purpose
 
