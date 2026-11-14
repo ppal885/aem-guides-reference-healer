@@ -286,6 +286,8 @@ class Session:
         self.max_groups = MAX_GROUPS if max_groups is None else max_groups
         self.choose = choose or self._ask_which_candidate
         self.reused = 0                         # findings taken from the cache in this check
+        self.decided_keys = set()               # what the decisions of this check rest on (see _decision_key)
+        self.replaying = False                  # True while earlier decisions are used again
         self.memory = _memory(memory or {})
         # What the repository itself reports as broken: {(file, attribute, value)}, or None when not told.
         self.reported = None if reported is None else {
@@ -658,6 +660,45 @@ class Session:
         return {int(c["reference"]): int(c["candidate"]) for c in answer.get("choices") or []
                 if str(c.get("reference", "")).isdigit() and str(c.get("candidate", "")).isdigit()}
 
+    # ---- the planner's own decisions, remembered ------------------------------------------------
+
+    def _decision_key(self, group):
+        """Changes whenever the planner would see something else for this group: another value, another
+        number of references, another finding, another way out, another answer of an author."""
+        seen = {k: v for k, v in self._describe(group).items() if k not in ("id", "decided")}
+        return "decision:" + hashlib.sha1(json.dumps(seen, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+    def _earlier_decision(self, group):
+        entry = (self.cache or {}).get(self._decision_key(group))
+        if not entry or time.time() - entry.get("when", 0) > CACHE_DAYS * 86400:
+            return None
+        return entry
+
+    def replay(self):
+        """Settles rounds without the planner while it decided every group of the round before and
+        nothing it saw has changed. Code checks each decision again. Returns how many groups."""
+        settled = 0
+        while self.cache and self.current["groups"] and len(self.rounds) <= MAX_ROUNDS:
+            groups = self.current["groups"]
+            if any(g["known"] and not self._earlier_decision(g) for g in groups.values()):
+                break
+            unknown = [g["id"] for g in groups.values() if not g["known"]]
+            if unknown:
+                self.tool_investigate({"group_ids": unknown})
+            earlier = {g["id"]: self._earlier_decision(g) for g in groups.values()}
+            if not all(earlier.values()):
+                break
+            self.replaying = True
+            by_decision = {}
+            for group_id, entry in earlier.items():
+                by_decision.setdefault((entry["decision"], entry["reason"]), []).append(group_id)
+            for (decision, reason), ids in by_decision.items():
+                self.tool_decide({"decision": decision, "reason": reason, "group_ids": ids})
+            self.replaying = False
+            settled += len(groups)
+            self.tool_apply_and_recheck({})
+        return settled
+
     def _check_decision(self, group, action):
         """None when the action is allowed for the group, else why not."""
         known = group["known"]
@@ -697,8 +738,12 @@ class Session:
             if problem:
                 rejected[group_id] = problem
                 continue
+            key = self._decision_key(group)
             group["decision"], group["reason"] = action, reason
             accepted.append(group_id)
+            self.decided_keys.add(key)
+            if self.cache is not None and not self.replaying:
+                self.cache[key] = {"when": time.time(), "decision": action, "reason": reason}
         if accepted:
             references = sum(len(self.current["groups"][i]["refs"]) for i in accepted)
             self.plan.append("%s Why: %s" % ({
@@ -1024,6 +1069,27 @@ class Session:
         return list(merged.values())
 
 
+def _ask_planner(session, backend, model, log, progress):
+    """Lets the planner agent settle what is open. Returns its steps."""
+    groups = session.current["groups"]
+    session.step("planner", "active", "Planner agent", "Reading the broken references and planning")
+    progress("Planner agent is reading %d broken references in %d groups." % (
+        sum(len(g["refs"]) for g in groups.values()), len(groups)))
+    task = ("The map has %d broken references in %d groups. Repair what can be repaired safely and tell the author "
+            "what is left. Start with overview." % (sum(len(g["refs"]) for g in groups.values()), len(groups)))
+    answer, steps, problem = agentloop.run(PLANNER_SYSTEM, task, session.tools(), FINISH, backend=backend, model=model,
+                                           max_calls=MAX_PLANNER_CALLS, log=log)
+    if problem:
+        log("planner stopped: %s" % problem)
+        session.plan.append("The planner stopped early (%s). What it had not decided got the safe default: repair when "
+                            "proven, otherwise ask you." % problem)
+    else:
+        session.summary = "Next: " + _whole_sentences(answer["summary"], 260)
+    session.step("planner", "done", "Planner agent", "Planned in %s" % _count(len(steps), "step") if not problem
+                 else "Stopped early; the safe default is used for what it had not decided")
+    return steps
+
+
 def plan_files(payload, backend="cli", model=None, log=print, progress=None, memory=None, timeline=None):
     """For a repository server. Same input and output as refheal.heal_files, plus "plan".
 
@@ -1087,26 +1153,27 @@ def plan_files(payload, backend="cli", model=None, log=print, progress=None, mem
         session.step("history", "done", "Version history", "Proved %s from the previous versions, no AI" % _count(proven, "rename"))
     if recalled:
         session.step("memory", "done", "Memory", "Reused %s an author gave in an earlier check" % _count(recalled, "answer"))
-    session.step("planner", "active", "Planner agent", "Reading the broken references and planning")
-    progress("Planner agent is reading %d broken references in %d groups." % (
-        sum(len(g["refs"]) for g in first.values()), len(first)))
-    task = ("The map has %d broken references in %d groups. Repair what can be repaired safely and tell the author "
-            "what is left. Start with overview." % (sum(len(g["refs"]) for g in first.values()), len(first)))
-    answer, steps, problem = agentloop.run(PLANNER_SYSTEM, task, session.tools(), FINISH, backend=backend, model=model,
-                                           max_calls=MAX_PLANNER_CALLS, log=log)
-    if problem:
-        log("planner stopped: %s" % problem)
-        session.plan.append("The planner stopped early (%s). What it had not decided got the safe default: repair when "
-                            "proven, otherwise ask you." % problem)
+    at = len(session.plan)
+    replayed = session.replay()
+    if replayed:
+        session.plan.insert(at, "Nothing changed for %s since an earlier check, so I kept the decisions I made then%s." % (
+            _count(replayed, "broken target"), "" if session.current["groups"] else "; the planner agent was not asked again"))
+        session.step("planner-memory", "done", "Memory", "Reused the planner's decisions for %s, each checked again by code"
+                     % _count(replayed, "broken target"))
+    steps = []
+    if session.current["groups"]:
+        steps = _ask_planner(session, backend, model, log, progress)
+        if stored and session.cache is not None and session.summary:
+            session.cache["summary"] = {"when": time.time(), "text": session.summary, "for": sorted(session.decided_keys)}
     else:
-        session.summary = "Next: " + _whole_sentences(answer["summary"], 260)
-    session.step("planner", "done", "Planner agent", "Planned in %s" % _count(len(steps), "step") if not problem
-                 else "Stopped early; the safe default is used for what it had not decided")
+        kept = (session.cache or {}).get("summary") or {}
+        if kept.get("for") == sorted(session.decided_keys):
+            session.summary = kept["text"]
     progress("Planner finished. Building the report.")
     session.finish_unfinished()
     if stored and session.cache is not None:
         _write(CACHE_PATH, session.cache)
     out = session.result()
-    out["stats"].update(planner_steps=len(steps), seconds=round(time.time() - started),
+    out["stats"].update(planner_steps=len(steps), planner_decisions_reused=replayed, seconds=round(time.time() - started),
                         findings_reused_from_an_earlier_check=session.reused)
     return out

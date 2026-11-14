@@ -88,7 +88,7 @@ Needs: the editor knows the signed-in user; the sidecar gets it with the feedbac
 ### 7. Finish what is half done
 
 - Condition presets, `ditavalref` and flagging in the per-output counts.
-- The planner's decisions remembered like the findings, so a second check is seconds, not 55.
+- ~~The planner's decisions remembered like the findings~~ Built on 14 Nov 2026: a second check of an unchanged map takes 11 to 13 s in AEM instead of 55.
 - The 40-target budget tried on a set with hundreds of targets.
 - A switch to write repairs without Track Changes marks, for teams that do not use them.
 
