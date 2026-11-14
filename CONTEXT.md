@@ -87,7 +87,7 @@ On a local branch `garage/fact-conflict-rule` (the name is left over from the dr
 | `e264c86fc7` | carries the planner's plan and choices |
 | `1d55f0fa91` | ranked candidates, previous versions from JCR, the key definition the report misses |
 | `707f9fd09b` | sends AEM's own findings and outside usage; asks the advisor also when the report is empty |
-| not committed on 14 Nov | removes the external links rule, its checker and its advisor client |
+| `d9b3094336` | removes the external links rule, its checker and its advisor client |
 
 `xmleditor`, on top of `3e4ffca619`:
 
@@ -100,7 +100,7 @@ On a local branch `garage/fact-conflict-rule` (the name is left over from the dr
 | `aab9966c3b` | live list of the agents at work |
 | `98042962aa` | repairs as Track Changes marks; the Repaired list |
 | `5c4199c21b` | per-output counts from DITAVAL filters |
-| not committed on 14 Nov | a row's "Replace link" takes its finding off the list and the counts; the external links rule is removed from the editor |
+| `4b3e8b0715` | removes external links from the editor; a row's "Replace link" takes its finding off the list and the counts; four "Fix all" bugs fixed (see docs/ROADMAP.md) |
 
 ## What was learned about AEM Guides
 
