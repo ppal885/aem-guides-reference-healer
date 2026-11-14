@@ -1,0 +1,118 @@
+{
+  "pieces": {
+    "slow": {
+      "was": "<note id=\"slow\" type=\"caution\">This operation can take up to an hour for large resources.</note>",
+      "plausible": [
+        "restore"
+      ],
+      "safety": true
+    },
+    "power": {
+      "was": "<note id=\"power\" type=\"danger\">Disconnect the power supply before you open the housing.</note>",
+      "plausible": [
+        "restore"
+      ],
+      "safety": true
+    },
+    "hot": {
+      "was": "<hazardstatement id=\"hot\" type=\"warning\"><messagepanel><typeofhazard>Hot plate</typeofhazard><howtoavoid>Let the unit cool for ten minutes before you touch it.</howtoavoid></messagepanel></hazardstatement>",
+      "plausible": [
+        "restore"
+      ],
+      "safety": true
+    },
+    "data-loss": {
+      "was": "<note id=\"data-loss\" type=\"warning\">Deleting a workspace removes all of its projects. This cannot be undone.</note>",
+      "plausible": [
+        "restore"
+      ],
+      "safety": true
+    },
+    "legacy-ui": {
+      "was": "<p id=\"legacy-ui\">The old settings page is still available until the end of March.</p>",
+      "plausible": [
+        "remove"
+      ],
+      "safety": false
+    },
+    "webinar": {
+      "was": "<p id=\"webinar\">Join the launch webinar on 12 May to see the new dashboard.</p>",
+      "plausible": [
+        "remove"
+      ],
+      "safety": false
+    },
+    "beta": {
+      "was": "<note id=\"beta\">This feature is in beta until version 2.0 is released.</note>",
+      "plausible": [
+        "remove"
+      ],
+      "safety": false
+    },
+    "old-importer": {
+      "was": "<p id=\"old-importer\">Use the legacy importer, which is deprecated and will be removed in version 3.</p>",
+      "plausible": [
+        "inline",
+        "remove"
+      ],
+      "safety": false
+    },
+    "definition": {
+      "was": "<p id=\"definition\">A workspace is a container for projects and their members.</p>",
+      "plausible": [
+        "inline",
+        "restore"
+      ],
+      "safety": false
+    },
+    "support-hours": {
+      "was": "<p id=\"support-hours\">Support is available on working days from 8:00 to 18:00 CET.</p>",
+      "plausible": [
+        "inline",
+        "restore"
+      ],
+      "safety": false
+    }
+  },
+  "runs": [
+    {
+      "run": 1,
+      "seconds": 135,
+      "scores": {
+        "right": 10
+      },
+      "suggested": {
+        "slow": "restore",
+        "power": "restore",
+        "hot": "restore",
+        "data-loss": "restore",
+        "legacy-ui": "remove",
+        "webinar": "remove",
+        "beta": "remove",
+        "old-importer": "remove",
+        "definition": "restore",
+        "support-hours": "restore"
+      }
+    },
+    {
+      "run": 2,
+      "seconds": 137,
+      "scores": {
+        "right": 10
+      },
+      "suggested": {
+        "slow": "restore",
+        "power": "restore",
+        "hot": "restore",
+        "data-loss": "restore",
+        "legacy-ui": "remove",
+        "webinar": "remove",
+        "beta": "remove",
+        "old-importer": "remove",
+        "definition": "restore",
+        "support-hours": "restore"
+      }
+    }
+  ],
+  "same_in_every_run": 10
+}

@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import refcheck  # noqa: E402
 import refheal  # noqa: E402
 import audit  # noqa: E402
+import wayouteval  # noqa: E402
 import refplan  # noqa: E402
 
 TOPIC = '<topic id="t"><title>Using it</title><body>%s</body></topic>'
@@ -687,6 +688,35 @@ class AuditRecord(unittest.TestCase):
             handle.write('{"file": "/d/cut\n')
         audit.record("/d/a.ditamap", "maria", [self.ENTRY], self.path)
         self.assertEqual(len(audit.entries(path=self.path)), 2)
+
+
+class WaysOutEvaluation(unittest.TestCase):
+    """The evaluation of the planner's suggestion scores what it should, without a model."""
+
+    def test_every_piece_is_gone_from_the_sample_and_two_topics_miss_it(self):
+        files = wayouteval.payload()["files"]
+        r = refcheck.Repo(files=[dict(f) for f in files])
+        missing = [ref["value"].rsplit("/", 1)[-1] for ref in r.broken() if not ref["generated"]]
+        self.assertEqual(sorted(set(missing)), sorted(wayouteval.PIECES))
+        self.assertEqual(len(missing), 2 * len(wayouteval.PIECES))
+
+    def test_removing_safety_content_is_never_right(self):
+        for name in wayouteval.SAFETY:
+            self.assertEqual(wayouteval.score(name, "remove"), "safety removed")
+            self.assertEqual(wayouteval.score(name, "restore"), "right")
+
+    def test_a_suggestion_outside_the_plausible_ways_is_listed_and_none_is_said(self):
+        self.assertEqual(wayouteval.score("webinar", "restore"), "other")
+        self.assertEqual(wayouteval.score("definition", "inline"), "right")
+        self.assertEqual(wayouteval.score("beta", None), "no suggestion")
+
+    def test_the_suggestion_is_read_from_the_planners_result(self):
+        out = {"repairs": [
+            {"old": "GUID-way-lib.dita#lib/slow", "verdict": "none", "detail": {"ways_out": {"recommended": {"kind": "restore"}}}},
+            {"old": "GUID-way-lib.dita#lib/beta", "verdict": "none", "detail": {"ways_out": {"recommended": None}}},
+            {"old": "GUID-way-lib.dita#lib/webinar", "verdict": "review", "detail": {}},
+            {"old": "GUID-way-lib.dita#lib/sign-in", "verdict": "fix", "detail": {}}]}
+        self.assertEqual(wayouteval.suggestions(out), {"slow": "restore", "beta": None, "webinar": "not gone: review"})
 
 
 class LiveView(unittest.TestCase):
