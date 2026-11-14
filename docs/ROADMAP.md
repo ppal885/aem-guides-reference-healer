@@ -110,8 +110,10 @@ Fixed, with tests:
 | "Fix all" | A reference inside an element that was itself repaired kept its old value | Nested reuse |
 | Report | A row's "Replace link" left the row in the list and the counts unchanged | Everyone |
 
-Seen and not fixed:
+Seen first, fixed later the same day:
 
-- In a narrow panel "Replace link" is half hidden at the right edge and easy to miss.
-- The live progress line comes from one sidecar for all maps: while two checks run, each panel shows the other's line.
-- After "Fix all" with an edit at the source, AEM lists the key references for more than ten minutes.
+| What | Fix |
+|---|---|
+| In a narrow panel "Replace link" was half hidden at the right edge | The row now stays inside its list cell (its padding was added to a 100% width), the title and the suggestion give way first, and the summary buttons wrap. Measured in a 262 px wide list: every row's last action ends inside the list |
+| The live progress came from one place for all maps, so two checks showed each other's line | AEM sends the map's path; the sidecar keeps progress per map and the panel asks for its own (`GET /progress?map=`). Seen: while one map's check ran, another map's progress stayed empty |
+| After "Fix all" with an edit at the source, AEM listed the key references for more than ten minutes, as findings | AEM's speed is not ours to change. Those references are now marked as waiting: they are counted in one line ("198 more are repaired and waiting for AEM to index the change") and not listed as findings. Seen in AEM after a "Fix all" with ten edits at the source |

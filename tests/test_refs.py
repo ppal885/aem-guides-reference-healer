@@ -359,7 +359,7 @@ class Learning(unittest.TestCase):
         self.assertEqual((failed, finished), ([], False))
         self.assertIn("1 repair saved and resolves", lines[0])
         self.assertIn("1 repair from the last Fix all did not reach the repository", lines[1])
-        self.assertIn("may not have indexed", lines[2])
+        self.assertIn("has not indexed the change yet", lines[2])
         session = self.session(files, reported=reported)
         lines, failed, finished = session.look_back(dict(applied, checks=1), now=1000 + refplan.SETTLE_SECONDS)
         self.assertEqual((failed, finished), ([("conref", "GUID-lib.dita#lib/help", "GUID-lib.dita#lib/other")], True))
@@ -378,6 +378,9 @@ class Learning(unittest.TestCase):
         self.assertIn("does not hold in AEM", lines[-1])
         early = self.session(files, reported=reported)
         self.assertEqual((early.look_back(applied, now=1100)[2], early.distrust), (False, []))
+        # Until AEM has indexed the edit, the references it repaired are waiting, not findings.
+        self.assertEqual([(r["verdict"], r["reason"][:30]) for r in early.result()["repairs"] if r["stage"] == "planner"],
+                         [("pending", "Repaired by the last Fix all. ")])
         r = RepairsWithoutAModel
         learned = refplan.Session([
             {"id": "GUID-lib", "path": "/d/lib.dita", "xml": r.LIB_NEW, "previous": [r.LIB_OLD]},
@@ -392,6 +395,101 @@ class Learning(unittest.TestCase):
         group = session.tool_overview({})["groups"][0]
         self.assertEqual(group["also_used_from_files_outside_this_map"], 2)
         self.assertEqual(session.result()["repairs"][0]["detail"]["outside"], ["a.dita", "b.dita"])
+
+
+class RememberedFindings(unittest.TestCase):
+    """What finder agents found is kept between checks, the biggest causes go first, and one
+    broken target that two topics mean differently gets an answer per topic."""
+
+    LIB = ('<topic id="lib"><title>Lib</title><body><note id="before-upgrade">Back up before you upgrade.</note>'
+           '<note id="retention">Backups are kept for 30 days.</note></body></topic>')
+    OLD = '<topic id="lib"><title>Lib</title><body><note id="backup">Back up before you upgrade. Kept for 30 days.</note></body></topic>'
+
+    def files(self, lib=None):
+        topic = '<topic id="%s"><title>%s</title><body><p>%s</p><note conref="GUID-lib.dita#lib/backup"/></body></topic>'
+        return [{"id": "GUID-lib", "path": "/d/lib.dita", "xml": lib or self.LIB, "previous": [self.OLD]},
+                {"id": "GUID-t1", "path": "/d/t1.dita", "xml": topic % ("t1", "Upgrade", "Before you upgrade:"), "previous": []},
+                {"id": "GUID-t2", "path": "/d/t2.dita", "xml": topic % ("t2", "Retention", "Old backups are removed."), "previous": []}]
+
+    def found(self, group):
+        """What a finder agent would have answered, put where the session keeps it."""
+        group["known"] = {"new_value": "GUID-lib.dita#lib/before-upgrade", "verdict": "review", "how": "finder", "reason": "Split.",
+                          "caveat": "", "reviewer": True, "candidates": [
+                              {"new_value": "GUID-lib.dita#lib/before-upgrade", "likelihood": 60, "why": "First half."},
+                              {"new_value": "GUID-lib.dita#lib/retention", "likelihood": 35, "why": "Second half."}]}
+
+    def session(self, files=None, **more):
+        return refplan.Session(files or self.files(), log=lambda message: None, **more)
+
+    def test_each_reference_gets_the_candidate_its_own_sentence_asks_for(self):
+        asked = []
+
+        def choose(was, candidates, references):
+            asked.append((was, candidates, references))
+            return {r["reference"]: 2 if r["topic"] == "Retention" else 1 for r in references}
+
+        session = self.session(choose=choose)
+        group = session.current["groups"]["r1-g1"]
+        self.found(group)
+        session._settle(session.current["repo"], group)
+        self.assertEqual(len(asked[0][1]), 2)
+        self.assertEqual(asked[0][1][1]["shows_now"], "Backups are kept for 30 days.")
+        session.tool_decide({"group_ids": ["r1-g1"], "decision": "ask_author", "reason": "Split in two."})
+        session.tool_apply_and_recheck({})
+        proposed = {r["file"]: r["new"] for r in session.result()["repairs"]}
+        self.assertEqual(proposed, {"/d/t1.dita": "GUID-lib.dita#lib/before-upgrade", "/d/t2.dita": "GUID-lib.dita#lib/retention"})
+
+    def test_a_finding_is_used_again_until_what_it_rests_on_changes(self):
+        cache = {}
+        first = self.session(cache=cache, choose=lambda *a: {})
+        group = first.current["groups"]["r1-g1"]
+        self.found(group)
+        first._to_cache(first.current["repo"], group)
+        again = self.session(cache=cache, choose=lambda *a: {})
+        self.assertTrue(again._from_cache(again.current["repo"], again.current["groups"]["r1-g1"]))
+        self.assertEqual(again.current["groups"]["r1-g1"]["known"]["new_value"], "GUID-lib.dita#lib/before-upgrade")
+        changed = self.session(self.files(self.LIB.replace("30 days", "60 days")), cache=cache)
+        self.assertFalse(changed._from_cache(changed.current["repo"], changed.current["groups"]["r1-g1"]))
+
+    def test_a_search_that_broke_down_is_not_remembered(self):
+        cache = {}
+        session = self.session(cache=cache)
+        group = session.current["groups"]["r1-g1"]
+        self.found(group)
+        session._to_cache(session.current["repo"], group, failed=True)
+        self.assertEqual(cache, {})
+
+    def test_past_the_budget_the_targets_with_fewer_references_wait_and_say_so(self):
+        files = self.files() + [{"id": "GUID-t3", "path": "/d/t3.dita", "previous": [],
+                                 "xml": TOPIC % '<note conref="GUID-lib.dita#lib/other-gone"/>'}]
+        cache = {}
+        session = self.session(files, cache=cache, max_groups=0)
+        ids = list(session.current["groups"])
+        result = session.tool_investigate({"group_ids": ids})
+        self.assertEqual(result["waiting_for_the_next_check"], 2)
+        self.assertTrue(all("Not looked at in this check" in g["known"]["reason"] for g in session.current["groups"].values()))
+        self.assertIn("wait for the next check (3 references)", session.plan[-1])
+        self.assertEqual(cache, {})
+
+
+class LiveView(unittest.TestCase):
+    def test_every_change_of_who_does_what_is_sent_as_rows(self):
+        seen = []
+        r = RepairsWithoutAModel
+        session = refplan.Session([
+            {"id": "GUID-lib", "path": "/d/lib.dita", "xml": r.LIB_NEW, "previous": [r.LIB_OLD]},
+            {"id": "GUID-t1", "path": "/d/t1.dita", "xml": TOPIC % '<note conref="GUID-lib.dita#lib/hot"/>'}],
+            log=lambda message: None, timeline=seen.append)
+        group = session.tool_overview({})["groups"][0]["id"]
+        session.step("planner", "active", "Planner agent", "Reading")
+        session.tool_decide({"group_ids": [group], "decision": "repair_references", "reason": "Renamed."})
+        session.tool_apply_and_recheck({})
+        session.step("planner", "done", "Planner agent", "Planned")
+        last = {row["id"]: (row["state"], row["who"], row["text"]) for row in seen[-1]}
+        self.assertEqual(last["planner"], ("done", "Planner agent", "Planned"))
+        self.assertEqual(last["decide-1"], ("done", "Planner agent", "Decided: repair 1"))
+        self.assertEqual(last["recheck-1"][2], "Tried the plan on a copy: 1 reference works, 0 left for the author")
+        self.assertEqual([row["id"] for row in seen[-1]], ["planner", "decide-1", "recheck-1"])
 
 
 class Scanner(unittest.TestCase):
@@ -454,6 +552,17 @@ class Scanner(unittest.TestCase):
         self.assertEqual((inside["references"], inside["in_map"]), (1, [[]]))
         plain = by_topic["[]"]
         self.assertEqual(plain["in_map"], [[{"product": "pro"}], [{"audience": "partner"}]])
+
+
+class Progress(unittest.TestCase):
+    def test_each_map_has_its_own_progress(self):
+        import sidecar
+        sidecar.PROGRESS.clear()
+        sidecar.progress_of("/dam/a.ditamap").update(running=True, lines=["a"])
+        sidecar.progress_of("/dam/b.ditamap").update(running=True, lines=["b"])
+        self.assertEqual(sidecar.PROGRESS["/dam/a.ditamap"]["lines"], ["a"])
+        self.assertEqual(sidecar.PROGRESS["/dam/b.ditamap"]["lines"], ["b"])
+        self.assertEqual(sidecar.PROGRESS.get("/dam/none.ditamap", sidecar.IDLE)["running"], False)
 
 
 class LooseAnswers(unittest.TestCase):

@@ -7,7 +7,7 @@
     POST /heal-refs   the files of a map -> repairs, source fixes and the planner's plan
     POST /feedback    an author accepted a repair, or took an earlier answer back
     POST /applied     what "Fix all" wrote
-    GET  /progress    what the agents are doing right now
+    GET  /progress    what the agents are doing right now; ?map=<path> for one map's check
     GET  /memory      what the planner remembers of authors' answers
     GET  /health
 
@@ -19,6 +19,7 @@ import json
 import re
 import subprocess
 import tempfile
+import urllib.parse
 
 
 def _log(message):
@@ -59,11 +60,14 @@ def parse_json(text):
 
 
 # What the agents are doing right now, for the editor to show while a check runs (prototype only).
-PROGRESS = {"running": False, "lines": [], "timeline": []}
+# What the agents are doing, per map: {map path: {"running", "lines", "timeline"}}. Two checks on
+# two maps run side by side, and each editor panel asks for its own map.
+PROGRESS = {}
+IDLE = {"running": False, "lines": [], "timeline": []}
 
 
-def _progress(text):
-    PROGRESS["lines"] = (PROGRESS["lines"] + [text])[-12:]
+def progress_of(map_path):
+    return PROGRESS.setdefault(map_path or "", {"running": False, "lines": [], "timeline": []})
 
 
 def serve(port, model=None):
@@ -81,8 +85,9 @@ def serve(port, model=None):
             self.wfile.write(data)
 
         def do_GET(self):
-            if self.path == "/progress":
-                self.send_json(200, PROGRESS)
+            if self.path.split("?")[0] == "/progress":
+                query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+                self.send_json(200, PROGRESS.get((query.get("map") or [""])[0], IDLE))
             elif self.path == "/memory":
                 import refplan
                 self.send_json(200, refplan.load_memory())
@@ -129,12 +134,15 @@ def serve(port, model=None):
                     self.send_json(200, refheal.heal_files(payload, BACKEND, model, _log))
                     return
                 import refplan
-                PROGRESS.update(running=True, lines=[], timeline=[])
+                state = progress_of(payload.get("map"))
+                state.update(running=True, lines=[], timeline=[])
                 try:
-                    self.send_json(200, refplan.plan_files(payload, BACKEND, model, _log, _progress,
-                                                           timeline=lambda steps: PROGRESS.update(timeline=steps)))
+                    self.send_json(200, refplan.plan_files(
+                        payload, BACKEND, model, _log,
+                        lambda text: state.update(lines=(state["lines"] + [text])[-12:]),
+                        timeline=lambda steps: state.update(timeline=steps)))
                 finally:
-                    PROGRESS["running"] = False
+                    state["running"] = False
             except ValueError:
                 self.send_json(400, {"error": "body is not valid JSON"})
             except Exception as exc:  # the rule reports the references without repairs on any non-200
