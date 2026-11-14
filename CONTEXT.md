@@ -118,6 +118,9 @@ Each of these cost time. They are facts about the local AEM on 14 Nov 2026, not 
 10. **Build with the `aemaacs` profile**, or the bundle stays "Installed".
 11. **The editor's highlight holds one element at a time.** Marking every repair in a topic at once is done through Track Changes marks instead: `<?tcx-delete content="…" reviewer reviewid time?>` and `<?tcx-insert-start …?>…<?tcx-insert-end?>`.
 12. **Output presets come from `/bin/guides/presets?mapPath=…&type=PATH`** (`localPresets`, `globalPresets`), each with `ditaValType`, `ditaValPathList`, `cpName`. Reading the map's `jcr:content/presets` node returns nothing for the default presets.
+14. **A repaired file that is open in a tab keeps showing its old content**, and saving that tab undoes the repair. The repair closes the tab, as the editor's own Find and Replace in files does, and leaves a file with unsaved edits alone.
+15. **Uploading a new asset to `folder/.createasset.html` fails** (the asset would be named `folder//file`); it only works when the asset exists. The loader posts to `folder.createasset.html` for files at the top.
+16. **Repeated "Fix all" and reset on one AEM changes what version history proves.** A "Fix all" that put an id back leaves a version in which the old id carries the new text. The loader deletes the sample's folders before loading.
 13. **A report shown after a page reload is the stored one**, older than any repair made since. The panel now leaves out findings whose reference was repaired after the report started.
 
 ## What the measurement says
@@ -139,7 +142,7 @@ Read the "Measured" table and the limits in the README. The short version, to ke
 ## Open, in the order it would help a customer
 
 1. **Content that was deleted** (109 references in the sample). The agent says what the text was and stops. It should offer the two real ways out: remove the reference, or put the piece back where it lived.
-2. **Accept and Reject on the Track Changes marks** were not tried. A switch to turn the marks off is missing.
+2. **A switch to write repairs without Track Changes marks** is missing. (Accept and Reject on the marks were tried on 14 Nov 2026 in the editor's "Tracked changes" panel: Reject put the old, broken reference back and removed the repaired one; Accept kept the repaired one. Both leave the topic with unsaved edits, as any edit does.)
 3. **The second check still takes 55 seconds**, because the planner decides again. Its decisions could be remembered like the findings.
 4. **Scale.** The budget of 40 targets per check is unit-tested only. References to files a build generates count as broken when content comes as plain files.
 5. **Condition presets, `ditavalref`, flagging and baselines** are not evaluated for the per-output counts.
