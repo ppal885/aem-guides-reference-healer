@@ -141,9 +141,9 @@ Seen first, fixed later the same day:
 | Tool | What it has | Here |
 |---|---|---|
 | Oxygen XML Author | Renaming or moving a file or an id updates the references at that moment; "Search references" first | Not built; decided against a trigger on rename on 14 Nov 2026 |
-| Oxygen AI Positron | "Fix" from a validation message, agentic since 2026, over a whole project; AI edits as tracked changes under the AI's name; accept part of the changes per file | Similar: plan tried on a copy, Track Changes marks. Missing: accept some topics of a group |
+| Oxygen AI Positron | "Fix" from a validation message, agentic since 2026, over a whole project; AI edits as tracked changes under the AI's name; accept part of the changes per file | Similar: plan tried on a copy, Track Changes marks. Built on 15 Nov 2026: a candidate for one topic of a group ("Only in <topic>") |
 | Oxygen completeness check | DITAVAL filters during validation; links from relationship tables | Per-output counts; relationship tables not read |
 | Fonto | Live check for cross-references to elements that are gone; an application can stop a referenced node from being cut | The save gate for safety content |
-| Heretto | Quality report before a release; a report of invalid keyrefs and conkeyrefs | Report plus repair; no gate before publishing |
+| Heretto | Quality report before a release; a report of invalid keyrefs and conkeyrefs | Report plus repair. Built on 15 Nov 2026: generating an output asks first when the map's last check found broken references, with the count this output publishes (`publish_gate.ts`) |
 
 Not found in that search: an editor whose AI finds the intended target of a broken reference from the version history and the text it showed before. That is "not found", not "does not exist".
