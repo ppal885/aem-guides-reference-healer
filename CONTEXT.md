@@ -104,6 +104,9 @@ On a local branch `garage/fact-conflict-rule` (the name is left over from the dr
 
 ## What was learned about AEM Guides
 
+- **The editor already refuses to delete an element that is reused by conref** (15 Nov 2026): `XmlValidationService.checkConrefIntegrity` in `~/starling/core/utils` runs on every save from the editor and rejects it. It covers `conref` only, not keys or `xref`, and it is skipped above 10,000 references. So in the product, references break through uploads, key changes in maps, elements reached through keys or `xref`, and file moves; the large sample breaks them by upload. Say this when asked how content breaks in the first place.
+- **AEM's "used in" list of a file does not contain the topics that reach it through a key**: it contains the map that defines the key. The map's own outgoing list has the topics.
+
 Each of these cost time. They are facts about the local AEM on 14 Nov 2026, not guesses.
 
 1. **References are stored as `GUID-….dita#topic/id`**, not as paths. The scanner maps the names both ways.
@@ -135,7 +138,7 @@ Read the "Measured" table and the limits in the README. The short version, to ke
 
 ## State on 14 Nov 2026
 
-- Tests: 73 here, 604 in the editor's Content Health folders, and the Java module's tests pass.
+- Tests: 73 here, 612 in the editor's Content Health folders, and the Java module's tests pass.
 - The local AEM holds `/content/dam/large-demo` (after a "Fix all": 492 findings left), `/content/dam/large-demo-outside`, `/content/dam/ref-demo`.
 - All four capabilities of the idea text have been seen working inside AEM.
 

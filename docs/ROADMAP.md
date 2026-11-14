@@ -45,7 +45,7 @@ Needs: a new kind of edit in the report (an element put back, an element removed
 
 ### 2. Safety content is never handled quietly  (equipment)
 
-**Partly built on 14 Nov 2026**: safety content is recognised and "remove the references" is neither offered nor accepted for it. Not built: a renamed warning with unchanged text is still repaired by "Fix all", and removed warnings are not moved to the top of the report.
+**Partly built on 14 Nov 2026**: safety content is recognised and "remove the references" is neither offered nor accepted for it. Built on 15 Nov 2026: a save in the editor that removes safety content which topics reach through a key or an xref asks first (`safety_gate.ts`; idea taken from Fonto, which lets an application guard a referenced node against deletion). Not built: a renamed warning with unchanged text is still repaired by "Fix all", and removed warnings are not moved to the top of the report.
 
 *"If a warning disappears from a manual, I need to hear about it before anyone else does."*
 
@@ -135,3 +135,15 @@ Seen first, fixed later the same day:
 | In a narrow panel "Replace link" was half hidden at the right edge | The row now stays inside its list cell (its padding was added to a 100% width), the title and the suggestion give way first, and the summary buttons wrap. Measured in a 262 px wide list: every row's last action ends inside the list |
 | The live progress came from one place for all maps, so two checks showed each other's line | AEM sends the map's path; the sidecar keeps progress per map and the panel asks for its own (`GET /progress?map=`). Seen: while one map's check ran, another map's progress stayed empty |
 | After "Fix all" with an edit at the source, AEM listed the key references for more than ten minutes, as findings | AEM's speed is not ours to change. Those references are now marked as waiting: they are counted in one line ("198 more are repaired and waiting for AEM to index the change") and not listed as findings. Seen in AEM after a "Fix all" with ten edits at the source |
+
+## What other editors do (looked up on the web, 15 Nov 2026; not tried)
+
+| Tool | What it has | Here |
+|---|---|---|
+| Oxygen XML Author | Renaming or moving a file or an id updates the references at that moment; "Search references" first | Not built; decided against a trigger on rename on 14 Nov 2026 |
+| Oxygen AI Positron | "Fix" from a validation message, agentic since 2026, over a whole project; AI edits as tracked changes under the AI's name; accept part of the changes per file | Similar: plan tried on a copy, Track Changes marks. Missing: accept some topics of a group |
+| Oxygen completeness check | DITAVAL filters during validation; links from relationship tables | Per-output counts; relationship tables not read |
+| Fonto | Live check for cross-references to elements that are gone; an application can stop a referenced node from being cut | The save gate for safety content |
+| Heretto | Quality report before a release; a report of invalid keyrefs and conkeyrefs | Report plus repair; no gate before publishing |
+
+Not found in that search: an editor whose AI finds the intended target of a broken reference from the version history and the text it showed before. That is "not found", not "does not exist".
