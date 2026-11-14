@@ -48,7 +48,7 @@ AEM Guides, Content Health job
   Broken links rule (Java)            sends the map's files, their previous versions, AEM's own list of
         |                             broken references and the files outside the map that use them
         v
-  sidecar  sidecar.py --serve 8766    POST /heal-refs, /feedback, /applied; GET /progress, /memory
+  sidecar  sidecar.py --serve 8766    POST /heal-refs, /feedback, /applied, /audit; GET /progress, /memory, /audit
         |
         v
   planner agent      (refplan.py)     tools: overview, investigate, decide, apply_and_recheck, finish
@@ -135,7 +135,7 @@ Read the "Measured" table and the limits in the README. The short version, to ke
 
 ## State on 14 Nov 2026
 
-- Tests: 64 here, 599 in the editor's Content Health folders, and the Java module's tests pass.
+- Tests: 73 here, 604 in the editor's Content Health folders, and the Java module's tests pass.
 - The local AEM holds `/content/dam/large-demo` (after a "Fix all": 492 findings left), `/content/dam/large-demo-outside`, `/content/dam/ref-demo`.
 - All four capabilities of the idea text have been seen working inside AEM.
 
@@ -143,7 +143,8 @@ Read the "Measured" table and the limits in the README. The short version, to ke
 
 1. **Content that was deleted** (109 references in the sample): built on 14 Nov 2026. `wayout.py` works out the possible ways (put it back, keep the text in the topics, remove the references), the planner suggests one, the author applies it from the compare box (`way_out.ts`). Removing is never offered for safety content. Open: the planner's suggestion is not scored by an evaluation yet (three removed pieces are too few to call it measured), and a way out that was applied is not remembered for the next check.
 2. **A switch to write repairs without Track Changes marks** is missing. (Accept and Reject on the marks were tried on 14 Nov 2026 in the editor's "Tracked changes" panel: Reject put the old, broken reference back and removed the repaired one; Accept kept the repaired one. Both leave the topic with unsaved edits, as any edit does.)
-3. **The second check took 55 seconds**: done on 14 Nov 2026. The planner's decisions are remembered per broken target (`Session.replay`, `_decision_key` in `refplan.py`); an unchanged map is checked in 11 to 13 s in AEM without a model call. Open: not measured after a "Fix all"; a decision the planner would make differently today stays for 7 days unless what it saw changes.
+3. **The second check took 55 seconds**: done on 14 Nov 2026. The planner's decisions are remembered per broken target (`Session.replay`, `_decision_key` in `refplan.py`), resting on the facts of a finding, not its wording; a finding about a key rests on the maps' key definitions, not the whole map. In AEM: an unchanged map 11 to 13 s, the check after "Fix all" 15 s, both without a model call. Open: a decision the planner would make differently today stays for 7 days unless what it saw changes.
+4. **Audit record**: built on 14 Nov 2026 (`audit.py`, editor `audit.ts`, button "Download audit record"). Open: a second approver; the record lives in `out/audit-log.jsonl` on the sidecar's machine and takes the user's name from the browser, so it is a prototype of the report, not evidence that holds up by itself; edits at the source made by "Fix all" were not checked in the record.
 4. **Scale.** The budget of 40 targets per check is unit-tested only. References to files a build generates count as broken when content comes as plain files.
 5. **Condition presets, `ditavalref`, flagging and baselines** are not evaluated for the per-output counts.
 6. **The live list and the memory go through a local sidecar.** In the product they belong to the report job and the Guides AI service.

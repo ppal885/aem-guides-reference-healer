@@ -272,6 +272,16 @@ def _whole_sentences(text, limit):
     return cut[:end + 1] if end > limit // 3 else cut.rstrip() + "…"
 
 
+def _key_definitions(map_xml):
+    """The key definitions of a map as sorted [keys, file] pairs; the element inside the file is left out."""
+    found = []
+    for tag in re.findall(r"<[A-Za-z][^<>]*\skeys\s*=\s*[\"'][^<>]*>", map_xml):
+        keys = re.search(r"\skeys\s*=\s*([\"'])(.*?)\1", tag)
+        href = re.search(r"\shref\s*=\s*([\"'])(.*?)\1", tag)
+        found.append([" ".join(sorted(keys.group(2).split())), href.group(2).split("#")[0] if href else ""])
+    return sorted(found)
+
+
 class Session:
     """The planner's working copy and the tools it acts through."""
 
@@ -587,8 +597,14 @@ class Session:
         else:
             scope = sorted(path for path in repo.files if path.endswith(".ditamap"))
         xml = {f["path"].lstrip("/"): f["xml"] for f in self.files}
+        if first["attribute"] in refcheck.PATH_ATTRS:
+            rests_on = [xml.get(p, "") for p in scope]
+        else:
+            # For a key: which keys the maps define and which file each one names. A repaired
+            # reference elsewhere in a map (what "Fix all" writes) does not make the finding old.
+            rests_on = [_key_definitions(xml.get(p, "")) for p in scope]
         parts = [first["attribute"], self.readable(first["value"]), first["element"],
-                 refheal.text_at(repo, first, first["value"], previous=True, limit=100000)] + [xml.get(p, "") for p in scope]
+                 refheal.text_at(repo, first, first["value"], previous=True, limit=100000)] + rests_on
         return hashlib.sha1(json.dumps(parts, ensure_ascii=False).encode("utf-8")).hexdigest()
 
     def _from_cache(self, repo, group):
@@ -666,6 +682,10 @@ class Session:
         """Changes whenever the planner would see something else for this group: another value, another
         number of references, another finding, another way out, another answer of an author."""
         seen = {k: v for k, v in self._describe(group).items() if k not in ("id", "decided")}
+        if seen.get("repair"):
+            # The facts of a finding, not its wording: a finder that is asked again (after "Fix all"
+            # changed the map) finds the same target and says so in other words.
+            seen["repair"] = {k: v for k, v in seen["repair"].items() if k in ("new_value", "verdict", "text_unchanged")}
         return "decision:" + hashlib.sha1(json.dumps(seen, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
 
     def _earlier_decision(self, group):

@@ -79,6 +79,8 @@ Needs: a list of maps from AEM's reference index (the rule already asks it for o
 
 ### 6. An audit report and a second approver  (bank)
 
+**The report is built (14 Nov 2026)**: per reference, with the person who accepted it, as a CSV download; see the README. The second approver is not built.
+
 *"In two years someone will ask why this sentence changed."*
 
 A downloadable record per check: each reference, what it was, what it became, the text before and after, who settled it (version history, which agent, which earlier answer), the agent's reason, **the person who accepted it** and when. And an option that a repair needs a second person: one proposes with "Apply to all", another accepts the Track Changes marks.
@@ -88,7 +90,7 @@ Needs: the editor knows the signed-in user; the sidecar gets it with the feedbac
 ### 7. Finish what is half done
 
 - Condition presets, `ditavalref` and flagging in the per-output counts.
-- ~~The planner's decisions remembered like the findings~~ Built on 14 Nov 2026: a second check of an unchanged map takes 11 to 13 s in AEM instead of 55.
+- ~~The planner's decisions remembered like the findings~~ Built on 14 Nov 2026: a second check of an unchanged map takes 11 to 13 s in AEM instead of 55, and the check after "Fix all" 15 s.
 - The 40-target budget tried on a set with hundreds of targets.
 - A switch to write repairs without Track Changes marks, for teams that do not use them.
 

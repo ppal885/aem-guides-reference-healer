@@ -40,6 +40,10 @@ What is left: the references the planner asked about and the ones with nothing t
 
 Open a "No repair found" row. The planner suggests a way out and says why: for the paragraph about the old settings page ("until the end of the year") it suggests removing the 63 references; for the caution note it suggests putting it back, and removing is not offered because it is safety content. Press "Put it back (1 edit)" twice: one tracked insertion in `warnings.dita`, and the rows of both ways that reach the note leave the list.
 
+## 4c. The record (20 s)
+
+Open "Repaired", press "Download audit record": one line per changed reference, with who accepted it, what settled it and the text before and after. Run the check again: it comes back in about 15 s, because nothing the planner saw has changed.
+
 ## 5. Where it stops (30 s)
 
 The planner cannot write to the repository; it works on a copy, and a person presses "Fix all". Code checks each of its decisions. If it fails, the report still comes with the cautious default.
