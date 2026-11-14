@@ -36,6 +36,10 @@ Press "Fix all", then confirm. About 190 files, each saved as a new version. The
 
 What is left: the references the planner asked about and the ones with nothing to point at. Those are the ones worth an author's time.
 
+## 4b. Content that is gone (45 s)
+
+Open a "No repair found" row. The planner suggests a way out and says why: for the paragraph about the old settings page ("until the end of the year") it suggests removing the 63 references; for the caution note it suggests putting it back, and removing is not offered because it is safety content. Press "Put it back (1 edit)" twice: one tracked insertion in `warnings.dita`, and the rows of both ways that reach the note leave the list.
+
 ## 5. Where it stops (30 s)
 
 The planner cannot write to the repository; it works on a copy, and a person presses "Fix all". Code checks each of its decisions. If it fails, the report still comes with the cautious default.

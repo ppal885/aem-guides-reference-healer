@@ -31,6 +31,8 @@ Each item: the problem in the writer's words, what the agents would do, what it 
 
 ### 1. A way out when the content is gone  (all three)
 
+**Built on 14 Nov 2026** (`wayout.py`, `way_out.ts`); see the README. Not yet done: scoring the planner's suggestion against a writer's choice on more than the sample's three pieces.
+
 *"109 of my references point at something a colleague deleted. Telling me so is not help."*
 
 The finder already knows what the piece was and that nothing replaces it. The planner would then propose one of three ways out, with its reason, and never apply it by itself:
@@ -42,6 +44,8 @@ The finder already knows what the piece was and that nothing replaces it. The pl
 Needs: a new kind of edit in the report (an element put back, an element removed), both as Track Changes marks. Measure: on the sample's three removed pieces, does the proposed way out match what a writer picks; and it must never choose "remove" for a warning (see 2).
 
 ### 2. Safety content is never handled quietly  (equipment)
+
+**Partly built on 14 Nov 2026**: safety content is recognised and "remove the references" is neither offered nor accepted for it. Not built: a renamed warning with unchanged text is still repaired by "Fix all", and removed warnings are not moved to the top of the report.
 
 *"If a warning disappears from a manual, I need to hear about it before anyone else does."*
 

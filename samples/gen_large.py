@@ -43,7 +43,7 @@ WARNINGS = [
     ("billing-impact", "note", "This change can increase your monthly bill."),
     ("admin-only", "note", "Only an administrator of the organisation can do this."),
     ("region-lock", "note", "The region cannot be changed after the resource is created."),
-    ("slow-operation", "note", "This operation can take up to an hour for large resources."),
+    ("slow-operation", "caution", "This operation can take up to an hour for large resources."),
     ("quota", "note", "Your plan limits how many resources of this kind you can create."),
     ("audit-logged", "note", "This action is recorded in the audit log."),
     ("mfa-required", "important", "You are asked for a second sign-in factor before this change is saved."),

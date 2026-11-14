@@ -397,6 +397,78 @@ class Learning(unittest.TestCase):
         self.assertEqual(session.result()["repairs"][0]["detail"]["outside"], ["a.dita", "b.dita"])
 
 
+class WaysOut(unittest.TestCase):
+    """When the content is gone, the agents say what can be done about it. A person chooses."""
+
+    OLD = ('<topic id="lib"><title>Lib</title><body><note id="keep">Keep.</note>'
+           '<note id="notice" type="note">The old page stays until <b>the end of the year</b>.</note>'
+           '<note id="hot" type="warning">The plate is hot.</note><p id="tail">Tail.</p></body></topic>')
+    NEW = '<topic id="lib"><title>Lib</title><body><note id="keep">Keep.</note><p id="tail">Tail.</p></body></topic>'
+
+    def session(self, *topics, **more):
+        files = [{"id": "GUID-lib", "path": "/d/lib.dita", "xml": self.NEW, "previous": [self.OLD]},
+                 {"id": "GUID-m", "path": "/d/m.ditamap", "xml": '<map><keydef keys="shared" href="GUID-lib.dita"/></map>',
+                  "previous": ['<map><keydef keys="notes" href="GUID-lib.dita"/></map>']}]
+        files += [{"id": "GUID-t%d" % i, "path": "/d/t%d.dita" % i, "xml": TOPIC % body, "previous": []}
+                  for i, body in enumerate(topics, 1)]
+        return refplan.Session(files, log=lambda message: None, **more)
+
+    def gone(self, session, value):
+        group = next(g for g in session.current["groups"].values() if value in g["refs"][0]["value"])
+        group["known"] = {"new_value": None, "verdict": "none", "how": "finder", "reason": "It was removed.", "caveat": ""}
+        return group
+
+    def test_a_removed_note_can_be_put_back_kept_as_text_or_removed(self):
+        session = self.session('<note conref="GUID-lib.dita#lib/notice"/>', '<note conref="GUID-lib.dita#lib/notice"/>')
+        group = self.gone(session, "notice")
+        described = next(g for g in session.tool_overview({})["groups"] if g["id"] == group["id"])
+        self.assertEqual([w["decision"] for w in described["ways_out"]], ["restore_at_source", "keep_text_in_topics", "remove_references"])
+        self.assertEqual((described["safety_content"], described["was"]), (False, "The old page stays until the end of the year ."))
+        ways = {o["kind"]: o for o in group["ways"]["options"]}
+        self.assertEqual(ways["restore"]["anchor"], {"after": "keep"})
+        self.assertEqual(ways["restore"]["xml"], '<note id="notice" type="note">The old page stays until <b>the end of the year</b>.</note>')
+        self.assertEqual(ways["inline"]["xml"], '<note type="note">The old page stays until <b>the end of the year</b>.</note>')
+
+    def test_a_removed_warning_is_never_offered_for_removal(self):
+        session = self.session('<note conref="GUID-lib.dita#lib/hot"/>')
+        group = self.gone(session, "hot")
+        described = session.tool_overview({})["groups"][0]
+        self.assertEqual((described["safety_content"], [w["decision"] for w in described["ways_out"]]),
+                         (True, ["restore_at_source", "keep_text_in_topics"]))
+        refused = session.tool_decide({"group_ids": [group["id"]], "decision": "remove_references", "reason": "Old."})
+        self.assertIn("safety content", refused["rejected"][group["id"]])
+
+    def test_a_link_to_removed_content_can_only_be_put_back(self):
+        session = self.session('<p>See <xref href="GUID-lib.dita#lib/notice"/></p>')
+        self.gone(session, "notice")
+        self.assertEqual([w["decision"] for w in session.tool_overview({})["groups"][0]["ways_out"]], ["restore_at_source"])
+
+    def test_the_planners_recommendation_reaches_the_author_and_nothing_is_changed(self):
+        session = self.session('<note conref="GUID-lib.dita#lib/notice"/>')
+        group = self.gone(session, "notice")
+        accepted = session.tool_decide({"group_ids": [group["id"]], "decision": "remove_references",
+                                        "reason": "The notice is about a page that stayed until the end of the year; it is out of date."})
+        self.assertEqual(accepted["accepted"], [group["id"]])
+        session.tool_apply_and_recheck({})
+        repair = session.result()["repairs"][0]
+        self.assertEqual((repair["verdict"], repair["new"]), ("none", None))
+        self.assertTrue(repair["reason"].startswith("Suggested: Remove the 1 references from the 1 topics."))
+        ways = repair["detail"]["ways_out"]
+        self.assertEqual((ways["recommended"]["kind"], [o["kind"] for o in ways["options"]]), ("remove", ["restore", "inline", "remove"]))
+        self.assertIn('conref="GUID-lib.dita#lib/notice"', session.files[2]["xml"])
+
+    def test_putting_a_piece_back_also_follows_a_key_that_was_renamed(self):
+        session = self.session('<note conkeyref="notes/notice"/>')
+        group = self.gone(session, "notes/notice")
+        session.tool_decide({"group_ids": [group["id"]], "decision": "restore_at_source", "reason": "Removed by mistake."})
+        session.tool_apply_and_recheck({})
+        ways = session.result()["repairs"][0]["detail"]["ways_out"]
+        restore = ways["options"][0]
+        self.assertEqual((restore["kind"], restore["file"], restore["reference_edits"]),
+                         ("restore", "/d/lib.dita", [{"attribute": "conkeyref", "old": "notes/notice", "new": "shared/notice"}]))
+        self.assertEqual(ways["recommended"]["kind"], "restore")
+
+
 class RememberedFindings(unittest.TestCase):
     """What finder agents found is kept between checks, the biggest causes go first, and one
     broken target that two topics mean differently gets an answer per topic."""

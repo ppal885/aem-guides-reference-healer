@@ -5,7 +5,7 @@
  "runs": [
   {
    "run": 1,
-   "seconds": 168,
+   "seconds": 129,
    "references": 1251,
    "scores": {
     "applied right": 710,
@@ -13,47 +13,22 @@
     "none, right": 109
    },
    "source_edits": 0,
-   "planner_steps": 8,
+   "planner_steps": 7,
    "plan": [
     "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
     "19 of those 34 were only renamed: the file's previous version proves it, no AI needed.",
     "Sent 15 to finder agents, each answer checked by a reviewer agent: 12 found under a new name or place, 3 removed for good.",
-    "Decided to repair 710 references. Why: The version history shows the same content now lives under a new name, so each reference is pointed at the new name.",
-    "Decided to ask you about 75 references (4 questions). Why: The quota and region notes were merged into one note about plan and region limits; check that the extra sentence fits each topic.",
-    "Decided to ask you about 306 references (7 questions). Why: A likely replacement was found, but its wording differs from what the topics showed before, so please read both before accepting.",
-    "Decided to ask you about 51 references (1 question). Why: The trial limits paragraph was split into a resource-limits and a support-level paragraph; please confirm the resource-limits one belongs in these topics.",
-    "Decided to leave 109 references broken. Why: The shared text was removed with no replacement: the notice that the old settings page stays until year end, and the note that large operations can take an hour.",
+    "Decided to repair 710 references. Why: The file history proves each target was only renamed with its content unchanged, so pointing to the new name keeps your colleague's clean-up intact.",
+    "Decided to ask you about 432 references (12 questions). Why: A likely target was found, but its wording differs from what these topics showed before, so please read both versions before accepting.",
+    "For 46 references whose content is gone I suggest putting the piece back. Why: The removed note warns that the operation \"can take up to an hour for large resources\"; a warning should not vanish from topics that carry it.",
+    "For 63 references whose content is gone I suggest removing them. Why: The notice said the old settings page is available \"until the end of the year\", so it was time-limited and the topics read well without it.",
     "Tried the plan on a copy and checked again: 710 references work now, 541 left for you.",
-    "Next: Review the proposed replacements where the wording changed and accept or reject each, then decide what the topics should say where shared text was removed."
+    "Next: Review the proposed targets whose wording changed and choose what to do with the two removed pieces; nothing has been applied for these. Start with the removed warning that an operation can take up to an hour, which I recommend restoring."
    ]
   },
   {
    "run": 2,
-   "seconds": 168,
-   "references": 1251,
-   "scores": {
-    "applied right": 710,
-    "asked, right": 432,
-    "none, right": 109
-   },
-   "source_edits": 9,
-   "planner_steps": 8,
-   "plan": [
-    "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
-    "19 of those 34 were only renamed: the file's previous version proves it, no AI needed.",
-    "Sent 15 to finder agents, each answer checked by a reviewer agent: 12 found under a new name or place, 3 removed for good.",
-    "Decided to repair 477 references with 9 edits where the target lives. Why: The content is unchanged and only its name was changed; restoring the old name fixes dozens of topics with one edit, and nothing here uses the new name.",
-    "Decided to repair 233 references. Why: The same warning still exists with unchanged text under a new name, so each reference is pointed at the new name and the colleague's renames stay.",
-    "Decided to ask you about 75 references (4 questions). Why: The quota and region warnings were merged into one note, so each topic would now show both statements; confirm the extra sentence fits.",
-    "Decided to ask you about 357 references (8 questions). Why: A likely replacement exists, but its wording differs from what the topics showed before, for example \"Atlas Identity\" is now \"Atlas Identity Hub\"; please confirm.",
-    "Decided to leave 109 references broken. Why: The shared text was removed and nothing replaces it: the note about the old settings page, and the warning that an operation can take an hour.",
-    "Tried the plan on a copy and checked again: 710 references work now, 541 left for you.",
-    "Next: Please go through the list of proposed replacements and confirm or reject each one, then decide what the topics with removed shared text should say."
-   ]
-  },
-  {
-   "run": 3,
-   "seconds": 142,
+   "seconds": 169,
    "references": 1251,
    "scores": {
     "applied right": 710,
@@ -61,66 +36,46 @@
     "none, right": 109
    },
    "source_edits": 0,
-   "planner_steps": 6,
+   "planner_steps": 8,
    "plan": [
     "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
     "19 of those 34 were only renamed: the file's previous version proves it, no AI needed.",
     "Sent 15 to finder agents, each answer checked by a reviewer agent: 12 found under a new name or place, 3 removed for good.",
-    "Decided to repair 710 references. Why: The file history proves the same content was only renamed, so each reference now points at the new name and your colleague's renames stay.",
-    "Decided to ask you about 432 references (12 questions). Why: A likely replacement was found, but its wording differs from what the topics showed before, so please read both before accepting.",
-    "Decided to leave 109 references broken. Why: The shared text was removed with no replacement, for example the old settings page notice and the note that an operation can take an hour.",
+    "Decided to repair 710 references. Why: The file history shows the same content under a new name, so the references follow your colleague's rename instead of undoing it.",
+    "Decided to ask you about 306 references (7 questions). Why: A likely new target was found, but its wording differs from what these topics showed before, so please read both texts before accepting.",
+    "Decided to ask you about 126 references (5 questions). Why: The old text was split or merged, so the proposed target adds or drops a sentence; please check it fits these topics before accepting.",
+    "For 46 references whose content is gone I suggest putting the piece back. Why: The removed note warns that the operation \"can take up to an hour for large resources\"; a warning should not vanish from topics that carry it.",
+    "For 63 references whose content is gone I suggest removing them. Why: The removed notice said the old settings page is \"still available until the end of the year\"; it is time-limited and topics read well without it.",
     "Tried the plan on a copy and checked again: 710 references work now, 541 left for you.",
-    "Next: Review the proposed replacements whose wording changed and accept or reject each, then decide what the topics should say where shared text was removed."
+    "Next: Review the proposals left for you and accept or reject each; none of them was applied, including the two recommendations for removed content."
+   ]
+  },
+  {
+   "run": 3,
+   "seconds": 154,
+   "references": 1251,
+   "scores": {
+    "applied right": 710,
+    "asked, right": 432,
+    "none, right": 109
+   },
+   "source_edits": 0,
+   "planner_steps": 8,
+   "plan": [
+    "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
+    "19 of those 34 were only renamed: the file's previous version proves it, no AI needed.",
+    "Sent 15 to finder agents, each answer checked by a reviewer agent: 12 found under a new name or place, 3 removed for good.",
+    "Decided to repair 710 references. Why: The version history shows the same content under a new name, text unchanged, so pointing to the new name keeps your colleagues' renames intact.",
+    "Decided to ask you about 75 references (4 questions). Why: The quota and region notes were merged into one, so each topic would gain a sentence it never showed; check the extra sentence fits.",
+    "Decided to ask you about 357 references (8 questions). Why: A likely replacement was found, but its wording differs from what the topics showed before, so please read both before accepting.",
+    "For 46 references whose content is gone I suggest putting the piece back. Why: The removed note warns that the operation \"can take up to an hour for large resources\"; a warning should not vanish from topics that carry it.",
+    "For 63 references whose content is gone I suggest removing them. Why: The removed notice said the old settings page is available \"until the end of the year\"; it is time-bound, and the topics read well without it.",
+    "Tried the plan on a copy and checked again: 710 references work now, 541 left for you.",
+    "Next: Review the proposals waiting for you and accept or correct each one; the safe renames are already repaired. Start with the removed warning about operations that can take up to an hour, which I recommend putting back."
    ]
   }
  ],
  "targets": 34,
- "targets_decided_the_same_in_every_run": 25,
- "targets_that_differed": {
-  "href api-rate-limits": [
-   "fix",
-   "covered",
-   "fix"
-  ],
-  "keyref console-name": [
-   "fix",
-   "covered",
-   "fix"
-  ],
-  "keyref free-plan": [
-   "fix",
-   "covered",
-   "fix"
-  ],
-  "conref need-help": [
-   "fix",
-   "covered",
-   "fix"
-  ],
-  "href quota-exceeded": [
-   "fix",
-   "covered",
-   "fix"
-  ],
-  "keyref cli-name": [
-   "fix",
-   "covered",
-   "fix"
-  ],
-  "conref open-console": [
-   "fix",
-   "covered",
-   "fix"
-  ],
-  "keyref retention-days": [
-   "fix",
-   "covered",
-   "fix"
-  ],
-  "href permission-denied": [
-   "fix",
-   "covered",
-   "fix"
-  ]
- }
+ "targets_decided_the_same_in_every_run": 34,
+ "targets_that_differed": {}
 }

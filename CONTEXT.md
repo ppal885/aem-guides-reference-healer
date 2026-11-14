@@ -135,13 +135,13 @@ Read the "Measured" table and the limits in the README. The short version, to ke
 
 ## State on 14 Nov 2026
 
-- Tests: 54 here, 588 in the editor's Content Health folders, and the Java module's tests pass.
+- Tests: 59 here, 599 in the editor's Content Health folders, and the Java module's tests pass.
 - The local AEM holds `/content/dam/large-demo` (after a "Fix all": 492 findings left), `/content/dam/large-demo-outside`, `/content/dam/ref-demo`.
 - All four capabilities of the idea text have been seen working inside AEM.
 
 ## Open, in the order it would help a customer
 
-1. **Content that was deleted** (109 references in the sample). The agent says what the text was and stops. It should offer the two real ways out: remove the reference, or put the piece back where it lived.
+1. **Content that was deleted** (109 references in the sample): built on 14 Nov 2026. `wayout.py` works out the possible ways (put it back, keep the text in the topics, remove the references), the planner suggests one, the author applies it from the compare box (`way_out.ts`). Removing is never offered for safety content. Open: the planner's suggestion is not scored by an evaluation yet (three removed pieces are too few to call it measured), and a way out that was applied is not remembered for the next check.
 2. **A switch to write repairs without Track Changes marks** is missing. (Accept and Reject on the marks were tried on 14 Nov 2026 in the editor's "Tracked changes" panel: Reject put the old, broken reference back and removed the repaired one; Accept kept the repaired one. Both leave the topic with unsaved edits, as any edit does.)
 3. **The second check still takes 55 seconds**, because the planner decides again. Its decisions could be remembered like the findings.
 4. **Scale.** The budget of 40 targets per check is unit-tested only. References to files a build generates count as broken when content comes as plain files.
@@ -157,6 +157,7 @@ Read the "Measured" table and the limits in the README. The short version, to ke
 | Set up and run | [README.md](README.md), [docs/RUN.md](docs/RUN.md) |
 | Give the demo | [docs/DEMO.md](docs/DEMO.md) |
 | The planner and its tools | `refplan.py` |
+| The ways out for removed content, and the safety rule | `wayout.py` (editor: `way_out.ts`) |
 | Finder, reviewer, rules, the fixed pipeline | `refheal.py` |
 | What counts as broken | `refcheck.py` |
 | The sidecar and the model call | `sidecar.py`, `agentloop.py`, `claudeapi.py` |

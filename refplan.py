@@ -29,6 +29,7 @@ import time
 import agentloop
 import refcheck
 import refheal
+import wayout
 
 # What the planner learned from authors, kept between checks:
 #   answers   {"attribute|old value": new value}   a repair an author accepted; not asked about again
@@ -189,7 +190,9 @@ You get what the old target showed, the candidates with what each shows now, and
 Reply with one JSON object and nothing else: {"choices": [{"reference": <number>, "candidate": <number>}]}"""
 MAX_PLANNER_CALLS = 14
 MAX_ROUNDS = 4
-ACTIONS = ("repair_references", "repair_at_source", "ask_author", "leave_broken")
+ACTIONS = ("repair_references", "repair_at_source", "ask_author", "leave_broken") + tuple(wayout.KINDS)
+# Decisions that hand a group to the author instead of changing it in the working copy.
+HANDED_OVER = ("ask_author", "leave_broken") + tuple(wayout.KINDS)
 
 PLANNER_SYSTEM = """You are in charge of repairing the broken references of one DITA map. Other agents work for you.
 
@@ -207,6 +210,12 @@ The four decisions:
 - repair_at_source: one edit where the target lives instead of one edit per reference. Offered only when code found it safe, and the option says what the edit is. An edit that adds a second name to a key is harmless and saves many edits. An edit that renames a key or an element id back undoes a colleague's rename and breaks any reference you repair to the new name in the same round, so choose it only when the saving is large and you decide every group that touches that key or id consistently.
 - ask_author: a target was found but with doubt (verdict "review" or a caveat), or two readings are possible. The author sees the proposal and the doubt.
 - leave_broken: the content is gone and nothing replaces it. Say what it used to be so the author can decide what the topics should say.
+
+When the content is gone, do not stop at leave_broken if the group lists ways_out. Recommend one of them instead; the author sees every way out and your recommendation with its reason, and chooses. None of them is applied by you.
+- restore_at_source: put the removed piece back where it lived, from the previous version. One edit repairs every reference. Right when the removal looks like a mistake, or when the piece is safety content (safety_content true): a warning must not disappear from the topics that carry it.
+- remove_references: take the references out of the topics. Right when the old text is out of date and the topics read well without it, for example a notice about something that has ended. Never offered for safety content.
+- keep_text_in_topics: the topics keep the old text as their own content. Right when the shared piece was removed on purpose but these topics still need the sentence.
+Read the old text (was) before you choose, and say in your reason what in the text made you choose.
 
 How to work:
 1. Call overview. Read it before you act.
@@ -463,6 +472,13 @@ class Session:
                 entry["repair"]["caveat"] = known["caveat"][:200]
             if "same_text" in known:
                 entry["repair"]["text_unchanged"] = known["same_text"]
+        if known and not known["new_value"] and known.get("how") != "planner":
+            ways = self._ways(self.current["repo"], group)
+            if ways["options"]:
+                entry["ways_out"] = [dict(decision=next(k for k, v in wayout.KINDS.items() if v == o["kind"]), what=o["label"])
+                                     for o in ways["options"]]
+                entry["was"] = _plain(re.sub(r"<[^>]+>", " ", ways["was"]))[:240]
+                entry["safety_content"] = ways["safety"]
         outside = self._used_outside(self.current["repo"], group)
         if outside:
             entry["also_used_from_files_outside_this_map"] = len(outside)
@@ -652,7 +668,22 @@ class Session:
                 return "the repair has verdict \"%s\", not \"fix\"; use ask_author" % known["verdict"]
         if action == "repair_at_source" and not group["source"]:
             return "no safe edit at the source exists for this group; use repair_references"
+        if action in wayout.KINDS:
+            if known and known["new_value"]:
+                return "a repair is known for this group; a way out is for content that is gone"
+            ways = self._ways(self.current["repo"], group)
+            if wayout.KINDS[action] not in [o["kind"] for o in ways["options"]]:
+                if action == "remove_references" and ways["safety"]:
+                    return "this is safety content; its references are never removed. Use restore_at_source or keep_text_in_topics"
+                return "this way out is not possible for the group; its ways_out lists what is"
         return None
+
+    def _ways(self, repo, group):
+        """The ways out for a group whose content is gone, worked out once."""
+        if "ways" not in group:
+            previous = {f["path"].lstrip("/"): f.get("previous") or [] for f in self.original}
+            group["ways"] = wayout.ways_out(repo, group["refs"], previous)
+        return group["ways"]
 
     def tool_decide(self, args):
         action, reason = args["decision"], args["reason"].strip()
@@ -677,6 +708,9 @@ class Session:
                 "ask_author": "Decided to ask you about %s (%s)." % (
                     _count(references, "reference"), _count(len(accepted), "question")),
                 "leave_broken": "Decided to leave %s broken." % _count(references, "reference"),
+                "restore_at_source": "For %s whose content is gone I suggest putting the piece back." % _count(references, "reference"),
+                "remove_references": "For %s whose content is gone I suggest removing them." % _count(references, "reference"),
+                "keep_text_in_topics": "For %s whose content is gone I suggest keeping the text in the topics." % _count(references, "reference"),
             }[action], _one_sentence(reason)))
         undecided = [g["id"] for g in self.current["groups"].values() if not g["decision"]]
         counts = {}
@@ -684,7 +718,8 @@ class Session:
             if group["decision"]:
                 counts[group["decision"]] = counts.get(group["decision"], 0) + len(group["refs"])
         words = {"repair_references": "repair", "repair_at_source": "repair at the source", "ask_author": "ask the author about",
-                 "leave_broken": "leave broken"}
+                 "leave_broken": "leave broken", "restore_at_source": "suggest putting back",
+                 "remove_references": "suggest removing", "keep_text_in_topics": "suggest keeping the text of"}
         self.step("decide-%d" % len(self.rounds), "active" if undecided else "done", "Planner agent", "Decided: " + ", ".join(
             "%s %s" % (words[action], format(count, ",")) for action, count in counts.items()))
         return {"summary": "%d accepted, %d rejected" % (len(accepted), len(rejected)), "accepted": accepted,
@@ -729,7 +764,7 @@ class Session:
         remaining = self._open_round()
         still = sum(len(g["refs"]) for g in remaining.values())
         left = len(self.left)
-        handed_over = sum(len(g["refs"]) for g in groups.values() if g["decision"] in ("ask_author", "leave_broken"))
+        handed_over = sum(len(g["refs"]) for g in groups.values() if g["decision"] in HANDED_OVER)
         self.plan.append("Tried the plan on a copy and checked again: %s work now, %s left for you%s." % (
             _count(before - still - handed_over, "reference"), format(handed_over, ","),
             ", %s still open" % format(still, ",") if still else ""))
@@ -769,7 +804,7 @@ class Session:
             {"name": "investigate", "description": "Hand groups that have no repair to finder agents; a reviewer agent checks each answer. Send all of them in one call.",
              "properties": {"group_ids": array}, "required": ["group_ids"], "fn": self.tool_investigate},
             # The parameter is not called "action": the CLI protocol uses that word for the tool's name.
-            {"name": "decide", "description": "Decide what to do with groups. decision: repair_references, repair_at_source, ask_author or leave_broken.",
+            {"name": "decide", "description": "Decide what to do with groups. decision: repair_references, repair_at_source, ask_author, leave_broken, or for content that is gone one of restore_at_source, remove_references, keep_text_in_topics.",
              "properties": {"group_ids": array, "decision": string, "reason": string},
              "required": ["group_ids", "decision", "reason"], "fn": self.tool_decide},
             {"name": "apply_and_recheck", "description": "Apply the decisions of this round to the working copy and scan again.",
@@ -898,14 +933,43 @@ class Session:
                                  target=refheal.target_label(final["repo"], ref, proposal) if proposal else None,
                                  reason=last["known"]["reason"], caveat=last["known"]["caveat"] or last["reason"])
                 else:
-                    known = (last or group)["known"] or {}
-                    entry.update(verdict="none", stage=known.get("how"), reason=known.get("reason") or (last or group)["reason"])
+                    gone = last or group
+                    known = gone["known"] or {}
+                    entry.update(verdict="none", stage=known.get("how"), reason=known.get("reason") or gone["reason"])
+                    if "ways_out" not in entry["detail"]:
+                        entry["detail"]["ways_out"] = self._ways_out_detail(gone, group, chains)
+                    suggested = entry["detail"]["ways_out"].get("recommended")
+                    if suggested:
+                        entry["reason"] = "Suggested: %s. %s %s" % (
+                            suggested["label"], _one_sentence(suggested["why"]), entry["reason"])
                 repairs.append(entry)
         return {"stats": {"files": len(first["repo"].files), "references": len(first["repo"].refs), "broken": len(repairs),
                           "groups": len(first["groups"]), "rounds": len(self.edits),
                           "reported_broken_only_by_the_repository": len(self.aem_only),
                           "reviewer_model": refheal.reviewer_model(self.backend, self.model)},
                 "repairs": repairs + self._aem_only_repairs(), "source_fixes": self._source_fixes(), "plan": self.plan + ([self.summary] if self.summary else [])}
+
+    def _ways_out_detail(self, gone, group, chains):
+        """The ways out for content that is gone, for the author to choose from: every possible one,
+        which one the planner recommends and why, and for "restore" the edits the references need
+        on top of it (a key that was renamed as well still has to be followed)."""
+        repo = self._round_of(gone)["repo"]
+        ways = self._ways(repo, gone) if (gone["known"] or {}).get("how") != "planner" else {"options": [], "safety": False, "was": ""}
+        follow = {}
+        for ref in group["refs"]:
+            value = ref["value"]
+            for chain in chains:
+                value = chain.get((ref["file"], ref["attribute"], value), value)
+            if ways.get("renamed_key") and value == ref["value"]:
+                value = ways["renamed_key"] + "/" + ref["value"].partition("/")[2]
+            if value != ref["value"]:
+                follow[(ref["attribute"], ref["value"])] = value
+        options = [dict(o, reference_edits=[{"attribute": a, "old": old, "new": new} for (a, old), new in follow.items()])
+                   if o["kind"] == "restore" else o for o in ways["options"]]
+        kind = wayout.KINDS.get(gone.get("decision") or "")
+        chosen = next((o for o in options if o["kind"] == kind), None)
+        return {"safety": ways["safety"], "options": options,
+                "recommended": {"kind": kind, "label": chosen["label"], "why": gone["reason"]} if chosen else None}
 
     def _detail(self, group):
         """What an author needs to compare before accepting: what the reference showed before, the

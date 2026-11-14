@@ -41,7 +41,7 @@ python3 refcheck.py samples/ref-demo/v2
 python3 refheal.py samples/ref-demo/v2
 ```
 
-The first runs the 54 tests (no network, no model). The second lists the 11 broken references of the small sample. The third repairs them with the fixed pipeline and writes a report and a patch to `out-refs/`.
+The first runs the 59 tests (no network, no model). The second lists the 11 broken references of the small sample. The third repairs them with the fixed pipeline and writes a report and a patch to `out-refs/`.
 
 The evaluations call the model and take minutes:
 
@@ -165,7 +165,19 @@ In the editor's Health check panel, each broken reference comes with one of thre
 |---|---|---|
 | Repair | Every check passed | "Replace link" on the row, or "Fix all" for all of them |
 | Repair to review | A target was found, with a stated doubt | Read the doubt, then "Replace link" |
-| No repair found | The content is gone; the row says why | Decide what the topic should say instead |
+| No repair found | The content is gone. The row says what it was and suggests a way out | Open the row: put the piece back (one edit), keep the text in the topics, or remove the references |
+
+**When the content is gone, the agent does not stop at "broken".** It works out which ways out are possible and the planner suggests one, with its reason. The author chooses, and every way is written as Track Changes marks:
+
+| Way out | What is written | When the planner suggests it |
+|---|---|---|
+| Put it back | The piece from the previous version goes back where it lived, as one tracked insertion in the shared file. References that pointed at a renamed key follow it | The removal looks like a mistake, or the piece is safety content |
+| Keep the text in the topics | Each reference is replaced by the text itself, without its id | The shared piece should stay removed but the topics still need the sentence |
+| Remove the references | Each reference is taken out, as a tracked deletion | The text is out of date |
+
+**Safety content** (a `note` of type warning, danger or caution, or a hazard statement): removing its references is not offered, and code refuses that decision if the planner makes it. One piece is often reached in two ways (by conref and through a key); putting it back settles the rows of both.
+
+Seen in AEM on the sample (14 Nov 2026): the planner suggested removing the 63 references to a paragraph that said an old page "is still available until the end of the year", and putting back a caution note used by 46 references. All three ways were applied from the compare box and read back from AEM: 63 references removed, the note back in `warnings.dita` with the 28 key references following the renamed key, and the text kept in 18 topics.
 
 When one broken target is used from several files, the report adds a "Fix at the source" row: one edit where the target lives (give a renamed key its old name back as a second name, or put an id back) instead of one edit per file.
 
@@ -177,7 +189,7 @@ The Broken links rule hands the whole map to a **planner agent**. It does not fo
 |---|---|
 | `overview` | The broken references grouped by what they point at, with any repair that code already proved from the file's version history |
 | `investigate` | Hands groups without a repair to **finder agents** (search files, read outlines, search elements and keys, read the previous version). A **reviewer agent** checks each answer without seeing the finder's reasoning |
-| `decide` | Per group: repair the references, repair at the source with one edit, ask the author, or leave it broken. With its reason |
+| `decide` | Per group: repair the references, repair at the source with one edit, ask the author, or leave it broken. For content that is gone: suggest putting it back, keeping the text in the topics, or removing the references. With its reason |
 | `apply_and_recheck` | Applies its decisions to a copy of the files in memory and scans again. What is still broken, or newly broken by its own edits, comes back as the next round |
 | `finish` | A summary for the author |
 
@@ -206,7 +218,7 @@ What keeps it safe:
 | What | Result | Where |
 |---|---|---|
 | 1,251 broken references in a 227-file map, inside AEM, planner agent | Report in 140 to 165 s: 710 repaired, 432 to review, 109 gone. "Fix all" wrote 242 edits in 188 files, none failed; the next check said "233 repairs saved and resolve" and listed the 198 references AEM had not re-indexed yet. | [docs/RUN.md](docs/RUN.md) |
-| The planner three times on the same 1,251 references, scored against the known right answer (`planeval.py`) | **0 wrong repairs, 0 wrong proposals, 0 missed.** Repair or ask was **the same in all three runs**: 710 applied, 432 asked, 109 gone; 34 of 34 targets got the same decision. 127 to 143 s per run. Before the text rule it applied 909, 895 and 840. | `eval/refs/planner-eval.json`, `planner-eval-before-stability.json` |
+| The planner three times on the same 1,251 references, scored against the known right answer (`planeval.py`) | **0 wrong repairs, 0 wrong proposals, 0 missed.** Repair or ask was **the same in all three runs**: 710 applied, 432 asked, 109 gone; 34 of 34 targets got the same decision. 129 to 169 s per run (run again on 14 Nov 2026 with the ways out). In all three runs the planner suggested the same way out for the removed pieces: put the caution note back (46 references), remove the 63 references to the time-limited notice. That is two pieces, so it shows the suggestion is stable here, not that it is right in general. Before the text rule it applied 909, 895 and 840. | `eval/refs/planner-eval.json`, `planner-eval-before-stability.json` |
 | The fixed pipeline on the same 1,251 references (`planeval.py --mode pipeline`) | 0 wrong, 0 missed. Applied 895, 949 and 895. 70 to 74 s per run. | `eval/refs/pipeline-eval.json` |
 | Nine references with two plausible targets each (`rankeval.py`, 2 runs) | The right target was proposed first for **9 of 9** in both runs; none was applied without asking. With one answer per broken target it was 8 of 9: two topics shared one old target and meant different pieces. | `eval/refs/rank-eval.json`, `rank-eval-one-answer-per-target.json` |
 | Two checks in a row inside AEM (348 broken references, 11 targets for finder agents) | First check 135 s. Second check **55 s**: all 11 findings reused, only the planner ran. | [docs/RUN.md](docs/RUN.md) |
@@ -234,6 +246,7 @@ Read the limits before quoting these:
 |---|---|
 | `refcheck.py` | Index of files, ids, keys and references; finds what does not resolve. Works on a folder or on files sent by a server (AEM's GUID file names included). |
 | `refplan.py` | The planner agent, its tools and its memory of author answers. This is what AEM calls. |
+| `wayout.py` | What can be done about a reference whose content is gone: put it back, keep the text, remove the references. No model. |
 | `planeval.py` | Runs the planner (or with `--mode pipeline` the fixed pipeline) several times on the large sample and scores every answer against the known right one. |
 | `rankeval.py` | Scores the ranking on `samples/rank-demo`: nine references with two plausible targets each. |
 | `refheal.py` | Finder agent, reviewer, rules and checks for one reference, and the fixed pipeline. `python3 refheal.py <folder>` writes a report and a patch. |
@@ -243,7 +256,7 @@ Read the limits before quoting these:
 | `reporthtml.py` | Shared pieces of the HTML report `refheal.py` writes. |
 | `samples/` | `ref-demo` (8 files, 11 broken references), `gen_large.py` (writes the 225-file sample, with content for internal readers and a DITAVAL), `gen_rank.py` (nine two-candidate cases), `load_large_demo.sh` (loads or resets the large sample in the local AEM and gives its "AEM Sites" output the DITAVAL filter), `set_output_filter.py`. |
 | `eval/` | Saved inputs and answers of the evaluations. |
-| `tests/` | `python3 -m unittest discover -s tests` (54 tests, no network, no model). |
+| `tests/` | `python3 -m unittest discover -s tests` (59 tests, no network, no model). |
 | `docs/` | `RUN.md` start and demo steps, `DEMO.md` the 5-minute script, `EVAL-REFS.md` the evaluation on public documentation. |
 
 ## Product code
@@ -253,7 +266,7 @@ On local branches named `garage/fact-conflict-rule` (the name is left over from 
 | Repository | What changed |
 |---|---|
 | `~/starling`, `core/content-health` | `BrokenLinkValidationRule` sends the map's files and their previous versions to `ReferenceRepairAdvisor` and attaches repairs, source fixes and the planner's plan to its findings. Findings carry `suggestedValue`, `suggestionType`, `suggestionLabel`, `suggestionSource`. It also sends AEM's own list of broken references and the files outside the map that use the changed files. The module's unit tests pass. |
-| `~/xmleditor` | Report rows show the repair, who settled it (planner, finder agent, version history, rule) and "Replace link". A bar above the rows gives the counts, the "AI repair plan" and "Fix all". The compare box applies a candidate, remembers the ones passed over and can forget an earlier answer; "Fix all" reports what it wrote to the sidecar. Type-check and the 588 Content Health tests pass. |
+| `~/xmleditor` | Report rows show the repair, who settled it (planner, finder agent, version history, rule) and "Replace link". A bar above the rows gives the counts, the "AI repair plan" and "Fix all". The compare box applies a candidate, remembers the ones passed over and can forget an earlier answer; "Fix all" reports what it wrote to the sidecar. Type-check and the 599 Content Health tests pass. |
 
 The rules reach the agent through a local HTTP sidecar. A product version would call the Guides AI service instead.
 
