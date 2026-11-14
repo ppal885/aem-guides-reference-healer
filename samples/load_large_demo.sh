@@ -1,12 +1,14 @@
 #!/bin/zsh
 # Puts the large sample into the local demo AEM in its broken state (garage-week PoC).
 # Local author on 127.0.0.1 with its default login only. Run again to reset after "Fix all": it
-# deletes /content/dam/large-demo and /content/dam/large-demo-outside and loads them again.
+# deletes its folder (/content/dam/large-demo) and the folder beside it ending in -outside, and loads them again.
 #   ./samples/load_large_demo.sh
 set -e
 A=http://127.0.0.1:4502
 AUTH=admin:admin
-ROOT=/content/dam/large-demo
+# ROOT=/content/dam/large-demo-test ./samples/load_large_demo.sh loads a second copy to try things
+# on, so the copy someone is working with in the editor stays as it is.
+ROOT=${ROOT:-/content/dam/large-demo}
 cd "$(dirname "$0")/large-demo"
 
 up() {  # version folder, relative file
@@ -21,7 +23,7 @@ stored() { curl -s -u $AUTH "$A$ROOT/$1/jcr:content/renditions/original/jcr:cont
 # that put an id back leaves a version in which the old id carries the new text; version history
 # then "proves" a rename that the clean sample does not have, and the counts drift from run to run.
 curl -s -o /dev/null -u $AUTH -X DELETE $A$ROOT
-curl -s -o /dev/null -u $AUTH -X DELETE $A/content/dam/large-demo-outside
+curl -s -o /dev/null -u $AUTH -X DELETE $A$ROOT-outside
 sleep 10
 curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sling:Folder" -F "jcr:title=Atlas Cloud guide (large reference demo)" $A$ROOT
 for d in $(cd v1 && ls -d */ | tr -d /); do curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sling:Folder" $A$ROOT/$d; done
@@ -54,11 +56,11 @@ sleep 20
 
 # One topic of another guide that reuses a warning of this one. It is not in the map, so the
 # agents never see it; the report must still say that the same break exists outside the map.
-OUTSIDE=/content/dam/large-demo-outside
+OUTSIDE=$ROOT-outside
 curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sling:Folder" -F "jcr:title=Another guide (uses the shared warnings)" $A$OUTSIDE
 printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">' \
   '<topic id="partner_onboarding"><title>Partner onboarding</title><body>' \
-  '<note conref="../large-demo/shared/warnings.dita#warnings/admin-only"/>' \
+  "<note conref=\"../$(basename $ROOT)/shared/warnings.dita#warnings/admin-only\"/>" \
   '<p>Ask your account manager for a partner organisation.</p></body></topic>' > /tmp/partner_onboarding.$$.dita
 curl -s -o /dev/null -u $AUTH -F "file=@/tmp/partner_onboarding.$$.dita;type=application/xml" -F "fileName=partner_onboarding.dita" "$A$OUTSIDE.createasset.html"
 rm -f /tmp/partner_onboarding.$$.dita

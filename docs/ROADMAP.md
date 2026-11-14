@@ -126,6 +126,15 @@ Found while checking that everything built so far really works (14 Nov 2026), an
 | Resetting the sample did not finish on a clean folder | The loader posted the map to an address that only works when the map exists |
 | Counts drifted after several "Fix all" and reset rounds (758 ready instead of 710) | Old versions stayed in AEM's history. The loader removes the sample's folders first |
 
+Fixed on 15 Nov 2026, the wait after "Fix all":
+
+| What | Fix |
+|---|---|
+| For the 30 seconds before the next check the list still showed the repaired references as open, with "Replace link", while "Repaired (710)" listed them too, and the bar still said "710 repairs ready" | The saved repairs leave the list at once and the bar counts what is left |
+| The only sign of the wait was the text on a disabled button, and the rows did nothing when pressed | The bar says "The repairs are saved. Checking again in 30 seconds, when AEM has indexed them."; the rows that are left can be used |
+| After 30 seconds the check started and replaced the list, also when the author had opened the "Repaired" list or a compare box in the meantime | A check does not start under an author who used the list; the bar then says "Regenerate the report to see what is left" |
+| A check the author started during the wait was followed by a second one; a map opened during the wait got the check | Neither starts now |
+
 Fixed on 15 Nov 2026: after the sample was reset, the "Repaired" list kept in the browser stayed, and a click on one of its rows said "Given asset id or path are invalid". When the server has no report for a map, the panel now forgets the list it kept for that map. What stays: an editor tab that was open during the reset still holds files under their old ids and must be reloaded; the loader says so when it ends.
 
 Seen first, fixed later the same day:
