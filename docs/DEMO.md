@@ -4,7 +4,7 @@
 
 Before the demo: start the three pieces (`RUN.md`), run `./samples/load_large_demo.sh`, and open `/content/dam/large-demo/atlas_guide.ditamap` in the editor.
 
-**Clear what the agents remember, or there is nothing to watch.** With findings and decisions from an earlier run the first check comes back in about 15 s without one agent working. From this folder: `rm -f out/agent-findings.json out/author-answers.json out/last-fix-all.json out/audit-log.jsonl`. Then close and reopen the editor tab, so its "Repaired" list starts empty.
+**Clear what the agents remember, or there is nothing to watch.** With findings and decisions from an earlier run the first check comes back in about 15 s without one agent working. From this folder: `rm -f out/agent-findings.json out/author-answers.json out/last-fix-all.json out/audit-log.jsonl`. Then reload the editor tab: after the loader every file has a new id, and a tab that was open during it answers clicks with "Given asset id or path are invalid".
 
 **Make the Health check panel tall before you start** (drag its top edge up to about half the window). At its default height the plan or the compare box fills it and the rows are out of sight.
 

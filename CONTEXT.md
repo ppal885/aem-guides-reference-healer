@@ -105,6 +105,8 @@ On a local branch `garage/fact-conflict-rule` (the name is left over from the dr
 ## What was learned about AEM Guides
 
 - **The editor already refuses to delete an element that is reused by conref** (15 Nov 2026): `XmlValidationService.checkConrefIntegrity` in `~/starling/core/utils` runs on every save from the editor and rejects it. It covers `conref` only, not keys or `xref`, and it is skipped above 10,000 references. So in the product, references break through uploads, key changes in maps, elements reached through keys or `xref`, and file moves; the large sample breaks them by upload. Say this when asked how content breaks in the first place.
+- **Resetting the sample under an open editor tab breaks that tab** (15 Nov 2026): the folders are deleted and loaded again, so every file has a new id; a click on a row of the old report or the old "Repaired" list then says "Given asset id or path are invalid". Reload the tab after `load_large_demo.sh`. The next check drops repaired rows that are broken again.
+- **`presetUtil.generate` must stay synchronous where it can**: tests and callers rely on it. Run the editor's whole suite (`CI=true npx jest`, about 5 minutes), not only the Content Health folders, after touching shared code such as `util/preset.ts` or `aem/loader.ts`.
 - **AEM's "used in" list of a file does not contain the topics that reach it through a key**: it contains the map that defines the key. The map's own outgoing list has the topics.
 
 Each of these cost time. They are facts about the local AEM on 14 Nov 2026, not guesses.
@@ -138,7 +140,7 @@ Read the "Measured" table and the limits in the README. The short version, to ke
 
 ## State on 14 Nov 2026
 
-- Tests: 73 here, 618 in the editor's Content Health folders, and the Java module's tests pass.
+- Tests: 73 here, 619 in the editor's Content Health folders, and the Java module's tests pass.
 - The local AEM holds `/content/dam/large-demo` (after a "Fix all": 492 findings left), `/content/dam/large-demo-outside`, `/content/dam/ref-demo`.
 - All four capabilities of the idea text have been seen working inside AEM.
 
