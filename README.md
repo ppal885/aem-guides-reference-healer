@@ -271,7 +271,7 @@ On local branches named `garage/fact-conflict-rule` (the name is left over from 
 | Repository | What changed |
 |---|---|
 | `~/starling`, `core/content-health` | `BrokenLinkValidationRule` sends the map's files and their previous versions to `ReferenceRepairAdvisor` and attaches repairs, source fixes and the planner's plan to its findings. Findings carry `suggestedValue`, `suggestionType`, `suggestionLabel`, `suggestionSource`. It also sends AEM's own list of broken references and the files outside the map that use the changed files. The module's unit tests pass. |
-| `~/xmleditor` | Report rows show the repair, who settled it (planner, finder agent, version history, rule) and "Replace link". A bar above the rows gives the counts, the "AI repair plan" and "Fix all". The compare box applies a candidate, remembers the ones passed over and can forget an earlier answer; "Fix all" reports what it wrote to the sidecar. Type-check and the 619 Content Health tests pass (and the editor's whole suite, 25,563 tests, on 15 Nov 2026). |
+| `~/xmleditor` | Report rows show the repair, who settled it (planner, finder agent, version history, rule) and "Replace link". A bar above the rows gives the counts, the "AI repair plan" and "Fix all". The compare box applies a candidate, remembers the ones passed over and can forget an earlier answer; "Fix all" reports what it wrote to the sidecar. Type-check and the 620 Content Health tests pass (and the editor's whole suite, 25,563 tests, on 15 Nov 2026). |
 
 The rules reach the agent through a local HTTP sidecar. A product version would call the Guides AI service instead.
 
