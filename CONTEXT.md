@@ -75,7 +75,7 @@ What the agent keeps between checks, in `out/` next to the sidecar (not in git):
 
 ## The product code
 
-On a local branch `garage/fact-conflict-rule` (the name is left over from the dropped rule) in Adobe's internal repositories `starling` and `xmleditor`. Nothing was pushed. Module `core/content-health` in `starling`; folder `src/controllers/widgets/content_health_report` and three widget views in `xmleditor`.
+On a local branch `garage/reference-healer` (cut on 15 Nov 2026 from `garage/fact-conflict-rule`, which is kept and points at the same commits) in Adobe's internal repositories `starling` and `xmleditor`. Nothing was pushed. Module `core/content-health` in `starling`; folder `src/controllers/widgets/content_health_report` and three widget views in `xmleditor`.
 
 `starling`, on top of `6e4234c29f`:
 
@@ -141,7 +141,7 @@ Read the "Measured" table and the limits in the README. The short version, to ke
 
 ## State on 14 Nov 2026
 
-- Tests: 73 here, 622 in the editor's Content Health folders, and the Java module's tests pass.
+- Tests: 77 here, 626 in the editor's Content Health folders, and the Java module's tests pass.
 - The local AEM holds `/content/dam/large-demo` (after a "Fix all": 492 findings left), `/content/dam/large-demo-outside`, `/content/dam/ref-demo`.
 - All four capabilities of the idea text have been seen working inside AEM.
 
@@ -154,7 +154,7 @@ Read the "Measured" table and the limits in the README. The short version, to ke
 4. **Scale.** The budget of 40 targets per check is unit-tested only. References to files a build generates count as broken when content comes as plain files.
 5. **Condition presets, `ditavalref`, flagging and baselines** are not evaluated for the per-output counts.
 6. **The live list and the memory go through a local sidecar.** In the product they belong to the report job and the Guides AI service.
-8. **The branch name** `garage/fact-conflict-rule` no longer says what is on it.
+8. **The branch name**: done on 15 Nov 2026, the work is on `garage/reference-healer` in both repositories. Not pushed.
 9. The small sample `ref-demo` was uploaded to AEM by hand; there is no loader for it.
 
 ## Where things are

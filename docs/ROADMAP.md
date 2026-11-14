@@ -31,7 +31,7 @@ Each item: the problem in the writer's words, what the agents would do, what it 
 
 ### 1. A way out when the content is gone  (all three)
 
-**Built on 14 Nov 2026** (`wayout.py`, `way_out.ts`); see the README. Not yet done: scoring the planner's suggestion against a writer's choice on more than the sample's three pieces.
+**Built on 14 Nov 2026** (`wayout.py`, `way_out.ts`); see the README. Scored on ten made-up pieces on 15 Nov 2026 (`wayouteval.py`): 10 of 10 in two runs. Not yet done: the same on real content, with a writer's choices.
 
 *"109 of my references point at something a colleague deleted. Telling me so is not help."*
 
@@ -125,6 +125,16 @@ Found while checking that everything built so far really works (14 Nov 2026), an
 | The "Repaired" list showed an empty line | Two rows from two page loads had the same key. A repaired row's key is now its reference |
 | Resetting the sample did not finish on a clean folder | The loader posted the map to an address that only works when the map exists |
 | Counts drifted after several "Fix all" and reset rounds (758 ready instead of 710) | Old versions stayed in AEM's history. The loader removes the sample's folders first |
+
+Found in a full rehearsal on a second copy of the sample (15 Nov 2026), and fixed:
+
+| What | Fix |
+|---|---|
+| "Save anyway" and "Generate anyway" were the default buttons of their questions, so Enter did the risky thing | A copy of the product's confirmation dialog with Cancel as the default (`content_health_confirmation`) |
+| A topic opened from the "Repaired" list showed other references in red and it looked as if the repair had failed | A notice says how many references of that topic are still in the findings |
+| After one topic got its own candidate, the compare box still said "Use 1 for all 51" and "change 51 files" | The box counts the rows that are left |
+
+Timed in that rehearsal: "Fix all" saved 220 files in 16 s; one topic's own answer about 9 s; "Put it back" settled 46 rows in one press.
 
 Fixed on 15 Nov 2026, the wait after "Fix all":
 
