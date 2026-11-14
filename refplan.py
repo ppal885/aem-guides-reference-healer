@@ -285,6 +285,7 @@ class Session:
         self.outside = {str(k).lstrip("/"): list(v) for k, v in (outside or {}).items() if isinstance(v, list)}
         self.aem_only = []        # reported as broken by the repository, resolving in the files given
         self.distrust = []        # kinds of edit at the source the last "Fix all" showed not to hold in the repository
+        self.waiting = set()      # repaired by the last "Fix all", still listed by the repository until it has indexed them
         self.progress = progress or (lambda text: None)   # one line on what is happening now, for a live view
         self.original = [dict(f) for f in files]
         self.files = [dict(f) for f in files]
@@ -807,8 +808,9 @@ class Session:
                 lines.append("AEM still reports %s I repaired as broken, in a second check. My check and AEM's disagree "
                              "there; I will not propose those repairs again." % _count(len(still), "reference"))
             elif still:
-                lines.append("AEM still lists %s that were just repaired. It may not have indexed them yet; "
-                             "check again in a minute." % _count(len(still), "reference"))
+                self.waiting |= {(k[0], k[1], k[3]) for k in still}
+                lines.append("AEM still lists %s just repaired. It has not indexed the change yet; counted as "
+                             "waiting, not as findings." % _count(len(still), "reference"))
             # An edit at the source (a key or an id put back) changes no reference, so whether it held
             # shows only in what the repository still reports for references that resolve here.
             kinds = {"keys" if key[1] in ("keyref", "conkeyref") else "id" for key in self.aem_only
@@ -821,10 +823,17 @@ class Session:
                              "them (%s). That kind of edit does not hold in AEM; from now on I repair such references "
                              "one by one instead." % (_count(other, "reference"), " and ".join(
                                  "a key renamed back" if kind == "keys" else "an id put back" for kind in self.distrust)))
+            elif source:
+                # The edit at the source is in the repository; AEM needs time (more than ten minutes
+                # was measured for keys) before its report follows. Until then these are not findings.
+                wanted = {"keyref", "conkeyref"} if "keys" in source else set()
+                wanted |= set(refcheck.PATH_ATTRS) if "id" in source else set()
+                self.waiting |= {key for key in self.aem_only if key[1] in wanted}
+                lines.append("AEM still lists %s repaired by the edit at the source. It has not indexed the change "
+                             "yet; counted as waiting, not as findings." % _count(other, "reference"))
             elif other:
-                lines.append("AEM also reports %s as broken that resolve in the files I was given, for example after an "
-                             "edit at the source. They are in the list without a repair; if AEM has not indexed the "
-                             "change yet, they go away with the next check." % _count(other, "reference"))
+                lines.append("AEM also reports %s as broken that resolve in the files I was given. They are in the "
+                             "list without a repair." % _count(other, "reference"))
             return lines, failed, (not still and not source) or settled
         if self.aem_only:
             lines.append("AEM reports %s as broken that resolve in the files I was given. They are in the list "
@@ -835,11 +844,14 @@ class Session:
         repo, lines = self.rounds[0]["repo"], {}
         for ref in repo.refs:
             lines.setdefault((ref["file"], ref["attribute"], ref["value"]), ref["line"])
+        waiting = "Repaired by the last Fix all. AEM has not indexed the change yet; this leaves the list by itself."
+        differs = ("AEM reports this reference as broken, but its target exists in the files of this map. AEM's check "
+                   "and the planner's differ here.")
         return [{"file": "/" + file, "line": lines.get((file, attribute, value), 0), "attribute": attribute, "old": value,
-                 "new": None, "target": None, "caveat": "", "used_in": ["/" + file], "stage": "planner", "verdict": "none",
-                 "reason": "AEM reports this reference as broken, but its target exists in the files of this map. If it "
-                           "was just repaired, AEM may not have indexed it yet; otherwise AEM's check and the planner's "
-                           "differ here."} for file, attribute, value in self.aem_only]
+                 "new": None, "target": None, "caveat": "", "used_in": ["/" + file], "stage": "planner",
+                 "verdict": "pending" if (file, attribute, value) in self.waiting else "none",
+                 "reason": waiting if (file, attribute, value) in self.waiting else differs}
+                for file, attribute, value in self.aem_only]
 
     # ---- the result ------------------------------------------------------------------------
 

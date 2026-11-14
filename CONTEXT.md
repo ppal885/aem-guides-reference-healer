@@ -132,7 +132,7 @@ Read the "Measured" table and the limits in the README. The short version, to ke
 
 ## State on 14 Nov 2026
 
-- Tests: 48 here, 587 in the editor's Content Health folders, and the Java module's tests pass.
+- Tests: 54 here, 588 in the editor's Content Health folders, and the Java module's tests pass.
 - The local AEM holds `/content/dam/large-demo` (after a "Fix all": 492 findings left), `/content/dam/large-demo-outside`, `/content/dam/ref-demo`.
 - All four capabilities of the idea text have been seen working inside AEM.
 
@@ -144,7 +144,6 @@ Read the "Measured" table and the limits in the README. The short version, to ke
 4. **Scale.** The budget of 40 targets per check is unit-tested only. References to files a build generates count as broken when content comes as plain files.
 5. **Condition presets, `ditavalref`, flagging and baselines** are not evaluated for the per-output counts.
 6. **The live list and the memory go through a local sidecar.** In the product they belong to the report job and the Guides AI service.
-7. **Narrow panel.** A row's actions run off the right edge; "Replace link" can be half hidden.
 8. **The branch name** `garage/fact-conflict-rule` no longer says what is on it.
 9. The small sample `ref-demo` was uploaded to AEM by hand; there is no loader for it.
 

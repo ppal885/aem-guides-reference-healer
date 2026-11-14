@@ -41,7 +41,7 @@ python3 refcheck.py samples/ref-demo/v2
 python3 refheal.py samples/ref-demo/v2
 ```
 
-The first runs the 48 tests (no network, no model). The second lists the 11 broken references of the small sample. The third repairs them with the fixed pipeline and writes a report and a patch to `out-refs/`.
+The first runs the 54 tests (no network, no model). The second lists the 11 broken references of the small sample. The third repairs them with the fixed pipeline and writes a report and a patch to `out-refs/`.
 
 The evaluations call the model and take minutes:
 
@@ -223,7 +223,7 @@ Read the limits before quoting these:
 - **How it repairs still varies.** In one of three runs the planner chose nine edits at the source for references it rewrote one by one in the others. What is applied and what is asked did not vary.
 - **Ranking is measured on nine cases I wrote, twice.** Real content is not measured, and the choice per reference was seen to split a group only in that sample.
 - **Learning that a repair "did not hold" is only unit-tested.** In AEM the references AEM still listed went away by themselves after more than ten minutes, so the 30-minute rule never fired.
-- **AEM is slow to forget key references.** After keys were renamed back in the map, the Broken links report listed the 198 references to them for more than ten minutes. The report shows them as "AEM may not have indexed it yet".
+- **AEM is slow to forget key references.** After keys were renamed back in the map, the Broken links report listed the 198 references to them for more than ten minutes. The panel counts them as "repaired and waiting for AEM to index the change" and does not list them as findings.
 - **"Affected outputs" evaluates DITAVAL filters on an output preset, and nothing else.** A condition preset is named and not evaluated. Flagging rules, a DITAVAL referenced from inside the map (`ditavalref`), key-based conditions and baselines are not looked at. The count is of references, not of pages. The DITAVAL rule is the plain one: an element is dropped when every value of one of its condition attributes is excluded.
 - The 1,251-reference sample is generated from templates. It has renamed, reworded, moved, merged, split and removed content, but real content is messier.
 - Key scopes are read in a simple way: a key in a scope counts as defined under its plain and its qualified names everywhere, so a reference from outside the scope to the plain name is not flagged. The end of a conref range (`conrefend`) is checked like a conref; whether AEM's report lists it has not been tried.
@@ -243,7 +243,7 @@ Read the limits before quoting these:
 | `reporthtml.py` | Shared pieces of the HTML report `refheal.py` writes. |
 | `samples/` | `ref-demo` (8 files, 11 broken references), `gen_large.py` (writes the 225-file sample, with content for internal readers and a DITAVAL), `gen_rank.py` (nine two-candidate cases), `load_large_demo.sh` (loads or resets the large sample in the local AEM and gives its "AEM Sites" output the DITAVAL filter), `set_output_filter.py`. |
 | `eval/` | Saved inputs and answers of the evaluations. |
-| `tests/` | `python3 -m unittest discover -s tests` (48 tests, no network, no model). |
+| `tests/` | `python3 -m unittest discover -s tests` (54 tests, no network, no model). |
 | `docs/` | `RUN.md` start and demo steps, `DEMO.md` the 5-minute script, `EVAL-REFS.md` the evaluation on public documentation. |
 
 ## Product code
@@ -253,7 +253,7 @@ On local branches named `garage/fact-conflict-rule` (the name is left over from 
 | Repository | What changed |
 |---|---|
 | `~/starling`, `core/content-health` | `BrokenLinkValidationRule` sends the map's files and their previous versions to `ReferenceRepairAdvisor` and attaches repairs, source fixes and the planner's plan to its findings. Findings carry `suggestedValue`, `suggestionType`, `suggestionLabel`, `suggestionSource`. It also sends AEM's own list of broken references and the files outside the map that use the changed files. The module's unit tests pass. |
-| `~/xmleditor` | Report rows show the repair, who settled it (planner, finder agent, version history, rule) and "Replace link". A bar above the rows gives the counts, the "AI repair plan" and "Fix all". The compare box applies a candidate, remembers the ones passed over and can forget an earlier answer; "Fix all" reports what it wrote to the sidecar. Type-check and the 582 Content Health tests pass. |
+| `~/xmleditor` | Report rows show the repair, who settled it (planner, finder agent, version history, rule) and "Replace link". A bar above the rows gives the counts, the "AI repair plan" and "Fix all". The compare box applies a candidate, remembers the ones passed over and can forget an earlier answer; "Fix all" reports what it wrote to the sidecar. Type-check and the 588 Content Health tests pass. |
 
 The rules reach the agent through a local HTTP sidecar. A product version would call the Guides AI service instead.
 
@@ -261,10 +261,9 @@ The rules reach the agent through a local HTTP sidecar. A product version would 
 
 UI and UX:
 
-- The live progress while a check runs is read by the editor straight from the local sidecar (`/progress`). In the product it has to come from the report job.
+- The live progress while a check runs is read by the editor straight from the local sidecar (`/progress?map=`, one per map). In the product it has to come from the report job.
 - The compare box (before, candidates, affected files and outputs) is plain text with one button per candidate. A proper side-by-side view would be better.
 - "Apply to all N" and "Use N for all" remove the rows at once; the author presses Regenerate at the end to confirm against the repository.
-- In a narrow panel the row's actions run off the right edge.
 - The planner's plan is plain numbered text.
 - The plan travels as one extra finding, so the issue count in the panel header is one too high.
 
