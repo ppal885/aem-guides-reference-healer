@@ -38,7 +38,7 @@ Click the repair text on the "trial-resource-limits" row. A paragraph was split 
 
 ## 4. Fix all (1 min)
 
-Press "Fix all", then confirm. 220 files, each saved as a new version. The check runs again by itself, and its plan starts with what became of the repairs: "Since the last Fix all: N repairs saved and resolve."
+Press "Fix all", then confirm. 220 files, each saved as a new version. The 710 rows leave the list at once and the bar says the check starts again in 30 seconds (do not click in the list meanwhile, or it waits for you to press Regenerate). Its plan starts with what became of the repairs: "Since the last Fix all: N repairs saved and resolve."
 
 What is left: the references the planner asked about and the ones with nothing to point at. Those are the ones worth an author's time.
 
