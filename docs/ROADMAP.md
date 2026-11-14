@@ -79,7 +79,7 @@ Needs: a list of maps from AEM's reference index (the rule already asks it for o
 
 A downloadable record per check: each reference, what it was, what it became, the text before and after, who settled it (version history, which agent, which earlier answer), the agent's reason, **the person who accepted it** and when. And an option that a repair needs a second person: one proposes with "Apply to all", another accepts the Track Changes marks.
 
-Needs: the editor knows the signed-in user; the sidecar gets it with the feedback. Accept and Reject on the marks must be tried first: they were not. Measure: the record of one "Fix all" against the versions AEM made.
+Needs: the editor knows the signed-in user; the sidecar gets it with the feedback. Accept and Reject on the marks work (tried 14 Nov 2026). Measure: the record of one "Fix all" against the versions AEM made.
 
 ### 7. Finish what is half done
 
@@ -109,6 +109,18 @@ Fixed, with tests:
 | "Fix all" | An element with two broken references got one change inside another | `xref` with `keyref` and `href` |
 | "Fix all" | A reference inside an element that was itself repaired kept its old value | Nested reuse |
 | Report | A row's "Replace link" left the row in the list and the counts unchanged | Everyone |
+
+Found while checking that everything built so far really works (14 Nov 2026), and fixed:
+
+| What | Fix |
+|---|---|
+| A repaired topic that was open in a tab kept showing the old, broken reference; the row said "Repaired". Saving the tab would have undone the repair | The repair closes the file's tab. A file open with unsaved edits is not touched and is named in the message |
+| A row's "Replace link" made an unsaved edit in the open topic, which did nothing when the topic was not locked, and still moved the row to "Repaired" | It now saves like every other repair, then opens the topic at the element |
+| The "Repaired" list showed an empty line | Two rows from two page loads had the same key. A repaired row's key is now its reference |
+| Resetting the sample did not finish on a clean folder | The loader posted the map to an address that only works when the map exists |
+| Counts drifted after several "Fix all" and reset rounds (758 ready instead of 710) | Old versions stayed in AEM's history. The loader removes the sample's folders first |
+
+Still open from that check: after the sample is reset, "Repaired" rows kept in the browser for edits at the source stay in the list until the browser tab is closed.
 
 Seen first, fixed later the same day:
 

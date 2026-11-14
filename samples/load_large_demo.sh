@@ -1,6 +1,7 @@
 #!/bin/zsh
 # Puts the large sample into the local demo AEM in its broken state (garage-week PoC).
-# Local author on 127.0.0.1 with its default login only. Run again to reset after "Fix all".
+# Local author on 127.0.0.1 with its default login only. Run again to reset after "Fix all": it
+# deletes /content/dam/large-demo and /content/dam/large-demo-outside and loads them again.
 #   ./samples/load_large_demo.sh
 set -e
 A=http://127.0.0.1:4502
@@ -9,11 +10,19 @@ ROOT=/content/dam/large-demo
 cd "$(dirname "$0")/large-demo"
 
 up() {  # version folder, relative file
-  local dir=$(dirname "$2"); [ "$dir" = "." ] && dir=""
-  curl -s -o /dev/null -u $AUTH -F "file=@$1/$2;type=application/xml" -F "fileName=$(basename $2)" "$A$ROOT/$dir.createasset.html"
+  # A file at the top of the sample goes to the folder itself: "$ROOT/.createasset.html" would name
+  # the asset "$ROOT//file", which AEM accepts when it overwrites an asset and refuses for a new one.
+  local dir=$(dirname "$2"); local target="$ROOT/$dir"; [ "$dir" = "." ] && target="$ROOT"
+  curl -s -o /dev/null -u $AUTH -F "file=@$1/$2;type=application/xml" -F "fileName=$(basename $2)" "$A$target.createasset.html"
 }
 stored() { curl -s -u $AUTH "$A$ROOT/$1/jcr:content/renditions/original/jcr:content/jcr:data"; }
 
+# Start from nothing: the sample's folders are removed first, with their version history. A "Fix all"
+# that put an id back leaves a version in which the old id carries the new text; version history
+# then "proves" a rename that the clean sample does not have, and the counts drift from run to run.
+curl -s -o /dev/null -u $AUTH -X DELETE $A$ROOT
+curl -s -o /dev/null -u $AUTH -X DELETE $A/content/dam/large-demo-outside
+sleep 10
 curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sling:Folder" -F "jcr:title=Atlas Cloud guide (large reference demo)" $A$ROOT
 for d in $(cd v1 && ls -d */ | tr -d /); do curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sling:Folder" $A$ROOT/$d; done
 
