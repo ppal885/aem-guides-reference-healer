@@ -1,0 +1,258 @@
+{
+ "sample": "samples/rank-demo",
+ "backend": "cli",
+ "cases": 9,
+ "runs": [
+  {
+   "run": 1,
+   "seconds": 95,
+   "scores": {
+    "in the list": 1,
+    "first right": 8
+   },
+   "applied_without_asking_and_wrong": 0,
+   "rows": [
+    {
+     "file": "upgrade.dita",
+     "old": "lib.dita#lib/backup-note",
+     "right": "lib.dita#lib/backup-before-upgrade",
+     "proposed": "lib.dita#lib/backup-retention",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "in the list",
+     "likelihoods": [
+      78,
+      20
+     ]
+    },
+    {
+     "file": "retention.dita",
+     "old": "lib.dita#lib/backup-note",
+     "right": "lib.dita#lib/backup-retention",
+     "proposed": "lib.dita#lib/backup-retention",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      78,
+      20
+     ]
+    },
+    {
+     "file": "plan_downtime.dita",
+     "old": "lib.dita#lib/restore-note",
+     "right": "lib.dita#lib/restore-duration",
+     "proposed": "lib.dita#lib/restore-duration",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      62,
+      35
+     ]
+    },
+    {
+     "file": "throttling.dita",
+     "old": "lib.dita#lib/api-rate-limit",
+     "right": "lib.dita#lib/api-request-limit",
+     "proposed": "lib.dita#lib/api-request-limit",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      95,
+      4
+     ]
+    },
+    {
+     "file": "cleaning.dita",
+     "old": "lib.dita#lib/burn-warning",
+     "right": "lib.dita#lib/hot-plate",
+     "proposed": "lib.dita#lib/hot-plate",
+     "verdict": "review",
+     "candidates": 1,
+     "outcome": "first right",
+     "likelihoods": [
+      95
+     ]
+    },
+    {
+     "file": "arm_servers.dita",
+     "old": "install.dita#install/install-linux",
+     "right": "install.dita#install/install-on-linux-arm",
+     "proposed": "install.dita#install/install-on-linux-arm",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      90,
+      7
+     ]
+    },
+    {
+     "file": "manage_users.dita",
+     "old": "product-admin",
+     "right": "admin-console",
+     "proposed": "admin-console",
+     "verdict": "fix",
+     "candidates": 1,
+     "outcome": "first right",
+     "likelihoods": [
+      100
+     ]
+    },
+    {
+     "file": "get_help.dita",
+     "old": "support-email",
+     "right": "support-contact",
+     "proposed": "support-contact",
+     "verdict": "review",
+     "candidates": 1,
+     "outcome": "first right",
+     "likelihoods": [
+      72
+     ]
+    },
+    {
+     "file": "change_card.dita",
+     "old": "billing_overview.dita",
+     "right": "billing_payment_methods.dita",
+     "proposed": "billing_payment_methods.dita#billing_payment_methods",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      80,
+      8
+     ]
+    }
+   ]
+  },
+  {
+   "run": 2,
+   "seconds": 107,
+   "scores": {
+    "in the list": 1,
+    "first right": 8
+   },
+   "applied_without_asking_and_wrong": 0,
+   "rows": [
+    {
+     "file": "upgrade.dita",
+     "old": "lib.dita#lib/backup-note",
+     "right": "lib.dita#lib/backup-before-upgrade",
+     "proposed": "lib.dita#lib/backup-retention",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "in the list",
+     "likelihoods": [
+      72,
+      25
+     ]
+    },
+    {
+     "file": "retention.dita",
+     "old": "lib.dita#lib/backup-note",
+     "right": "lib.dita#lib/backup-retention",
+     "proposed": "lib.dita#lib/backup-retention",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      72,
+      25
+     ]
+    },
+    {
+     "file": "plan_downtime.dita",
+     "old": "lib.dita#lib/restore-note",
+     "right": "lib.dita#lib/restore-duration",
+     "proposed": "lib.dita#lib/restore-duration",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      65,
+      33
+     ]
+    },
+    {
+     "file": "throttling.dita",
+     "old": "lib.dita#lib/api-rate-limit",
+     "right": "lib.dita#lib/api-request-limit",
+     "proposed": "lib.dita#lib/api-request-limit",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      93,
+      5
+     ]
+    },
+    {
+     "file": "cleaning.dita",
+     "old": "lib.dita#lib/burn-warning",
+     "right": "lib.dita#lib/hot-plate",
+     "proposed": "lib.dita#lib/hot-plate",
+     "verdict": "review",
+     "candidates": 1,
+     "outcome": "first right",
+     "likelihoods": [
+      95
+     ]
+    },
+    {
+     "file": "arm_servers.dita",
+     "old": "install.dita#install/install-linux",
+     "right": "install.dita#install/install-on-linux-arm",
+     "proposed": "install.dita#install/install-on-linux-arm",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      88,
+      10
+     ]
+    },
+    {
+     "file": "manage_users.dita",
+     "old": "product-admin",
+     "right": "admin-console",
+     "proposed": "admin-console",
+     "verdict": "fix",
+     "candidates": 1,
+     "outcome": "first right",
+     "likelihoods": [
+      100
+     ]
+    },
+    {
+     "file": "get_help.dita",
+     "old": "support-email",
+     "right": "support-contact",
+     "proposed": "support-contact",
+     "verdict": "review",
+     "candidates": 1,
+     "outcome": "first right",
+     "likelihoods": [
+      65
+     ]
+    },
+    {
+     "file": "change_card.dita",
+     "old": "billing_overview.dita",
+     "right": "billing_payment_methods.dita",
+     "proposed": "billing_payment_methods.dita#billing_payment_methods",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      80,
+      10
+     ]
+    }
+   ]
+  }
+ ],
+ "note": "change_card.dita was rescored after the run: the proposal named the right topic with its topic id, which the first scoring did not accept."
+}

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="shared_notes">
+  <title>Shared notes</title>
+  <body>
+    <note id="power-warning" type="warning">Do not unplug the router while the power light is blinking.</note>
+    <note id="backup-tip" type="tip">Save a copy of your settings before you change them.</note>
+    <p id="support-contact">For help, contact support at the number printed under the router.</p>
+  </body>
+</topic>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="cleaning">
+  <title>Clean the device</title>
+  <body>
+    <p>Wait ten minutes after you switch it off.</p><note conref="lib.dita#lib/burn-warning"/>
+  </body>
+</topic>

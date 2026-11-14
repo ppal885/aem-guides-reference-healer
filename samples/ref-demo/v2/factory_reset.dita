@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="factory_reset">
+  <title>Reset the router to factory settings</title>
+  <taskbody>
+    <context><note conref="shared_notes.dita#shared_notes/backup-tip"/></context>
+    <steps>
+      <step><cmd>Hold the reset button for 10 seconds.</cmd></step>
+      <step><cmd>Wait for the power light, then follow <xref href="first_time_setup.dita"/> again.</cmd></step>
+    </steps>
+  </taskbody>
+</task>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="upgrade">
+  <title>Upgrade to version 5</title>
+  <body>
+    <p>Before you start the upgrade:</p><note conref="lib.dita#lib/backup-note"/>
+  </body>
+</topic>

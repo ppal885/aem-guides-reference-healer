@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="troubleshooting">
+  <title>Troubleshooting</title>
+  <body>
+    <section id="no-internet"><title>No internet</title>
+      <p>Restart the <ph keyref="product-name"/>. If that does not help, see <xref keyref="reset-steps"/>.</p></section>
+    <section id="update-fails"><title>Firmware update fails</title>
+      <p>Check the cable and try again. See also <xref href="firmware_update.dita"/>.</p></section>
+    <section id="forgot-password"><title>Forgot the Wi-Fi password</title>
+      <p>See <xref href="wifi_settings.dita#wifi_settings/change-password"/>.</p>
+      <p conref="shared_notes.dita#shared_notes/support-contact"/></section>
+  </body>
+</topic>

@@ -1,0 +1,96 @@
+{
+ "sample": "samples/large-demo",
+ "backend": "cli",
+ "runs": [
+  {
+   "run": 1,
+   "seconds": 138,
+   "references": 1251,
+   "scores": {
+    "applied right": 909,
+    "asked, right": 233,
+    "none, right": 109
+   },
+   "source_edits": 0,
+   "planner_steps": 7,
+   "plan": [
+    "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
+    "19 of those 34 were only renamed: the file's previous version proves it, no AI needed.",
+    "Sent the other 15 to finder agents, each answer checked by a reviewer agent: 12 found under a new name or place, 3 removed for good.",
+    "Decided to repair 800 references. Why: The same content still exists unchanged under a new name, so each reference now points at the new name and your colleague's renames stay.",
+    "Decided to repair 109 references. Why: The same text was moved to another topic, for example the 5 TB object size sentence now lives in the storage topic.",
+    "Decided to ask you about 233 references (7 questions). Why: A likely target exists but its content changed, for example \"Atlas Identity\" became \"Atlas Identity Hub\" and two warnings were merged into one; please confirm.",
+    "Decided to leave 109 references broken. Why: The shared text was removed and nothing replaces it: the notice that the old settings page stays until year end, and the warning that operations can take an hour.",
+    "Tried the plan on a copy and checked again: 909 references work now, 342 left for you.",
+    "Next: Please review the references left for you: confirm the proposed targets where content changed, and decide what topics should say where shared text was removed."
+   ]
+  },
+  {
+   "run": 2,
+   "seconds": 131,
+   "references": 1251,
+   "scores": {
+    "applied right": 895,
+    "asked, right": 247,
+    "none, right": 109
+   },
+   "source_edits": 0,
+   "planner_steps": 8,
+   "plan": [
+    "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
+    "19 of those 34 were only renamed: the file's previous version proves it, no AI needed.",
+    "Sent the other 15 to finder agents, each answer checked by a reviewer agent: 12 found under a new name or place, 3 removed for good.",
+    "Decided to repair 330 references. Why: The same text still exists under a new name, for example the note \"This action permanently deletes data\" is now called permanent-delete.",
+    "Decided to repair 565 references. Why: The same content exists under a new name, so the references follow your colleague's rename, for example console-name is now web-console-name.",
+    "Decided to ask you about 75 references (4 questions). Why: The quota and region notes were merged into one, so each topic would now show both statements; please check both apply.",
+    "Decided to ask you about 172 references (3 questions). Why: A likely new home was found but with doubt, for example the trial limits paragraph was split into resource limits and support level.",
+    "Decided to leave 109 references broken. Why: The content was removed with no replacement: the notice that the old settings page stays until year end, and the warning that large operations can take an hour.",
+    "Tried the plan on a copy and checked again: 895 references work now, 356 left for you.",
+    "Next: Review the references left for you: confirm the proposed targets where content was merged, split or moved, and decide what topics should say where content was removed."
+   ]
+  },
+  {
+   "run": 3,
+   "seconds": 130,
+   "references": 1251,
+   "scores": {
+    "applied right": 840,
+    "asked, right": 302,
+    "none, right": 109
+   },
+   "source_edits": 0,
+   "planner_steps": 8,
+   "plan": [
+    "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
+    "19 of those 34 were only renamed: the file's previous version proves it, no AI needed.",
+    "Sent the other 15 to finder agents, each answer checked by a reviewer agent: 12 found under a new name or place, 3 removed for good.",
+    "Decided to repair 840 references. Why: The same content still exists under a new name, so the references now use the new name and your colleague's renames stay in place.",
+    "Decided to ask you about 75 references (4 questions). Why: The quota and region warnings were merged into one note, so each topic would now show both sentences; please check that fits.",
+    "Decided to ask you about 109 references (2 questions). Why: This content moved to another topic, such as the 5 TB object size sentence now under storage; please confirm the new place and wording fit.",
+    "Decided to ask you about 118 references (2 questions). Why: A likely new target exists but is not certain, for example the trial limits paragraph was split in two; please confirm which one belongs here.",
+    "Decided to leave 109 references broken. Why: This shared text was removed with no replacement: the old settings page notice and the warning that an operation can take up to an hour.",
+    "Tried the plan on a copy and checked again: 840 references work now, 411 left for you.",
+    "Next: Please go through the open questions and confirm or reject each proposed target, then decide what the topics with removed text should say."
+   ]
+  }
+ ],
+ "targets": 34,
+ "targets_decided_the_same_in_every_run": 31,
+ "targets_that_differed": {
+  "conref cli-install": [
+   "fix",
+   "fix",
+   "review"
+  ],
+  "href storage-limits": [
+   "fix",
+   "review",
+   "review"
+  ],
+  "keyref sso-product": [
+   "review",
+   "fix",
+   "fix"
+  ]
+ }
+}

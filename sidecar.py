@@ -1,0 +1,170 @@
+#!/usr/bin/env python3
+"""The sidecar AEM Guides calls for reference repairs, and the one place a model is called from
+(garage-week PoC). Stdlib only.
+
+    python3 -u sidecar.py --serve 8766 [--backend cli|sdk] [--model NAME]
+
+    POST /heal-refs   the files of a map -> repairs, source fixes and the planner's plan
+    POST /feedback    an author accepted a repair, or took an earlier answer back
+    POST /applied     what "Fix all" wrote
+    GET  /progress    what the agents are doing right now
+    GET  /memory      what the planner remembers of authors' answers
+    GET  /health
+
+It listens on 127.0.0.1 only. The model is called through the local `claude` CLI by default, or
+through the Claude API with --backend sdk (claudeapi.py).
+"""
+import argparse
+import json
+import re
+import subprocess
+import tempfile
+
+
+def _log(message):
+    print(message, flush=True)
+
+
+# ---- Model ---------------------------------------------------------------------------------
+
+# "cli" calls the model through the local `claude` CLI; "sdk" uses the Claude API (claudeapi.py).
+BACKEND = "cli"
+
+
+def call_model(system, user, model=None):
+    if BACKEND == "sdk":
+        import claudeapi
+        return claudeapi.call_model(system, user, model)
+    cmd = ["claude", "-p", "--output-format", "json", "--system-prompt", system,
+           "--tools", "", "--no-session-persistence"]
+    if model:
+        cmd += ["--model", model]
+    with tempfile.TemporaryDirectory() as cwd:
+        proc = subprocess.run(cmd, input=user, capture_output=True, text=True, timeout=600, cwd=cwd)
+    if proc.returncode != 0:
+        raise RuntimeError("claude CLI failed: %s" % (proc.stderr or proc.stdout)[:400])
+    envelope = json.loads(proc.stdout)
+    if envelope.get("is_error"):
+        raise RuntimeError("claude CLI error: %s" % str(envelope.get("result"))[:400])
+    return parse_json(envelope.get("result", ""))
+
+
+def parse_json(text):
+    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end < 0:
+        raise ValueError("No JSON object in model output: %s" % text[:200])
+    return json.loads(text[start:end + 1])
+
+
+
+# What the agents are doing right now, for the editor to show while a check runs (prototype only).
+PROGRESS = {"running": False, "lines": [], "timeline": []}
+
+
+def _progress(text):
+    PROGRESS["lines"] = (PROGRESS["lines"] + [text])[-12:]
+
+
+def serve(port, model=None):
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class Handler(BaseHTTPRequestHandler):
+        def send_json(self, status, body):
+            data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+            self.send_response(status)
+            # The editor's dev page reads /progress from another local port.
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def do_GET(self):
+            if self.path == "/progress":
+                self.send_json(200, PROGRESS)
+            elif self.path == "/memory":
+                import refplan
+                self.send_json(200, refplan.load_memory())
+            elif self.path == "/health":
+                self.send_json(200, {"status": "ok"})
+            else:
+                self.send_json(404, {"error": "not found"})
+
+        def do_POST(self):
+            if self.path in ("/feedback", "/applied"):
+                # From the editor, as text/plain so the browser needs no preflight request.
+                #   /feedback  an author accepted a repair ("rejected": the candidates passed over),
+                #              or took an earlier answer back ("forget": true)
+                #   /applied   what "Fix all" wrote, so the next check can see what became of it
+                try:
+                    import refplan
+                    length = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(length).decode("utf-8"))
+                    if self.path == "/applied":
+                        stored = refplan.record_applied(body.get("edits"), body.get("failed"))
+                        _log("Fix all recorded: %d edits" % stored)
+                        self.send_json(200, {"recorded": stored})
+                    elif body.get("forget"):
+                        forgotten = refplan.forget(body.get("attribute"), body.get("old"))
+                        _log("author answer forgotten: %s" % forgotten)
+                        self.send_json(200, {"forgotten": forgotten})
+                    else:
+                        stored = refplan.remember(body.get("attribute"), body.get("old"), body.get("new"),
+                                                  rejected=body.get("rejected"))
+                        _log("author answer stored (%d in all)" % stored)
+                        self.send_json(200, {"stored": stored})
+                except (ValueError, AttributeError, TypeError) as exc:
+                    self.send_json(400, {"error": str(exc)})
+                return
+            if self.path != "/heal-refs":
+                self.send_json(404, {"error": "not found"})
+                return
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                payload = json.loads(self.rfile.read(length).decode("utf-8"))
+                # The planner agent by default; "mode": "pipeline" runs the fixed order of refheal.
+                if payload.get("mode") == "pipeline":
+                    import refheal
+                    self.send_json(200, refheal.heal_files(payload, BACKEND, model, _log))
+                    return
+                import refplan
+                PROGRESS.update(running=True, lines=[], timeline=[])
+                try:
+                    self.send_json(200, refplan.plan_files(payload, BACKEND, model, _log, _progress,
+                                                           timeline=lambda steps: PROGRESS.update(timeline=steps)))
+                finally:
+                    PROGRESS["running"] = False
+            except ValueError:
+                self.send_json(400, {"error": "body is not valid JSON"})
+            except Exception as exc:  # the rule reports the references without repairs on any non-200
+                _log("repair failed: %s" % exc)
+                self.send_json(500, {"error": str(exc)})
+
+        def log_message(self, fmt, *args):
+            _log("%s %s" % (self.address_string(), fmt % args))
+
+    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    _log("Reference repair sidecar on http://127.0.0.1:%d" % port)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        _log("\nSidecar stopped.")
+    finally:
+        server.server_close()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--serve", type=int, metavar="PORT", required=True, help="port to listen on, on 127.0.0.1")
+    parser.add_argument("--model")
+    parser.add_argument("--backend", choices=["cli", "sdk"], default="cli",
+                        help="cli: local claude CLI (default). sdk: Claude API; needs the anthropic package and credentials")
+    args = parser.parse_args()
+    global BACKEND
+    BACKEND = args.backend
+    serve(args.serve, args.model)
+
+
+if __name__ == "__main__":
+    main()

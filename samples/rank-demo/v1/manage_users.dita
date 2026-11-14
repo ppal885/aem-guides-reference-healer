@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="manage_users">
+  <title>Manage users</title>
+  <body>
+    <p>Open <ph keyref="product-admin"/> and choose Users.</p>
+  </body>
+</topic>

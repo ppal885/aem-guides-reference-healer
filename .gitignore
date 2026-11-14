@@ -1,0 +1,15 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Output of a run: reports, patches, logs, and what the agent remembers between checks
+out/
+out-*/
+*.log
+
+# Written by samples/gen_large.py
+samples/large-demo/
+
+# macOS
+.DS_Store

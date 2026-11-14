@@ -1,0 +1,56 @@
+[
+ {
+  "file": "upgrade.dita",
+  "attribute": "conref",
+  "old": "lib.dita#lib/backup-note",
+  "right": "lib.dita#lib/backup-before-upgrade"
+ },
+ {
+  "file": "retention.dita",
+  "attribute": "conref",
+  "old": "lib.dita#lib/backup-note",
+  "right": "lib.dita#lib/backup-retention"
+ },
+ {
+  "file": "plan_downtime.dita",
+  "attribute": "conref",
+  "old": "lib.dita#lib/restore-note",
+  "right": "lib.dita#lib/restore-duration"
+ },
+ {
+  "file": "throttling.dita",
+  "attribute": "conref",
+  "old": "lib.dita#lib/api-rate-limit",
+  "right": "lib.dita#lib/api-request-limit"
+ },
+ {
+  "file": "cleaning.dita",
+  "attribute": "conref",
+  "old": "lib.dita#lib/burn-warning",
+  "right": "lib.dita#lib/hot-plate"
+ },
+ {
+  "file": "arm_servers.dita",
+  "attribute": "href",
+  "old": "install.dita#install/install-linux",
+  "right": "install.dita#install/install-on-linux-arm"
+ },
+ {
+  "file": "manage_users.dita",
+  "attribute": "keyref",
+  "old": "product-admin",
+  "right": "admin-console"
+ },
+ {
+  "file": "get_help.dita",
+  "attribute": "keyref",
+  "old": "support-email",
+  "right": "support-contact"
+ },
+ {
+  "file": "change_card.dita",
+  "attribute": "href",
+  "old": "billing_overview.dita",
+  "right": "billing_payment_methods.dita"
+ }
+]

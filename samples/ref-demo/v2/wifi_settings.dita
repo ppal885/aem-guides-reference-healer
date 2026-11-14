@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="wifi_settings">
+  <title>Wi-Fi settings</title>
+  <body>
+    <section id="change-name"><title>Change the Wi-Fi name</title>
+      <p>In the <ph keyref="admin-app"/> app, open Wi-Fi and type a new name.</p></section>
+    <section id="wifi-password"><title>Change the Wi-Fi password</title>
+      <p>Open Wi-Fi, then Security, and type a new password of at least 12 characters.</p>
+      <note conref="shared_notes.dita#shared_notes/backup-tip"/></section>
+    <section id="guest-network"><title>Guest network</title>
+      <p>Turn on the guest network to give visitors internet without your main password.</p></section>
+  </body>
+</topic>
