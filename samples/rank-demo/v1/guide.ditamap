@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">
+<map>
+  <title>Atlas guide</title>
+  <keydef keys="product-admin"><topicmeta><keywords><keyword>Admin Console</keyword></keywords></topicmeta></keydef>
+  <keydef keys="support-email"><topicmeta><keywords><keyword>support@atlas.example</keyword></keywords></topicmeta></keydef>
+  <topicref href="arm_servers.dita"/>
+  <topicref href="billing_overview.dita"/>
+  <topicref href="change_card.dita"/>
+  <topicref href="cleaning.dita"/>
+  <topicref href="get_help.dita"/>
+  <topicref href="install.dita"/>
+  <topicref href="lib.dita"/>
+  <topicref href="manage_users.dita"/>
+  <topicref href="plan_downtime.dita"/>
+  <topicref href="retention.dita"/>
+  <topicref href="throttling.dita"/>
+  <topicref href="upgrade.dita"/>
+</map>

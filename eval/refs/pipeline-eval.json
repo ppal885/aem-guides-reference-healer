@@ -1,0 +1,55 @@
+{
+ "sample": "samples/large-demo",
+ "mode": "pipeline",
+ "backend": "cli",
+ "runs": [
+  {
+   "run": 1,
+   "seconds": 74,
+   "references": 1251,
+   "scores": {
+    "applied right": 895,
+    "asked, right": 247,
+    "none, right": 109
+   },
+   "source_edits": 22,
+   "planner_steps": null,
+   "plan": null
+  },
+  {
+   "run": 2,
+   "seconds": 74,
+   "references": 1251,
+   "scores": {
+    "applied right": 949,
+    "asked, right": 193,
+    "none, right": 109
+   },
+   "source_edits": 22,
+   "planner_steps": null,
+   "plan": null
+  },
+  {
+   "run": 3,
+   "seconds": 70,
+   "references": 1251,
+   "scores": {
+    "applied right": 895,
+    "asked, right": 247,
+    "none, right": 109
+   },
+   "source_edits": 22,
+   "planner_steps": null,
+   "plan": null
+  }
+ ],
+ "targets": 34,
+ "targets_decided_the_same_in_every_run": 33,
+ "targets_that_differed": {
+  "href storage-limits": [
+   "review",
+   "fix",
+   "review"
+  ]
+ }
+}

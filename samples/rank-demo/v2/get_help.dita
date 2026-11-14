@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="get_help">
+  <title>Get help</title>
+  <body>
+    <p>If the error stays, write to <ph keyref="support-email"/> and attach the log.</p>
+  </body>
+</topic>

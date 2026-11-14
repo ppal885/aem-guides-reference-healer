@@ -1,0 +1,1036 @@
+#!/usr/bin/env python3
+"""A planner agent that repairs the broken references of a whole map (garage-week PoC).
+
+refheal.py settles one broken reference at a time in a fixed order. Here an agent is given the
+whole job and decides how to do it:
+
+    planner agent
+      overview            what is broken, grouped by target, with what code already proved
+      investigate         hands groups to finder agents; a reviewer agent checks each answer
+      decide              per group: repair the references, repair at the source, ask the
+                          author, or leave it broken
+      apply_and_recheck   applies its decisions to a copy of the files and scans again;
+                          what is still broken becomes the next round
+      finish              a summary for the author
+
+The planner cannot write to the repository. It works on a copy held in memory; the result is a
+list of edits that a person applies ("Fix all") or not. Code checks every decision: a repair
+must have passed the reviewer, and an edit at the source must not break a reference that works.
+If the planner fails or stops early, the remaining groups get the cautious default.
+"""
+import collections
+import concurrent.futures
+import hashlib
+import json
+import os
+import re
+import time
+
+import agentloop
+import refcheck
+import refheal
+
+# What the planner learned from authors, kept between checks:
+#   answers   {"attribute|old value": new value}   a repair an author accepted; not asked about again
+#   rejected  {"attribute|old value": [values]}    targets an author passed over, or that AEM kept
+#                                                  reporting as broken after they were applied
+#   renames   [{"kind", "old", "new", ...}]        the rename behind an accepted answer, so that the
+#                                                  same old target reached through another attribute
+#                                                  or file needs no second question
+MEMORY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out", "author-answers.json")
+# What the editor applied with the last "Fix all", so the next check can see what became of it.
+APPLIED_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out", "last-fix-all.json")
+
+
+def _memory(data):
+    """The stored memory in today's form. The first version was a flat {"attribute|old": new}."""
+    data = data if isinstance(data, dict) else {}
+    if not any(key in data for key in ("answers", "rejected", "renames", "no_source_edit")):
+        data = {"answers": {k: v for k, v in data.items() if isinstance(v, str)}}
+    data.setdefault("answers", {})
+    data.setdefault("rejected", {})
+    data.setdefault("renames", [])
+    data.setdefault("no_source_edit", [])   # "keys" / "id": edits at the source that did not hold in the repository
+    return data
+
+
+def _read(path):
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return json.load(handle)
+    except (OSError, ValueError):
+        return None
+
+
+def _write(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=1, ensure_ascii=False)
+
+
+def load_memory(path=None):
+    return _memory(_read(path or MEMORY_PATH))
+
+
+def _renames(attribute, old, new):
+    """What was renamed, read off an accepted answer. A rename is tied to the file or key it
+    happened in; an element id reached through a key is not, and counts as a weaker hint."""
+    source = "%s|%s" % (attribute, old)
+    if attribute in ("keyref", "conkeyref"):
+        old_key, _, old_id = old.partition("/")
+        new_key, _, new_id = new.partition("/")
+        found = [{"kind": "key", "old": old_key, "new": new_key}] if old_key != new_key else []
+        if old_id and new_id and old_id != new_id:
+            found.append({"kind": "element", "old": old_id, "new": new_id})
+    else:
+        old_file, _, old_part = old.partition("#")
+        new_file, _, new_part = new.partition("#")
+        if old_file == new_file:
+            found = [{"kind": "fragment", "file": old_file, "old": old_part, "new": new_part}]
+        elif old_part == new_part:
+            found = [{"kind": "file", "old": old_file, "new": new_file}]
+        else:
+            found = [{"kind": "address", "old": old, "new": new}]
+    return [dict(entry, source=source) for entry in found]
+
+
+def learned(memory, attribute, value):
+    """(new value, exact) from the renames authors accepted, or None. exact is False when the hint
+    is an element id that was renamed behind some key: it may be another file's element."""
+    exact, new = True, value
+    if attribute in ("keyref", "conkeyref"):
+        key, _, element_id = value.partition("/")
+        for rename in memory["renames"]:
+            if rename["kind"] == "key" and rename["old"] == key:
+                key = rename["new"]
+            elif rename["kind"] == "element" and element_id and rename["old"] == element_id:
+                element_id, exact = rename["new"], False
+        new = key + ("/" + element_id if element_id else "")
+    else:
+        file_part, _, fragment = value.partition("#")
+        for rename in memory["renames"]:
+            if rename["kind"] == "fragment" and rename["file"] == file_part and rename["old"] == fragment:
+                fragment = rename["new"]
+            elif rename["kind"] == "file" and rename["old"] == file_part:
+                file_part = rename["new"]
+            elif rename["kind"] == "address" and rename["old"] == value:
+                file_part, _, fragment = rename["new"].partition("#")
+        new = file_part + ("#" + fragment if fragment else "")
+    return (new, exact) if new != value else None
+
+
+def remember(attribute, old, new, path=None, rejected=None):
+    """Records that an author accepted the repair old -> new, and which other candidates they
+    passed over. Returns how many answers are stored."""
+    if not all(isinstance(v, str) and v.strip() for v in (attribute, old, new)) or old == new:
+        raise ValueError("attribute, old and new must be different, non-empty strings")
+    path = path or MEMORY_PATH
+    memory, key = load_memory(path), "%s|%s" % (attribute, old)
+    memory["answers"][key] = new
+    memory["renames"] = [r for r in memory["renames"] if r.get("source") != key] + _renames(attribute, old, new)
+    declined = [v for v in (rejected or []) if isinstance(v, str) and v and v != new]
+    kept = [v for v in memory["rejected"].get(key, []) if v != new]
+    if kept or declined:
+        memory["rejected"][key] = list(dict.fromkeys(kept + declined))
+    else:
+        memory["rejected"].pop(key, None)
+    _write(path, memory)
+    return len(memory["answers"])
+
+
+def reject(attribute, old, new, path=None):
+    """Records that old -> new is not the repair: an author said so, or AEM kept reporting it."""
+    path = path or MEMORY_PATH
+    memory, key = load_memory(path), "%s|%s" % (attribute, old)
+    if memory["answers"].get(key) == new:
+        forget(attribute, old, path)
+        memory = load_memory(path)
+    memory["rejected"][key] = list(dict.fromkeys(memory["rejected"].get(key, []) + [new]))
+    _write(path, memory)
+
+
+def forget(attribute, old, path=None):
+    """Drops an accepted answer and what was learned from it. Returns whether there was one."""
+    path = path or MEMORY_PATH
+    memory, key = load_memory(path), "%s|%s" % (attribute, old)
+    had = memory["answers"].pop(key, None) is not None
+    memory["renames"] = [r for r in memory["renames"] if r.get("source") != key]
+    _write(path, memory)
+    return had
+
+
+def record_applied(edits, failed=None, path=None):
+    """What "Fix all" wrote, for the next check: [{"file", "attribute", "old", "new"}]."""
+    kept = [{k: e[k] for k in ("file", "attribute", "old", "new")} for e in edits or []
+            if isinstance(e, dict) and all(isinstance(e.get(k), str) and e.get(k) for k in ("file", "attribute", "old", "new"))]
+    _write(path or APPLIED_PATH, {"when": time.time(), "checks": 0, "edits": kept,
+                                  "failed": [f for f in failed or [] if isinstance(f, str)]})
+    return len(kept)
+
+
+# How long after "Fix all" the repository may still list a repaired reference before the planner
+# concludes the repair did not hold. Measured on 14 Nov 2026: after keys were renamed back in a map,
+# AEM listed the 198 references to them for more than ten minutes, then dropped them by itself.
+SETTLE_SECONDS = 1800
+# What finder and reviewer agents concluded, kept between checks so that a check after "Fix all", or
+# the next morning, does not pay for the same search again. An entry is used only while the broken
+# target, what it used to show and the file (or the maps) it lives in are all unchanged.
+CACHE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out", "agent-findings.json")
+CACHE_DAYS = 7
+# How many broken targets finder agents look at in one check. One agent per target is about two
+# minutes for 15 targets and was 47 minutes for 388; past this number the targets with the most
+# references go first and the rest wait for the next check.
+MAX_GROUPS = int(os.environ.get("REFHEAL_MAX_GROUPS", "40"))
+
+CHOOSE_SYSTEM = """A shared piece of DITA content was changed and references to it broke. Two or three candidate targets could replace it. Different topics may have meant different candidates.
+
+You get what the old target showed, the candidates with what each shows now, and the references: the topic each sits in and the sentence around it. For every reference choose the candidate that fits what that topic needs there. When nothing in the topic or sentence tells them apart, choose candidate 1.
+
+Reply with one JSON object and nothing else: {"choices": [{"reference": <number>, "candidate": <number>}]}"""
+MAX_PLANNER_CALLS = 14
+MAX_ROUNDS = 4
+ACTIONS = ("repair_references", "repair_at_source", "ask_author", "leave_broken")
+
+PLANNER_SYSTEM = """You are in charge of repairing the broken references of one DITA map. Other agents work for you.
+
+A clean-up of shared content broke many references: ids and keys were renamed, content was reworded, moved, merged or removed. Your job is to get as many references as possible pointing at the right thing again with as few and as safe edits as possible, and to hand the author a short, clear list of what only a person can decide.
+
+You work with tools:
+- overview: the broken references of the current round, grouped by what they point at. A group may already carry a repair that code proved from the file's version history.
+- investigate: give groups without a repair to finder agents. Each answer is checked by a reviewer agent. Send all such groups in one call; they run in parallel.
+- decide: choose what to do with one or more groups, with your reason.
+- apply_and_recheck: apply your decisions to a working copy and scan again. References that are still broken, or newly broken, come back as the next round.
+- finish: when nothing is left that you can settle.
+
+The four decisions:
+- repair_references: rewrite each reference to the repair. Allowed only when the repair has verdict "fix".
+- repair_at_source: one edit where the target lives instead of one edit per reference. Offered only when code found it safe, and the option says what the edit is. An edit that adds a second name to a key is harmless and saves many edits. An edit that renames a key or an element id back undoes a colleague's rename and breaks any reference you repair to the new name in the same round, so choose it only when the saving is large and you decide every group that touches that key or id consistently.
+- ask_author: a target was found but with doubt (verdict "review" or a caveat), or two readings are possible. The author sees the proposal and the doubt.
+- leave_broken: the content is gone and nothing replaces it. Say what it used to be so the author can decide what the topics should say.
+
+How to work:
+1. Call overview. Read it before you act.
+2. Investigate every group that has no repair, in one call.
+3. Decide every group. Group your decide calls by action. The reason is shown to the author as it is: one sentence of at most 25 plain words that says why, with an example from the content if it helps. No group ids, no file paths, no jargon such as "verdict".
+4. Call apply_and_recheck. Read what is still broken. An edit can uncover a second break in the same reference (a renamed key hid a renamed id). Handle the next round the same way.
+5. Finish when the recheck shows nothing left that you can settle. The summary is two short sentences for the author: what they should do next, and what to look at first. The counts are shown elsewhere; do not repeat them.
+
+A wrong repair is worse than none: a conref to the wrong element silently publishes wrong content. When in doubt, ask the author."""
+
+FINISH = {"name": "finish", "description": "End the job.",
+          "properties": {"summary": {"type": "string", "description": "for the author, two short plain sentences: what to do next and what to look at first"}},
+          "required": ["summary"]}
+
+
+def apply_attribute_edits(xml, edits):
+    """edits: [(attribute, old value, new value)]. Every occurrence in that attribute changes."""
+    changed = 0
+    for attribute, old, new in dict.fromkeys(edits):
+        pattern = re.compile(r'(\s%s\s*=\s*)(["\'])%s\2' % (re.escape(attribute), re.escape(refcheck_escape(old))))
+        xml, count = pattern.subn(lambda m: m.group(1) + m.group(2) + refcheck_escape(new) + m.group(2), xml)
+        changed += count
+    return xml, changed
+
+
+def refcheck_escape(value):
+    return value.replace("&", "&amp;").replace("<", "&lt;").replace('"', "&quot;")
+
+
+def _one_sentence(text, limit=170):
+    """The first sentence of a reason, without the planner's internal group ids."""
+    text = re.sub(r"\s*\((?:r\d+-)?g\d+(?:[^)]*)\)", "", text)
+    text = re.sub(r"\b(?:r\d+-)?g\d+\b,?\s*", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    first = re.split(r"(?<=[.!?])\s", text, 1)[0]
+    return first if len(first) <= limit else first[:limit].rsplit(" ", 1)[0] + "…"
+
+
+def _plain(text):
+    return re.sub(r"\s+", " ", text or "").strip()
+
+
+def _count(number, word):
+    return "%s %s%s" % (format(number, ","), word, "" if number == 1 else "s")
+
+
+def _whole_sentences(text, limit):
+    """text cut to the limit at the end of a sentence."""
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    end = max(cut.rfind(". "), cut.rfind("? "))
+    return cut[:end + 1] if end > limit // 3 else cut.rstrip() + "…"
+
+
+class Session:
+    """The planner's working copy and the tools it acts through."""
+
+    def __init__(self, files, backend="cli", model=None, log=print, progress=None, memory=None, reported=None,
+                 outside=None, timeline=None, cache=None, max_groups=None,
+                 choose=None):
+        self.backend, self.model, self.log = backend, model, log
+        # Who is doing what, as rows for a live view: [{"id", "state", "who", "text"}], state is
+        # "done", "active" or "waiting". on_timeline gets the whole list after every change.
+        self.steps, self.on_timeline = [], timeline or (lambda steps: None)
+        self.cache = cache                      # None: remember nothing between checks
+        self.max_groups = MAX_GROUPS if max_groups is None else max_groups
+        self.choose = choose or self._ask_which_candidate
+        self.reused = 0                         # findings taken from the cache in this check
+        self.memory = _memory(memory or {})
+        # What the repository itself reports as broken: {(file, attribute, value)}, or None when not told.
+        self.reported = None if reported is None else {
+            (str(r.get("file", "")).lstrip("/"), r.get("attribute"), r.get("value")) for r in reported if isinstance(r, dict)}
+        # Files outside this map that point into a file of it: {path: [paths]}. The map's files are all the planner sees.
+        self.outside = {str(k).lstrip("/"): list(v) for k, v in (outside or {}).items() if isinstance(v, list)}
+        self.aem_only = []        # reported as broken by the repository, resolving in the files given
+        self.distrust = []        # kinds of edit at the source the last "Fix all" showed not to hold in the repository
+        self.progress = progress or (lambda text: None)   # one line on what is happening now, for a live view
+        self.original = [dict(f) for f in files]
+        self.files = [dict(f) for f in files]
+        self.rounds = []          # [{"repo", "groups": {id: group}}], the last one is open
+        self.edits = []           # per round: [(file, attribute, old, new)]
+        self.source_edits = []    # [(file, element, attribute, current, new, label, group ids)]
+        self.left = {}            # (file, attribute, value) -> group that was left to the author
+        self.plan = []            # what the planner did, in words, for the author
+        self.summary = ""
+        self._open_round()
+
+    def step(self, step_id, state, who, text):
+        """Adds a row to the live view, or changes the row with that id."""
+        row = next((s for s in self.steps if s["id"] == step_id), None)
+        if row is None:
+            row = {"id": step_id}
+            self.steps.append(row)
+        row.update(state=state, who=who, text=text)
+        self.on_timeline([dict(s) for s in self.steps])
+
+    def _short(self, group):
+        """The broken id or key of a group, without its file."""
+        return re.split(r"[#/]", self.readable(group["refs"][0]["value"]))[-1]
+
+    def _found(self, group):
+        """One line on what the finder and the reviewer made of a group."""
+        known = group["known"]
+        if not known["new_value"]:
+            return "%s: gone, nothing replaces it" % self._short(group)
+        new = re.split(r"[#/]", self.readable(known["new_value"]))[-1]
+        review = {True: "reviewer agreed", False: "reviewer disagreed"}.get(known.get("reviewer"), "no review")
+        verdict = "same text, safe to repair" if known["verdict"] == "fix" else "text changed, ask the author"
+        return "%s: found %s. %s. %s" % (self._short(group), new, review.capitalize(), verdict.capitalize())
+
+    # ---- rounds ----------------------------------------------------------------------------
+
+    def _open_round(self):
+        repo = refcheck.Repo(files=self.files)
+        groups, by_key = {}, {}
+        for ref in repo.broken():
+            if ref["generated"] or (ref["file"], ref["attribute"], ref["value"]) in self.left:
+                continue
+            by_key.setdefault(refheal.group_key(repo, ref), []).append(ref)
+        number = len(self.rounds) + 1
+        for index, refs in enumerate(by_key.values(), 1):
+            group = {"id": "r%d-g%d" % (number, index), "refs": refs, "known": None, "source": None, "decision": None,
+                     "reason": ""}
+            quick = refheal.rule_fix(repo, refs[0])
+            if quick:
+                proven = quick["reason"].startswith("In the previous version")
+                group["known"] = {"new_value": refheal.new_value(repo, refs[0], quick), "verdict": "fix",
+                                  "how": "history" if proven else "rule", "reason": quick["reason"], "caveat": ""}
+            if not group["known"]:
+                self._recall(repo, group)
+            elif group["known"]["new_value"] in self._declined(refs[0]):
+                group["known"].update(verdict="review", caveat="This repair was declined in an earlier check.")
+            self._source_option(repo, group)
+            groups[group["id"]] = group
+        self.rounds.append({"repo": repo, "groups": groups})
+        return groups
+
+    def _declined(self, ref):
+        return set(self.memory["rejected"].get("%s|%s" % (ref["attribute"], ref["value"]), []))
+
+    def _recall(self, repo, group):
+        """An author accepted this repair in an earlier check, or the rename behind it: use it, if
+        it still resolves and nobody declined it since."""
+        first = group["refs"][0]
+        new, exact = self.memory["answers"].get("%s|%s" % (first["attribute"], first["value"])), True
+        reason = "An author accepted this repair in an earlier check."
+        if not new:
+            hint = learned(self.memory, first["attribute"], first["value"])
+            if hint:
+                new, exact = hint
+                reason = "An author accepted the same rename for another reference in an earlier check."
+        if new and new not in self._declined(first) and repo.check(dict(first, value=new)) is None:
+            group["known"] = {"new_value": new, "verdict": "fix" if exact else "review", "how": "author", "reason": reason,
+                              "caveat": "" if exact else "The rename was accepted for an element reached another way; "
+                                                         "check that this is the same element."}
+
+    def _drop_declined(self, ref, known):
+        """Takes targets an author declined out of a finder's answer; the next candidate moves up."""
+        declined = self._declined(ref)
+        if not declined:
+            return
+        left = [c for c in known.get("candidates") or [] if c["new_value"] not in declined]
+        if known["new_value"] in declined:
+            if left:
+                known.update(new_value=left[0]["new_value"], verdict="review", reason=left[0]["why"],
+                             caveat="The first choice was declined in an earlier check; this is the next candidate.")
+            else:
+                known.update(new_value=None, verdict="none", caveat="",
+                             reason="The only target found was declined in an earlier check.")
+        known["candidates"] = left
+
+    def _weigh(self, repo, ref, known):
+        """Settles "repair" or "ask the author" for a finder's answer on a fact, not on how sure the
+        model sounded in this run: the text the reference showed before, against the text at the
+        new target. The same text is repaired, changed text is asked about. Where the two texts
+        cannot be read, a second run of the finder must name the same target without doubt."""
+        if not known["new_value"]:
+            return
+        was = _plain(refheal.text_at(repo, ref, ref["value"], previous=True, limit=100000))
+        now = _plain(refheal.text_at(repo, ref, known["new_value"], limit=100000))
+        if was and now:
+            known["same_text"] = was == now
+            if was == now and known.get("reviewer") is not False:
+                known.update(verdict="fix", caveat="", reason=known["reason"].rstrip() +
+                             " The text there is word for word what this reference showed before.")
+            elif was != now:
+                known.update(verdict="review", caveat=known["caveat"] or
+                             "The text is not what this reference showed before; read both before accepting.")
+            return
+        if known["verdict"] == "fix":
+            if "second_run_agrees" not in known:
+                second = refheal.heal_one(repo, ref, self.backend, self.model, False, self.log)
+                known["second_run_agrees"] = second["new_value"] == known["new_value"] and second["verdict"] == "fix"
+            if not known["second_run_agrees"]:
+                known.update(verdict="review", caveat="A second, independent run of the finder agent did not confirm "
+                                                      "this target without doubt.")
+
+    def _used_outside(self, repo, group):
+        """Files outside this map that point into the file a group's target lives in."""
+        first = group["refs"][0]
+        if first["attribute"] in refcheck.PATH_ATTRS:
+            target = repo.split_target(first)[0]
+        else:
+            target = (repo.keys.get(first["value"].partition("/")[0]) or {}).get("target")
+        return self.outside.get(target or "", [])
+
+    def _source_option(self, repo, group):
+        # Only in the first round: a later round sees keys and ids this session already edited.
+        known = group["known"]
+        if self.edits or not known or not known["new_value"]:
+            return
+        kind = "keys" if group["refs"][0]["attribute"] in ("keyref", "conkeyref") else "id"
+        if kind in self.memory["no_source_edit"]:
+            return  # learned from an earlier "Fix all": the repository kept reporting such references
+        item = dict(group["refs"][0], uses=[{"file": r["file"]} for r in group["refs"]],
+                    repair={"verdict": known["verdict"], "new_value": known["new_value"]})
+        group["source"] = refheal.source_fix(repo, item)
+
+    @property
+    def current(self):
+        return self.rounds[-1]
+
+    def _uses(self, repo, group):
+        """(file, attribute, old value, new value) for every reference of a group."""
+        first, chosen = group["refs"][0], group.get("choice") or {}
+        result = []
+        for ref in group["refs"]:
+            value = new = chosen.get(ref["file"], group["known"]["new_value"])
+            if ref is not first and ref["attribute"] in refcheck.PATH_ATTRS:
+                target, topic_id, element_id = repo.split_target(dict(first, value=new))
+                value = repo.compose(ref, target=target, topic_id=topic_id, element_id=element_id)
+            result.append((ref["file"], ref["attribute"], ref["value"], value))
+        return result
+
+    def readable(self, value):
+        """A stored reference with the GUID file name replaced by the file's own name."""
+        for stored, path in self.current["repo"].alias.items():
+            value = value.replace(stored, os.path.basename(path))
+        return value
+
+    def _describe(self, group):
+        first = group["refs"][0]
+        entry = {"id": group["id"], "kind": first["attribute"], "broken_value": self.readable(first["value"]),
+                 "why_broken": first["reason"], "references": len(group["refs"]),
+                 "files": len({r["file"] for r in group["refs"]}), "repair": None}
+        known = group["known"]
+        if known:
+            entry["repair"] = {"new_value": self.readable(known["new_value"]) if known["new_value"] else None,
+                               "verdict": known["verdict"], "found_by": known["how"], "reason": known["reason"][:150]}
+            if known["caveat"]:
+                entry["repair"]["caveat"] = known["caveat"][:200]
+            if "same_text" in known:
+                entry["repair"]["text_unchanged"] = known["same_text"]
+        outside = self._used_outside(self.current["repo"], group)
+        if outside:
+            entry["also_used_from_files_outside_this_map"] = len(outside)
+        if group["source"]:
+            entry["source_option"] = group["source"]["label"]
+        if group["decision"]:
+            entry["decided"] = group["decision"]
+        return entry
+
+    # ---- tools -----------------------------------------------------------------------------
+
+    def tool_overview(self, args):
+        groups = self.current["groups"]
+        total = sum(len(g["refs"]) for g in groups.values())
+        return {"summary": "round %d: %d broken references in %d groups" % (len(self.rounds), total, len(groups)),
+                "round": len(self.rounds), "broken_references": total, "left_for_the_author_so_far": len(self.left),
+                "groups": [self._describe(g) for g in groups.values()]}
+
+    def tool_investigate(self, args):
+        groups = self.current["groups"]
+        wanted = [groups[i] for i in args["group_ids"] if i in groups and not groups[i]["known"]]
+        unknown = [i for i in args["group_ids"] if i not in groups]
+        repo = self.current["repo"]
+        wanted.sort(key=lambda g: -len(g["refs"]))
+        remembered = [g for g in wanted if self._from_cache(repo, g)]
+        fresh = [g for g in wanted if g not in remembered]
+        waiting, fresh = fresh[self.max_groups:], fresh[:self.max_groups]
+        for group in waiting:
+            group["known"] = {"new_value": None, "verdict": "none", "how": "planner", "caveat": "", "reason":
+                              "Not looked at in this check: finder agents take the %d broken targets with the most "
+                              "references per check. Run the check again to continue." % self.max_groups}
+        self.progress("Planner handed %d groups to finder agents. A reviewer agent checks each answer." % len(fresh))
+        finished = []
+        number = len(self.rounds)
+        self.step("handed-%d" % number, "active", "Planner agent",
+                  "Handed %s to finder agents, up to 8 at a time" % _count(len(fresh), "group"))
+        for group in remembered:
+            self.step(group["id"], "done", "Memory", "%s (found in an earlier check, nothing changed since)" % self._found(group))
+        for group in fresh:
+            self.step(group["id"], "waiting", "Finder agent", "%s: waiting" % self._short(group))
+
+        def run(group):
+            self.step(group["id"], "active", "Finder agent", "%s: searching files, ids, keys and the previous version"
+                      % self._short(group))
+            outcome = refheal.heal_one(repo, group["refs"][0], self.backend, self.model, False, self.log)
+            group["known"] = {"new_value": outcome["new_value"], "verdict": outcome["verdict"], "how": "finder",
+                              "candidates": outcome["candidates"],
+                              "reason": outcome["reason"], "caveat": outcome["caveat"],
+                              "reviewer": (outcome["review"] or {}).get("agree")}
+            self._to_cache(repo, group, failed=bool(outcome.get("failed")))
+            self._settle(repo, group)
+            self._keep_second_opinion(repo, group)
+            finished.append(group["id"])
+            self.step(group["id"], "done", "Finder + reviewer", self._found(group))
+            self.progress("Finder and reviewer agents: %d of %d groups answered." % (len(finished), len(fresh)))
+            return group
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            done = list(pool.map(run, fresh)) + remembered
+        self.reused += len(remembered)
+        if remembered:
+            self.plan.append("%s: nothing changed since an earlier check, so I used what the agents found then." % (
+                _count(len(remembered), "broken target")))
+        if waiting:
+            self.plan.append("%s with fewer references wait for the next check (%s): I look at %d per check, the ones "
+                             "that break the most references first." % (
+                                 _count(len(waiting), "broken target"), _count(sum(len(g["refs"]) for g in waiting), "reference"),
+                                 self.max_groups))
+        split = [g for g in done if len(set((g.get("choice") or {}).values())) > 1]
+        if split:
+            self.plan.append("%s could mean two different pieces. I read the sentence around each reference and "
+                             "chose per reference (%s)." % (_count(len(split), "broken target"), "; ".join(
+                                 "%s: %s" % (self._short(g), " and ".join(str(n) for n in sorted(
+                                     collections.Counter(g["choice"].values()).values(), reverse=True)))
+                                 for g in split)))
+        found = sum(1 for g in done if g["known"]["new_value"])
+        self.step("handed-%d" % number, "done", "Planner agent", "Handed %s to finder agents: %d found, %d gone" % (
+            _count(len(fresh), "group"), sum(1 for g in fresh if g["known"]["new_value"]),
+            sum(1 for g in fresh if not g["known"]["new_value"])))
+        if fresh:
+            self.plan.append("Sent %d to finder agents, each answer checked by a reviewer agent: %d found under "
+                             "a new name or place, %d removed for good." % (
+                                 len(fresh), sum(1 for g in fresh if g["known"]["new_value"]),
+                                 sum(1 for g in fresh if not g["known"]["new_value"])))
+        return {"summary": "%d investigated, %d with a target" % (len(done), found), "unknown_ids": unknown,
+                "waiting_for_the_next_check": len(waiting),
+                "groups": [self._describe(g) for g in done]}
+
+    def _settle(self, repo, group):
+        """What code does with a finder's answer, fresh or remembered: drops what an author declined,
+        weighs it against the text, splits it per reference where two pieces could be meant."""
+        first, known = group["refs"][0], group["known"]
+        self._drop_declined(first, known)
+        self._weigh(repo, first, known)
+        self._choose_per_reference(repo, group)
+        self._source_option(repo, group)
+
+    def _fingerprint(self, repo, group):
+        """Changes whenever a remembered finding could be out of date: another broken value, another
+        text behind it, or a change in the file (for a key: in the maps) the target lives in."""
+        first = group["refs"][0]
+        if first["attribute"] in refcheck.PATH_ATTRS:
+            scope = [repo.split_target(first)[0]]
+        else:
+            scope = sorted(path for path in repo.files if path.endswith(".ditamap"))
+        xml = {f["path"].lstrip("/"): f["xml"] for f in self.files}
+        parts = [first["attribute"], self.readable(first["value"]), first["element"],
+                 refheal.text_at(repo, first, first["value"], previous=True, limit=100000)] + [xml.get(p, "") for p in scope]
+        return hashlib.sha1(json.dumps(parts, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+    def _from_cache(self, repo, group):
+        """Uses what the agents found for this group in an earlier check, if nothing it rests on changed."""
+        entry = (self.cache or {}).get(self._fingerprint(repo, group))
+        if not entry or time.time() - entry.get("when", 0) > CACHE_DAYS * 86400:
+            return False
+        known = dict(entry["known"], how="finder", remembered=True)
+        if known["new_value"] and repo.check(dict(group["refs"][0], value=known["new_value"])) is not None:
+            return False
+        group["known"] = known
+        group["choice"] = {f: v for f, v in (entry.get("choice") or {}).items()
+                           if repo.check(dict(group["refs"][0], value=v)) is None}
+        self._settle(repo, group)
+        return True
+
+    def _to_cache(self, repo, group, failed=False):
+        if self.cache is None or failed:
+            return   # a search that broke down is not a finding
+        known = group["known"]
+        self.cache[self._fingerprint(repo, group)] = {"when": time.time(), "known": {
+            k: known.get(k) for k in ("new_value", "verdict", "candidates", "reason", "caveat", "reviewer")}}
+
+    def _keep_second_opinion(self, repo, group):
+        """A second finder run is part of the finding: remembered with it, not paid for again."""
+        entry = (self.cache or {}).get(self._fingerprint(repo, group))
+        if entry is not None and "second_run_agrees" in group["known"]:
+            entry["known"]["second_run_agrees"] = group["known"]["second_run_agrees"]
+
+    def _choose_per_reference(self, repo, group):
+        """One old target, two pieces it could mean, many topics: each reference gets the candidate
+        its own sentence asks for. The choice is a proposal; such a group is always for review."""
+        known, refs = group["known"], group["refs"]
+        candidates = (known.get("candidates") or [])[:3]
+        if len(candidates) < 2 or len(refs) < 2 or group.get("choice"):
+            return
+        if len({(r["topic_title"], r["context"]) for r in refs}) < 2:
+            return
+        first = refs[0]
+        described = [{"candidate": n, "target": refheal.target_label(repo, first, c["new_value"]),
+                      "shows_now": refheal.text_at(repo, first, c["new_value"])[:300]} for n, c in enumerate(candidates, 1)]
+        was = refheal.text_at(repo, first, first["value"], previous=True)[:400]
+        choice = {}
+        for start in range(0, len(refs), 60):
+            batch = refs[start:start + 60]
+            try:
+                picked = self.choose(was, described, [{"reference": n, "topic": r["topic_title"], "sentence": r["context"][:240]}
+                                                      for n, r in enumerate(batch, 1)])
+            except Exception as exc:
+                self.log("choosing per reference failed: %s" % str(exc)[:120])
+                return
+            for n, ref in enumerate(batch, 1):
+                index = picked.get(n, 1)
+                choice[ref["file"]] = candidates[index - 1 if 1 <= index <= len(candidates) else 0]["new_value"]
+        group["choice"] = choice
+        if len(set(choice.values())) > 1:
+            known.update(verdict="review", caveat=known["caveat"] or "Two pieces could be meant; the proposal differs "
+                                                                     "by topic. Read both before accepting.")
+            entry = (self.cache or {}).get(self._fingerprint(repo, group))
+            if entry is not None:
+                entry["choice"] = choice
+
+    def _ask_which_candidate(self, was, candidates, references):
+        """{reference number: candidate number}, from one model call."""
+        import sidecar
+        sidecar.BACKEND = self.backend
+        answer = sidecar.call_model(CHOOSE_SYSTEM, json.dumps(
+            {"old_target_showed": was, "candidates": candidates, "references": references}, ensure_ascii=False, indent=1), self.model)
+        return {int(c["reference"]): int(c["candidate"]) for c in answer.get("choices") or []
+                if str(c.get("reference", "")).isdigit() and str(c.get("candidate", "")).isdigit()}
+
+    def _check_decision(self, group, action):
+        """None when the action is allowed for the group, else why not."""
+        known = group["known"]
+        if action == "repair_references":
+            if not known or not known["new_value"]:
+                return "no repair is known; investigate it, or ask_author / leave_broken"
+            if known["verdict"] != "fix":
+                return "the repair has verdict \"%s\", not \"fix\"; use ask_author" % known["verdict"]
+        if action == "repair_at_source" and not group["source"]:
+            return "no safe edit at the source exists for this group; use repair_references"
+        return None
+
+    def tool_decide(self, args):
+        action, reason = args["decision"], args["reason"].strip()
+        if action not in ACTIONS:
+            return {"summary": "unknown decision", "error": "decision must be one of: %s" % ", ".join(ACTIONS)}
+        accepted, rejected = [], {}
+        self.progress("Planner is deciding: %s for %d groups." % (action.replace("_", " "), len(args["group_ids"])))
+        for group_id in args["group_ids"]:
+            group = self.current["groups"].get(group_id)
+            problem = "no such group in this round" if not group else self._check_decision(group, action)
+            if problem:
+                rejected[group_id] = problem
+                continue
+            group["decision"], group["reason"] = action, reason
+            accepted.append(group_id)
+        if accepted:
+            references = sum(len(self.current["groups"][i]["refs"]) for i in accepted)
+            self.plan.append("%s Why: %s" % ({
+                "repair_references": "Decided to repair %s." % _count(references, "reference"),
+                "repair_at_source": "Decided to repair %s with %s where the target lives." % (
+                    _count(references, "reference"), _count(len(accepted), "edit")),
+                "ask_author": "Decided to ask you about %s (%s)." % (
+                    _count(references, "reference"), _count(len(accepted), "question")),
+                "leave_broken": "Decided to leave %s broken." % _count(references, "reference"),
+            }[action], _one_sentence(reason)))
+        undecided = [g["id"] for g in self.current["groups"].values() if not g["decision"]]
+        counts = {}
+        for group in self.current["groups"].values():
+            if group["decision"]:
+                counts[group["decision"]] = counts.get(group["decision"], 0) + len(group["refs"])
+        words = {"repair_references": "repair", "repair_at_source": "repair at the source", "ask_author": "ask the author about",
+                 "leave_broken": "leave broken"}
+        self.step("decide-%d" % len(self.rounds), "active" if undecided else "done", "Planner agent", "Decided: " + ", ".join(
+            "%s %s" % (words[action], format(count, ",")) for action, count in counts.items()))
+        return {"summary": "%d accepted, %d rejected" % (len(accepted), len(rejected)), "accepted": accepted,
+                "rejected": rejected, "still_undecided": undecided}
+
+    def _default(self, group):
+        """The cautious decision for a group the planner did not decide."""
+        known = group["known"]
+        if known and known["new_value"] and known["verdict"] == "fix":
+            return "repair_references"
+        return "ask_author" if known and known["new_value"] else "leave_broken"
+
+    def tool_apply_and_recheck(self, args):
+        current = self.current
+        repo, groups = current["repo"], current["groups"]
+        self.progress("Planner is applying its plan to a working copy and checking again.")
+        number = len(self.rounds)
+        self.step("recheck-%d" % number, "active", "Planner agent", "Applying the plan to a copy and scanning again")
+        defaulted = [g for g in groups.values() if not g["decision"]]
+        for group in defaulted:
+            group["decision"], group["reason"] = self._default(group), "not decided by the planner; cautious default"
+        before = sum(len(g["refs"]) for g in groups.values())
+        edits, by_file, sources = [], {}, 0
+        for group in groups.values():
+            if group["decision"] == "repair_references":
+                for use in self._uses(repo, group):
+                    edits.append(use)
+                    by_file.setdefault(use[0], []).append(use[1:])
+            elif group["decision"] == "repair_at_source":
+                fix = group["source"]
+                self.source_edits.append(dict(fix, groups=[group["id"]]))
+                by_file.setdefault(fix["file"].lstrip("/"), []).append((fix["attribute"], self._current_value(fix), self._merged(fix)))
+                sources += 1
+            else:
+                for ref in group["refs"]:
+                    self.left[(ref["file"], ref["attribute"], ref["value"])] = group
+        self.edits.append(edits)
+        for entry in self.files:
+            wanted = by_file.get(entry["path"].lstrip("/"))
+            if wanted:
+                entry["xml"], _ = apply_attribute_edits(entry["xml"], wanted)
+        remaining = self._open_round()
+        still = sum(len(g["refs"]) for g in remaining.values())
+        left = len(self.left)
+        handed_over = sum(len(g["refs"]) for g in groups.values() if g["decision"] in ("ask_author", "leave_broken"))
+        self.plan.append("Tried the plan on a copy and checked again: %s work now, %s left for you%s." % (
+            _count(before - still - handed_over, "reference"), format(handed_over, ","),
+            ", %s still open" % format(still, ",") if still else ""))
+        self.step("recheck-%d" % number, "done", "Planner agent", "Tried the plan on a copy: %s %s, %s left for the author%s" % (
+            _count(before - still - handed_over, "reference"), "works" if before - still - handed_over == 1 else "work",
+            format(handed_over, ","),
+            ", %s still open" % format(still, ",") if still else ""))
+        result = {"summary": "%d still to settle" % still, "reference_edits": len(edits), "edits_at_the_source": sources,
+                  "left_for_the_author": left, "still_broken_and_undecided": still,
+                  "defaulted_groups": [g["id"] for g in defaulted]}
+        if still and len(self.rounds) <= MAX_ROUNDS:
+            result["next"] = "Round %d has %d groups. Call overview." % (len(self.rounds), len(remaining))
+        else:
+            result["next"] = "Nothing left that you can settle. Call finish."
+        return result
+
+    def _current_value(self, fix):
+        """The attribute's value in the working copy: an earlier source edit may have changed it."""
+        if fix.get("mode") != "alias":
+            return fix["current"]
+        merged = [e for e in self.source_edits[:-1] if (e["file"], e["attribute"], e["current"]) == (fix["file"], "keys", fix["current"])]
+        names = fix["current"].split()
+        for earlier in merged:
+            names += [n for n in earlier["new"].split() if n not in names]
+        return " ".join(names)
+
+    def _merged(self, fix):
+        names = self._current_value(fix).split()
+        names += [n for n in fix["new"].split() if n not in names]
+        return " ".join(names) if fix.get("mode") == "alias" else fix["new"]
+
+    def tools(self):
+        string, array = {"type": "string"}, {"type": "array", "items": {"type": "string"}}
+        return [
+            {"name": "overview", "description": "The broken references of the current round, grouped by target.",
+             "properties": {}, "required": [], "fn": self.tool_overview},
+            {"name": "investigate", "description": "Hand groups that have no repair to finder agents; a reviewer agent checks each answer. Send all of them in one call.",
+             "properties": {"group_ids": array}, "required": ["group_ids"], "fn": self.tool_investigate},
+            # The parameter is not called "action": the CLI protocol uses that word for the tool's name.
+            {"name": "decide", "description": "Decide what to do with groups. decision: repair_references, repair_at_source, ask_author or leave_broken.",
+             "properties": {"group_ids": array, "decision": string, "reason": string},
+             "required": ["group_ids", "decision", "reason"], "fn": self.tool_decide},
+            {"name": "apply_and_recheck", "description": "Apply the decisions of this round to the working copy and scan again.",
+             "properties": {}, "required": [], "fn": self.tool_apply_and_recheck},
+        ]
+
+    # ---- what happened since the last check --------------------------------------------------
+
+    def look_back(self, applied, now=None):
+        """Compares what the last "Fix all" wrote with what the repository holds and reports now.
+        Returns (lines for the plan, [(attribute, old, new)] repairs that did not hold, whether the
+        record is finished with). A repair counts as not holding only when the repository still
+        reports it broken in a second check, SETTLE_SECONDS or more after it was saved: AEM indexes
+        saved files later, and checks soon after "Fix all" can still list them."""
+        repo = self.rounds[0]["repo"]
+        present = {(r["file"], r["attribute"], r["value"]) for r in repo.refs}
+        broken = {(r["file"], r["attribute"], r["value"]) for g in self.current["groups"].values() for r in g["refs"]}
+        if self.reported is not None:
+            self.aem_only = sorted(key for key in self.reported if key in present and key not in broken)
+        lines, failed = [], []
+        edits = (applied or {}).get("edits") or []
+        if edits:
+            keys = [(e["file"].lstrip("/"), e["attribute"], e["old"], e["new"]) for e in edits]
+            unsaved = [k for k in keys if (k[0], k[1], k[2]) in broken]
+            still = [k for k in keys if (k[0], k[1], k[3]) in self.aem_only]
+            held = sum(1 for k in keys if (k[0], k[1], k[3]) in present) - len(still)
+            if any(k[1] not in ("keys", "id") for k in keys):
+                lines.append("Since the last Fix all: %s saved and %s." % (
+                    _count(held, "repair"), "resolves" if held == 1 else "resolve"))
+            if unsaved:
+                lines.append("%s from the last Fix all did not reach the repository (%s); they are in this list again."
+                             % (_count(len(unsaved), "repair"), _count(len({k[0] for k in unsaved}), "file")))
+            settled = applied.get("checks", 0) >= 1 and (now or time.time()) - applied.get("when", 0) >= SETTLE_SECONDS
+            if still and settled:
+                failed = sorted({(k[1], k[2], k[3]) for k in still})
+                lines.append("AEM still reports %s I repaired as broken, in a second check. My check and AEM's disagree "
+                             "there; I will not propose those repairs again." % _count(len(still), "reference"))
+            elif still:
+                lines.append("AEM still lists %s that were just repaired. It may not have indexed them yet; "
+                             "check again in a minute." % _count(len(still), "reference"))
+            # An edit at the source (a key or an id put back) changes no reference, so whether it held
+            # shows only in what the repository still reports for references that resolve here.
+            kinds = {"keys" if key[1] in ("keyref", "conkeyref") else "id" for key in self.aem_only
+                     if (key[0], key[1]) not in {(k[0], k[1]) for k in still}}
+            source = {e["attribute"] for e in edits if e["attribute"] in ("keys", "id")} & kinds
+            other = len(self.aem_only) - len(still)
+            if source and settled:
+                self.distrust = sorted(source)
+                lines.append("AEM still reports %s as broken after the edit at the source that should have repaired "
+                             "them (%s). That kind of edit does not hold in AEM; from now on I repair such references "
+                             "one by one instead." % (_count(other, "reference"), " and ".join(
+                                 "a key renamed back" if kind == "keys" else "an id put back" for kind in self.distrust)))
+            elif other:
+                lines.append("AEM also reports %s as broken that resolve in the files I was given, for example after an "
+                             "edit at the source. They are in the list without a repair; if AEM has not indexed the "
+                             "change yet, they go away with the next check." % _count(other, "reference"))
+            return lines, failed, (not still and not source) or settled
+        if self.aem_only:
+            lines.append("AEM reports %s as broken that resolve in the files I was given. They are in the list "
+                         "without a repair." % _count(len(self.aem_only), "reference"))
+        return lines, failed, True
+
+    def _aem_only_repairs(self):
+        repo, lines = self.rounds[0]["repo"], {}
+        for ref in repo.refs:
+            lines.setdefault((ref["file"], ref["attribute"], ref["value"]), ref["line"])
+        return [{"file": "/" + file, "line": lines.get((file, attribute, value), 0), "attribute": attribute, "old": value,
+                 "new": None, "target": None, "caveat": "", "used_in": ["/" + file], "stage": "planner", "verdict": "none",
+                 "reason": "AEM reports this reference as broken, but its target exists in the files of this map. If it "
+                           "was just repaired, AEM may not have indexed it yet; otherwise AEM's check and the planner's "
+                           "differ here."} for file, attribute, value in self.aem_only]
+
+    # ---- the result ------------------------------------------------------------------------
+
+    def finish_unfinished(self):
+        """Closes rounds the planner left open, with the cautious default for undecided groups."""
+        guard = 0
+        while self.current["groups"] and guard < MAX_ROUNDS:
+            before = len(self.left) + sum(len(e) for e in self.edits)
+            self.tool_apply_and_recheck({})
+            guard += 1
+            if len(self.left) + sum(len(e) for e in self.edits) == before:
+                break
+
+    def result(self):
+        first, final = self.rounds[0], self.rounds[-1]
+        final_broken = {(r["file"], r["attribute"], r["value"]) for r in final["repo"].broken()}
+        chains = [{(file, attribute, old): new for file, attribute, old, new in edits} for edits in self.edits]
+        source_label = {}
+        for edit in self.source_edits:
+            for group_id in edit["groups"]:
+                source_label[group_id] = edit["label"]
+        repairs, details = [], {}
+        for group in first["groups"].values():
+            used_in = sorted({"/" + r["file"] for r in group["refs"]})
+            for ref in group["refs"]:
+                value, how = ref["value"], (group["known"] or {}).get("how")
+                for chain in chains:
+                    value = chain.get((ref["file"], ref["attribute"], value), value)
+                entry = {"file": "/" + ref["file"], "line": ref["line"], "attribute": ref["attribute"], "old": ref["value"],
+                         "new": None, "target": None, "caveat": "", "used_in": used_in, "stage": how,
+                         "detail": details.setdefault(group["id"], self._detail(group))}
+                broken_now = (ref["file"], ref["attribute"], value) in final_broken
+                last = self.left.get((ref["file"], ref["attribute"], value))
+                if not broken_now and value != ref["value"]:
+                    entry.update(verdict="fix", new=value, target=refheal.target_label(final["repo"], ref, value),
+                                 reason=(group["known"] or {}).get("reason", ""))
+                elif not broken_now:
+                    entry.update(verdict="covered", stage="planner",
+                                 reason="Repaired by one edit at the source. " + source_label.get(group["id"], ""))
+                elif last and last["known"] and last["known"]["new_value"]:
+                    proposal = next((new for file, attribute, old, new in self._uses(self._round_of(last)["repo"], last)
+                                     if (file, attribute, old) == (ref["file"], ref["attribute"], value)), None)
+                    entry.update(verdict="review", new=proposal, stage=last["known"]["how"],
+                                 target=refheal.target_label(final["repo"], ref, proposal) if proposal else None,
+                                 reason=last["known"]["reason"], caveat=last["known"]["caveat"] or last["reason"])
+                else:
+                    known = (last or group)["known"] or {}
+                    entry.update(verdict="none", stage=known.get("how"), reason=known.get("reason") or (last or group)["reason"])
+                repairs.append(entry)
+        return {"stats": {"files": len(first["repo"].files), "references": len(first["repo"].refs), "broken": len(repairs),
+                          "groups": len(first["groups"]), "rounds": len(self.edits),
+                          "reported_broken_only_by_the_repository": len(self.aem_only),
+                          "reviewer_model": refheal.reviewer_model(self.backend, self.model)},
+                "repairs": repairs + self._aem_only_repairs(), "source_fixes": self._source_fixes(), "plan": self.plan + ([self.summary] if self.summary else [])}
+
+    def _detail(self, group):
+        """What an author needs to compare before accepting: what the reference showed before, the
+        candidate targets ranked with what each shows now, and what the repair touches."""
+        repo, first, known = self._round_of(group)["repo"], group["refs"][0], group["known"] or {}
+        ranked = known.get("candidates") or ([{"new_value": known["new_value"], "likelihood": 100, "why": known["reason"]}]
+                                             if known.get("new_value") else [])
+        files = sorted({os.path.basename(r["file"]) for r in group["refs"]})
+        return {"was": refheal.text_at(repo, first, first["value"], previous=True)[:300],
+                "candidates": [{"value": c["new_value"], "target": refheal.target_label(repo, first, c["new_value"]),
+                                "likelihood": c["likelihood"], "why": _whole_sentences(c["why"], 240),
+                                "now": refheal.text_at(repo, first, c["new_value"])[:300]} for c in ranked[:3]],
+                "references": len(group["refs"]), "files": len(files), "file_names": files[:6],
+                "published_under": self._published_under(repo, group),
+                "outside": [os.path.basename(f) for f in self._used_outside(repo, group)[:6]],
+                "outside_count": len(self._used_outside(repo, group))}
+
+    def _published_under(self, repo, group):
+        """The conditions the references of a group are published under, for the editor to hold
+        against each output's filter: [{"references", "in_topic": [...], "in_map": [[...]]}].
+        in_topic: condition attributes on the referencing element and its ancestors. in_map: the
+        same for every place the map includes that topic. One entry per distinct combination."""
+        combined = {}
+        for ref in group["refs"]:
+            entry = {"in_topic": ref.get("conditions") or [], "in_map": repo.map_conditions.get(ref["file"]) or []}
+            key = json.dumps(entry, sort_keys=True)
+            combined.setdefault(key, dict(entry, references=0))["references"] += 1
+        return sorted(combined.values(), key=lambda e: -e["references"])[:20]
+
+    def _round_of(self, group):
+        return next(r for r in self.rounds if group["id"] in r["groups"])
+
+    def _source_fixes(self):
+        merged = {}
+        for edit in self.source_edits:
+            key = (edit["file"], edit["attribute"], edit["current"])
+            entry = merged.setdefault(key, {"file": edit["file"], "element": edit["element"], "attribute": edit["attribute"],
+                                            "current": edit["current"], "new": edit["current"], "references": 0,
+                                            "labels": [], "chosen": True})
+            if edit.get("mode") == "alias":
+                names = entry["new"].split()
+                entry["new"] = " ".join(names + [n for n in edit["new"].split() if n not in names])
+            else:
+                entry["new"] = edit["new"]
+            entry["references"] += edit["references"]
+            if edit["label"] not in entry["labels"]:
+                entry["labels"].append(edit["label"])
+        for entry in merged.values():
+            labels = entry.pop("labels")
+            entry["label"] = labels[0] if len(labels) == 1 else (
+                "Fix at the source, chosen by the planner: one edit here repairs %d references." % entry["references"])
+        return list(merged.values())
+
+
+def plan_files(payload, backend="cli", model=None, log=print, progress=None, memory=None, timeline=None):
+    """For a repository server. Same input and output as refheal.heal_files, plus "plan".
+
+    Optional in the payload: "reported" [{"file", "attribute", "value"}], what the repository's own
+    report lists as broken; "used_outside" {path: [paths]}, files outside the map that point into
+    one of its files.
+    With memory=None the stored author answers and the record of the last "Fix all" are used and
+    updated; a caller that passes its own memory (an evaluation) touches nothing on disk."""
+    files = payload.get("files") if isinstance(payload, dict) else None
+    if not isinstance(files, list):
+        raise ValueError("body must be a JSON object with a \"files\" list")
+    started = time.time()
+    progress = progress or (lambda text: None)
+    progress("Scanning %d files for broken references." % len(files))
+    stored = memory is None
+    session = Session(files, backend, model, log, progress, load_memory() if stored else memory,
+                      reported=payload.get("reported"), outside=payload.get("used_outside"), timeline=timeline)
+    log("planner input: %d files, %s references reported by the repository, %d files with users outside the map"
+        % (len(files), len(payload["reported"]) if isinstance(payload.get("reported"), list) else "no",
+           sum(1 for v in (payload.get("used_outside") or {}).values() if v)))
+    cache = (_read(CACHE_PATH) or {}) if stored else None
+    session.cache = cache if isinstance(cache, dict) or cache is None else {}
+    applied = _read(APPLIED_PATH) if stored else None
+    looked_back, failed, finished = session.look_back(applied)
+    if stored and applied:
+        for attribute, old, new in failed:
+            reject(attribute, old, new)
+        if session.distrust:
+            memory_now = load_memory()
+            memory_now["no_source_edit"] = sorted(set(memory_now["no_source_edit"]) | set(session.distrust))
+            _write(MEMORY_PATH, memory_now)
+        if finished:
+            os.remove(APPLIED_PATH)
+        else:
+            _write(APPLIED_PATH, dict(applied, checks=applied.get("checks", 0) + 1))
+    first = session.current["groups"]
+    if not first:
+        out = session.result()
+        out["plan"] = looked_back
+        return out
+    proven = sum(1 for g in first.values() if g["known"])
+    session.plan.append("Found %s in %d files. They all come from %d ids and keys that were renamed, moved or removed." % (
+        _count(sum(len(g["refs"]) for g in first.values()), "broken reference"), len(session.rounds[0]["repo"].files),
+        len(first)))
+    session.plan += looked_back
+    outside = {f for g in first.values() for f in session._used_outside(session.current["repo"], g)}
+    if outside:
+        session.plan.append("%s outside this map also %s into the files that changed. I only see this map; those "
+                            "references are not in this list." % (_count(len(outside), "file"), "points" if len(outside) == 1 else "point"))
+    recalled = sum(1 for g in first.values() if g["known"] and g["known"]["how"] == "author")
+    proven -= recalled
+    if proven:
+        session.plan.append("%d of those %d were only renamed: the file's previous version proves it, no AI needed."
+                            % (proven, len(first)))
+    if recalled:
+        session.plan.append("%d more %s answered by an author in an earlier check; I used %s again." % (
+            recalled, "was" if recalled == 1 else "were", "that answer" if recalled == 1 else "those answers"))
+    session.step("scan", "done", "Scanner", "Found %s in %d files, from %d renamed, moved or removed ids and keys" % (
+        _count(sum(len(g["refs"]) for g in first.values()), "broken reference"), len(session.rounds[0]["repo"].files), len(first)))
+    if proven:
+        session.step("history", "done", "Version history", "Proved %s from the previous versions, no AI" % _count(proven, "rename"))
+    if recalled:
+        session.step("memory", "done", "Memory", "Reused %s an author gave in an earlier check" % _count(recalled, "answer"))
+    session.step("planner", "active", "Planner agent", "Reading the broken references and planning")
+    progress("Planner agent is reading %d broken references in %d groups." % (
+        sum(len(g["refs"]) for g in first.values()), len(first)))
+    task = ("The map has %d broken references in %d groups. Repair what can be repaired safely and tell the author "
+            "what is left. Start with overview." % (sum(len(g["refs"]) for g in first.values()), len(first)))
+    answer, steps, problem = agentloop.run(PLANNER_SYSTEM, task, session.tools(), FINISH, backend=backend, model=model,
+                                           max_calls=MAX_PLANNER_CALLS, log=log)
+    if problem:
+        log("planner stopped: %s" % problem)
+        session.plan.append("The planner stopped early (%s). What it had not decided got the safe default: repair when "
+                            "proven, otherwise ask you." % problem)
+    else:
+        session.summary = "Next: " + _whole_sentences(answer["summary"], 260)
+    session.step("planner", "done", "Planner agent", "Planned in %s" % _count(len(steps), "step") if not problem
+                 else "Stopped early; the safe default is used for what it had not decided")
+    progress("Planner finished. Building the report.")
+    session.finish_unfinished()
+    if stored and session.cache is not None:
+        _write(CACHE_PATH, session.cache)
+    out = session.result()
+    out["stats"].update(planner_steps=len(steps), seconds=round(time.time() - started),
+                        findings_reused_from_an_earlier_check=session.reused)
+    return out

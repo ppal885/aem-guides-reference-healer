@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="firmware_update">
+  <title>Update the firmware</title>
+  <taskbody>
+    <context>Updates keep the <ph keyref="product-name"/> secure.</context>
+    <steps>
+      <step><cmd>Open the <ph keyref="admin-app"/> app and select System.</cmd></step>
+      <step><cmd>Select Check for updates, then Install.</cmd>
+        <info><note conref="shared_notes.dita#shared_notes/power-warning"/></info></step>
+    </steps>
+    <postreq>If the update fails, see <xref href="troubleshooting.dita#troubleshooting/update-fails"/>.</postreq>
+  </taskbody>
+</task>

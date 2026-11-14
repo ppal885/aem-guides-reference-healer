@@ -1,0 +1,255 @@
+{
+ "sample": "samples/rank-demo",
+ "backend": "cli",
+ "cases": 9,
+ "runs": [
+  {
+   "run": 1,
+   "seconds": 103,
+   "scores": {
+    "first right": 9
+   },
+   "applied_without_asking_and_wrong": 0,
+   "rows": [
+    {
+     "file": "upgrade.dita",
+     "old": "lib.dita#lib/backup-note",
+     "right": "lib.dita#lib/backup-before-upgrade",
+     "proposed": "lib.dita#lib/backup-before-upgrade",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      80,
+      18
+     ]
+    },
+    {
+     "file": "retention.dita",
+     "old": "lib.dita#lib/backup-note",
+     "right": "lib.dita#lib/backup-retention",
+     "proposed": "lib.dita#lib/backup-retention",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      80,
+      18
+     ]
+    },
+    {
+     "file": "plan_downtime.dita",
+     "old": "lib.dita#lib/restore-note",
+     "right": "lib.dita#lib/restore-duration",
+     "proposed": "lib.dita#lib/restore-duration",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      60,
+      38
+     ]
+    },
+    {
+     "file": "throttling.dita",
+     "old": "lib.dita#lib/api-rate-limit",
+     "right": "lib.dita#lib/api-request-limit",
+     "proposed": "lib.dita#lib/api-request-limit",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      95,
+      4
+     ]
+    },
+    {
+     "file": "cleaning.dita",
+     "old": "lib.dita#lib/burn-warning",
+     "right": "lib.dita#lib/hot-surface",
+     "proposed": "lib.dita#lib/hot-surface",
+     "verdict": "review",
+     "candidates": 1,
+     "outcome": "first right",
+     "likelihoods": [
+      95
+     ]
+    },
+    {
+     "file": "arm_servers.dita",
+     "old": "install.dita#install/install-linux",
+     "right": "install.dita#install/install-on-linux-arm",
+     "proposed": "install.dita#install/install-on-linux-arm",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      93,
+      5
+     ]
+    },
+    {
+     "file": "manage_users.dita",
+     "old": "product-admin",
+     "right": "admin-console",
+     "proposed": "admin-console",
+     "verdict": "fix",
+     "candidates": 1,
+     "outcome": "first right",
+     "likelihoods": [
+      100
+     ]
+    },
+    {
+     "file": "get_help.dita",
+     "old": "support-email",
+     "right": "support-contact",
+     "proposed": "support-contact",
+     "verdict": "review",
+     "candidates": 1,
+     "outcome": "first right",
+     "likelihoods": [
+      70
+     ]
+    },
+    {
+     "file": "change_card.dita",
+     "old": "billing_overview.dita",
+     "right": "billing_payment_methods.dita",
+     "proposed": "billing_payment_methods.dita#billing_payment_methods",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      75,
+      8
+     ]
+    }
+   ]
+  },
+  {
+   "run": 2,
+   "seconds": 126,
+   "scores": {
+    "first right": 9
+   },
+   "applied_without_asking_and_wrong": 0,
+   "rows": [
+    {
+     "file": "upgrade.dita",
+     "old": "lib.dita#lib/backup-note",
+     "right": "lib.dita#lib/backup-before-upgrade",
+     "proposed": "lib.dita#lib/backup-before-upgrade",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      75,
+      22
+     ]
+    },
+    {
+     "file": "retention.dita",
+     "old": "lib.dita#lib/backup-note",
+     "right": "lib.dita#lib/backup-retention",
+     "proposed": "lib.dita#lib/backup-retention",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      75,
+      22
+     ]
+    },
+    {
+     "file": "plan_downtime.dita",
+     "old": "lib.dita#lib/restore-note",
+     "right": "lib.dita#lib/restore-duration",
+     "proposed": "lib.dita#lib/restore-duration",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      60,
+      38
+     ]
+    },
+    {
+     "file": "throttling.dita",
+     "old": "lib.dita#lib/api-rate-limit",
+     "right": "lib.dita#lib/api-request-limit",
+     "proposed": "lib.dita#lib/api-request-limit",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      93,
+      5
+     ]
+    },
+    {
+     "file": "cleaning.dita",
+     "old": "lib.dita#lib/burn-warning",
+     "right": "lib.dita#lib/hot-surface",
+     "proposed": "lib.dita#lib/hot-surface",
+     "verdict": "review",
+     "candidates": 1,
+     "outcome": "first right",
+     "likelihoods": [
+      95
+     ]
+    },
+    {
+     "file": "arm_servers.dita",
+     "old": "install.dita#install/install-linux",
+     "right": "install.dita#install/install-on-linux-arm",
+     "proposed": "install.dita#install/install-on-linux-arm",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      88,
+      10
+     ]
+    },
+    {
+     "file": "manage_users.dita",
+     "old": "product-admin",
+     "right": "admin-console",
+     "proposed": "admin-console",
+     "verdict": "fix",
+     "candidates": 1,
+     "outcome": "first right",
+     "likelihoods": [
+      100
+     ]
+    },
+    {
+     "file": "get_help.dita",
+     "old": "support-email",
+     "right": "support-contact",
+     "proposed": "support-contact",
+     "verdict": "review",
+     "candidates": 1,
+     "outcome": "first right",
+     "likelihoods": [
+      72
+     ]
+    },
+    {
+     "file": "change_card.dita",
+     "old": "billing_overview.dita",
+     "right": "billing_payment_methods.dita",
+     "proposed": "billing_payment_methods.dita#billing_payment_methods",
+     "verdict": "review",
+     "candidates": 2,
+     "outcome": "first right",
+     "likelihoods": [
+      80,
+      8
+     ]
+    }
+   ]
+  }
+ ]
+}

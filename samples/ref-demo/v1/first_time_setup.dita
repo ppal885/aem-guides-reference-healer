@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="first_time_setup">
+  <title>Set up the router for the first time</title>
+  <taskbody>
+    <prereq id="before-you-begin">You need the cable from the box and the password printed under the router.</prereq>
+    <steps>
+      <step><cmd>Plug in the <ph keyref="product-name"/> and wait for the power light.</cmd>
+        <info><note conref="shared_notes.dita#shared_notes/power-warning"/></info></step>
+      <step><cmd>Open the <ph keyref="admin-app"/> app and follow the steps on screen.</cmd></step>
+      <step id="choose-wifi-name"><cmd>Choose a Wi-Fi name and password.</cmd>
+        <info>See <xref href="wifi_settings.dita#wifi_settings/change-password"/> to change it later.</info></step>
+    </steps>
+  </taskbody>
+</task>

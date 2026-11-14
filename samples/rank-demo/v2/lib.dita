@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="lib">
+  <title>Shared notes</title>
+  <body>
+    <note id="backup-before-upgrade">Back up your data before you upgrade.</note>
+    <note id="backup-retention">Backups are kept for 30 days.</note>
+    <note id="restore-duration">Restore takes up to an hour.</note>
+    <note id="restore-overwrites">Restoring replaces all data written after the backup.</note>
+    <p id="api-request-limit">Each key may send 600 requests per minute to the API.</p>
+    <p id="api-burst-limit">A key may send a burst of 100 requests in one second.</p>
+    <note id="hot-surface">The plate stays hot during and after operation. Do not touch it.</note>
+    <note id="fire-hazard">Keep paper and cloth away from the plate. They can catch fire.</note>
+  </body>
+</topic>

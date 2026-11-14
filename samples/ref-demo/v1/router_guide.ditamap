@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">
+<map id="router_guide">
+  <title>AX-200 Router Guide</title>
+  <keydef keys="product-name"><topicmeta><keywords><keyword>AX-200 Router</keyword></keywords></topicmeta></keydef>
+  <keydef keys="admin-app"><topicmeta><keywords><keyword>HomeNet Admin</keyword></keywords></topicmeta></keydef>
+  <keydef keys="reset-steps" href="factory_reset.dita"/>
+  <topicref href="overview.dita"/>
+  <topicref href="first_time_setup.dita"/>
+  <topicref href="wifi_settings.dita"/>
+  <topicref href="firmware_update.dita"/>
+  <topicref href="factory_reset.dita"/>
+  <topicref href="troubleshooting.dita"/>
+  <topicref href="shared_notes.dita" processing-role="resource-only"/>
+</map>

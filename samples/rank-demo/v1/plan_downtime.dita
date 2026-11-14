@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="plan_downtime">
+  <title>Plan the downtime</title>
+  <body>
+    <p>Tell your users how long the service is unavailable.</p><note conref="lib.dita#lib/restore-note"/>
+  </body>
+</topic>

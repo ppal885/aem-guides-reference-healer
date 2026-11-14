@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="arm_servers">
+  <title>Run on ARM servers</title>
+  <body>
+    <p>ARM servers need their own package, see <xref href="install.dita#install/install-linux"/>.</p>
+  </body>
+</topic>

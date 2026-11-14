@@ -1,0 +1,77 @@
+{
+ "sample": "samples/large-demo",
+ "mode": "planner",
+ "backend": "cli",
+ "runs": [
+  {
+   "run": 1,
+   "seconds": 134,
+   "references": 1251,
+   "scores": {
+    "applied right": 710,
+    "asked, right": 432,
+    "none, right": 109
+   },
+   "source_edits": 0,
+   "planner_steps": 6,
+   "plan": [
+    "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
+    "19 of those 34 were only renamed: the file's previous version proves it, no AI needed.",
+    "Sent 15 to finder agents, each answer checked by a reviewer agent: 12 found under a new name or place, 3 removed for good.",
+    "Decided to repair 710 references. Why: The file history shows the same content under a new name, for example \"console-name\" is now \"web-console-name\", so we point to the new name.",
+    "Decided to ask you about 432 references (12 questions). Why: A likely replacement was found, but its wording differs from what the topics showed before, so please read both before accepting.",
+    "Decided to leave 109 references broken. Why: The shared text was removed and nothing replaces it: the old settings page notice and the note that an operation can take up to an hour.",
+    "Tried the plan on a copy and checked again: 710 references work now, 541 left for you.",
+    "Next: Review the proposed replacements whose wording changed and accept or reject each, then decide what the topics should say where shared text was removed."
+   ]
+  },
+  {
+   "run": 2,
+   "seconds": 143,
+   "references": 1251,
+   "scores": {
+    "applied right": 710,
+    "asked, right": 432,
+    "none, right": 109
+   },
+   "source_edits": 0,
+   "planner_steps": 7,
+   "plan": [
+    "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
+    "19 of those 34 were only renamed: the file's previous version proves it, no AI needed.",
+    "Sent 15 to finder agents, each answer checked by a reviewer agent: 12 found under a new name or place, 3 removed for good.",
+    "Decided to repair 710 references. Why: The version history shows the same content under a new name, so each reference is pointed at the new name and your colleague's renames stay.",
+    "Decided to ask you about 357 references (8 questions). Why: A likely replacement was found, but its wording differs from what these topics showed before, so please read both before accepting.",
+    "Decided to ask you about 75 references (4 questions). Why: The quota and region warnings were merged into one note, so these topics would gain a sentence they did not show before; please check it fits.",
+    "Decided to leave 109 references broken. Why: The shared text was removed with no replacement: the notice that the old settings page stays until year end, and the warning that large operations can take an hour.",
+    "Tried the plan on a copy and checked again: 710 references work now, 541 left for you.",
+    "Next: Review the proposed replacements where the shared wording changed and accept or reject each, then decide what the topics should say where shared text was removed."
+   ]
+  },
+  {
+   "run": 3,
+   "seconds": 127,
+   "references": 1251,
+   "scores": {
+    "applied right": 710,
+    "asked, right": 432,
+    "none, right": 109
+   },
+   "source_edits": 0,
+   "planner_steps": 6,
+   "plan": [
+    "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
+    "19 of those 34 were only renamed: the file's previous version proves it, no AI needed.",
+    "Sent 15 to finder agents, each answer checked by a reviewer agent: 12 found under a new name or place, 3 removed for good.",
+    "Decided to repair 710 references. Why: The version history shows the same content under a new name, for example the key \"console-name\" is now \"web-console-name\" with the same text.",
+    "Decided to ask you about 432 references (12 questions). Why: A likely replacement exists but its wording differs from what the topics showed before, for example the quota note now also covers region.",
+    "Decided to leave 109 references broken. Why: The content was removed with no replacement: the old settings page notice and the note that an operation can take up to an hour.",
+    "Tried the plan on a copy and checked again: 710 references work now, 541 left for you.",
+    "Next: Review the proposed replacements whose wording changed and accept or reject each, then decide what the topics should say where content was removed."
+   ]
+  }
+ ],
+ "targets": 34,
+ "targets_decided_the_same_in_every_run": 34,
+ "targets_that_differed": {}
+}

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="retention">
+  <title>How long data is kept</title>
+  <body>
+    <p>Old backups are removed automatically.</p><note conref="lib.dita#lib/backup-note"/>
+  </body>
+</topic>

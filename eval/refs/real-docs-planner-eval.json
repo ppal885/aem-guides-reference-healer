@@ -1,0 +1,422 @@
+{
+ "plan": [
+  "Found 475 broken references in 319 files. They all come from 388 ids and keys that were renamed, moved or removed.",
+  "14 of those 388 were only renamed: the file's previous version proves it, no AI needed.",
+  "Sent the other 374 to finder agents, each answer checked by a reviewer agent: 37 found under a new name or place, 337 removed for good.",
+  "Decided to repair 8 references. Why: The target was moved or renamed and only one match exists, for example migrating-to-2.4.dita now lives in the topics folder.",
+  "Decided to repair 13 references with 4 edits where the target lives. Why: The key was renamed but still points at the same topic, so adding the old name as a second name fixes every reference with one harmless edit.",
+  "Decided to ask you about 20 references (11 questions). Why: A likely new home was found by subject only, for example a section in the merged details topic, but the old file may be generated at build time.",
+  "Decided to repair 9 references. Why: A finder located the renamed or moved target and a reviewer confirmed it as a safe match.",
+  "Decided to ask you about 24 references (19 questions). Why: A possible new target was found, but the match is not certain, so please confirm it before the reference is changed.",
+  "Decided to leave 401 references broken. Why: The target file is missing and no replacement was found; files such as parameters-base.dita may be generated at build time, so check that first.",
+  "Tried the plan on a copy and checked again: 30 references work now, 445 left for you.",
+  "Next: Check first whether the missing parameter, extension-point and Markdown files are generated at build time, because most of what is left depends on that."
+ ],
+ "stats": {
+  "files": 319,
+  "references": 2340,
+  "broken": 475,
+  "groups": 388,
+  "rounds": 1,
+  "dead_web_links": 0,
+  "reported_broken_only_by_the_repository": 0,
+  "reviewer_model": "sonnet",
+  "planner_steps": 10,
+  "seconds": 2821
+ },
+ "broken_before_the_seeding": {
+  "fix": 8,
+  "review": 41,
+  "none": 326,
+  "covered": 2
+ },
+ "seeds": [
+  {
+   "kind": "rename-file",
+   "old": "release-notes/rel1.2.2.dita",
+   "truth": {
+    "path": "release-notes/rel1.2.2-guide.dita"
+   }
+  },
+  {
+   "kind": "rename-file",
+   "old": "release-notes/rel1.1.2.1.dita",
+   "truth": {
+    "path": "release-notes/rel1.1.2.1-guide.dita"
+   }
+  },
+  {
+   "kind": "rename-file",
+   "old": "release-notes/rel1.5.dita",
+   "truth": {
+    "path": "release-notes/rel1.5-guide.dita"
+   }
+  },
+  {
+   "kind": "move-file",
+   "old": "release-notes/rel1.7.dita",
+   "truth": {
+    "path": "resources/ditaotdaykeys/rel1.7.dita"
+   }
+  },
+  {
+   "kind": "move-file",
+   "old": "release-notes/rel1.4.3.dita",
+   "truth": {
+    "path": "topics/rel1.4.3.dita"
+   }
+  },
+  {
+   "kind": "move-file",
+   "old": "release-notes/rel1.0.dita",
+   "truth": {
+    "path": "extension-points/rel1.0.dita"
+   }
+  },
+  {
+   "kind": "delete-file",
+   "old": "release-notes/rel1.4.1.dita",
+   "truth": null
+  },
+  {
+   "kind": "delete-file",
+   "old": "release-notes/rel1.3.1.dita",
+   "truth": null
+  },
+  {
+   "kind": "delete-file",
+   "old": "release-notes/rel1.0.2.dita",
+   "truth": null
+  },
+  {
+   "kind": "rename-id",
+   "old": "topics/sample-pdf-theme.dita#ID/headers-footers",
+   "truth": {
+    "path": "topics/sample-pdf-theme.dita",
+    "topic": "ID",
+    "element": "headers-footers-details"
+   }
+  },
+  {
+   "kind": "rename-id",
+   "old": "reference/extended-functionality.dita#code-reference/coderef-by-content",
+   "truth": {
+    "path": "reference/extended-functionality.dita",
+    "topic": "code-reference",
+    "element": "coderef-by-content-details"
+   }
+  },
+  {
+   "kind": "rename-id",
+   "old": "parameters/ant-parameters-details.dita#base-html/args.csspath.details",
+   "truth": {
+    "path": "parameters/ant-parameters-details.dita",
+    "topic": "base-html",
+    "element": "args.csspath.details-details"
+   }
+  },
+  {
+   "kind": "rename-key",
+   "old": "store-api",
+   "truth": {
+    "key": "store-api-topic"
+   }
+  },
+  {
+   "kind": "rename-key",
+   "old": "output-formats",
+   "truth": {
+    "key": "output-formats-topic"
+   }
+  },
+  {
+   "kind": "rename-key",
+   "old": "books",
+   "truth": {
+    "key": "books-topic"
+   }
+  }
+ ],
+ "rows": [
+  {
+   "kind": "rename-key",
+   "old": "output-formats",
+   "truth": {
+    "key": "output-formats-topic"
+   },
+   "element": "xref",
+   "attribute": "keyref",
+   "uses": 1,
+   "stage": "planner",
+   "verdict": "covered",
+   "new_value": null,
+   "outcome": "right",
+   "reason": "Repaired by one edit at the source. Fix at the source: give key \"output-formats-topic\" the second name \"output-formats\". Repairs 3 references in 3 files with one edit.",
+   "seconds": null
+  },
+  {
+   "kind": "move-file",
+   "old": "release-notes/rel1.7.dita",
+   "truth": {
+    "path": "resources/ditaotdaykeys/rel1.7.dita"
+   },
+   "element": "topicref",
+   "attribute": "href",
+   "uses": 1,
+   "stage": "rule",
+   "verdict": "fix",
+   "new_value": "../resources/ditaotdaykeys/rel1.7.dita",
+   "outcome": "right",
+   "reason": "The only file named rel1.7.dita in the repository is resources/ditaotdaykeys/rel1.7.dita.",
+   "seconds": null
+  },
+  {
+   "kind": "rename-file",
+   "old": "release-notes/rel1.5.dita",
+   "truth": {
+    "path": "release-notes/rel1.5-guide.dita"
+   },
+   "element": "topicref",
+   "attribute": "href",
+   "uses": 1,
+   "stage": "finder",
+   "verdict": "fix",
+   "new_value": "rel1.5-guide.dita#rel1.5",
+   "outcome": "right",
+   "reason": "release-notes/rel1.5.dita no longer exists, but release-notes/rel1.5-guide.dita in the same folder has the title \"DITA OT release 1.5\" and topic id rel1.5, matching the old file name; sibling files (rel1.1.2.1-guide.dita, rel1.2.2-guide.dita) show the same -guide rename pattern.",
+   "seconds": null
+  },
+  {
+   "kind": "move-file",
+   "old": "release-notes/rel1.4.3.dita",
+   "truth": {
+    "path": "topics/rel1.4.3.dita"
+   },
+   "element": "topicref",
+   "attribute": "href",
+   "uses": 1,
+   "stage": "rule",
+   "verdict": "fix",
+   "new_value": "../topics/rel1.4.3.dita",
+   "outcome": "right",
+   "reason": "The only file named rel1.4.3.dita in the repository is topics/rel1.4.3.dita.",
+   "seconds": null
+  },
+  {
+   "kind": "delete-file",
+   "old": "release-notes/rel1.4.1.dita",
+   "truth": null,
+   "element": "topicref",
+   "attribute": "href",
+   "uses": 1,
+   "stage": "finder",
+   "verdict": "none",
+   "new_value": null,
+   "outcome": "right",
+   "reason": "No file with 1.4.1 in its name, path or title exists in the repository. Searches for rel1.4.1, rel1.4.1-guide and the title \"DITA OT release 1.4.1\" only returned other releases (1.0 to 1.2.2, 1.5).",
+   "seconds": null
+  },
+  {
+   "kind": "delete-file",
+   "old": "release-notes/rel1.3.1.dita",
+   "truth": null,
+   "element": "topicref",
+   "attribute": "href",
+   "uses": 1,
+   "stage": "finder",
+   "verdict": "none",
+   "new_value": null,
+   "outcome": "right",
+   "reason": "No file named rel1.3.1 or titled \"DITA OT release 1.3.1\" appeared in any search. The only 1.x release notes shown were 1.0, 1.0.1, 1.1, 1.1.1, 1.1.2, 1.1.2.1, 1.2.1, 1.2.2 and 1.5, some renamed with a -guide suffix or moved to another folder.",
+   "seconds": null
+  },
+  {
+   "kind": "rename-file",
+   "old": "release-notes/rel1.2.2.dita",
+   "truth": {
+    "path": "release-notes/rel1.2.2-guide.dita"
+   },
+   "element": "topicref",
+   "attribute": "href",
+   "uses": 1,
+   "stage": "finder",
+   "verdict": "fix",
+   "new_value": "rel1.2.2-guide.dita#rel1.2.2",
+   "outcome": "right",
+   "reason": "release-notes/rel1.2.2-guide.dita is in the same folder, is titled \"DITA OT release 1.2.2\" and has topic id rel1.2.2, matching the missing rel1.2.2.dita; the file appears to have been renamed with a -guide suffix.",
+   "seconds": null
+  },
+  {
+   "kind": "rename-file",
+   "old": "release-notes/rel1.1.2.1.dita",
+   "truth": {
+    "path": "release-notes/rel1.1.2.1-guide.dita"
+   },
+   "element": "topicref",
+   "attribute": "href",
+   "uses": 1,
+   "stage": "finder",
+   "verdict": "fix",
+   "new_value": "rel1.1.2.1-guide.dita#rel1.1.2.1",
+   "outcome": "right",
+   "reason": "release-notes/rel1.1.2.1-guide.dita is in the same folder, is titled \"DITA OT release 1.1.2.1\" and keeps the topic id rel1.1.2.1, so it looks like the old file renamed with a -guide suffix. No other file found covers release 1.1.2.1.",
+   "seconds": null
+  },
+  {
+   "kind": "delete-file",
+   "old": "release-notes/rel1.0.2.dita",
+   "truth": null,
+   "element": "topicref",
+   "attribute": "href",
+   "uses": 1,
+   "stage": "finder",
+   "verdict": "none",
+   "new_value": null,
+   "outcome": "right",
+   "reason": "No file named rel1.0.2 and no topic titled \"DITA OT release 1.0.2\" exists anywhere in the repository, and there is no earlier version of the file to trace. The near matches (rel1.0.1.dita, rel1.1.2.dita, extension-points/rel1.0.dita) are release notes for other releases, so none of them is a valid replacement.",
+   "seconds": null
+  },
+  {
+   "kind": "move-file",
+   "old": "release-notes/rel1.0.dita",
+   "truth": {
+    "path": "extension-points/rel1.0.dita"
+   },
+   "element": "topicref",
+   "attribute": "href",
+   "uses": 1,
+   "stage": "rule",
+   "verdict": "fix",
+   "new_value": "../extension-points/rel1.0.dita",
+   "outcome": "right",
+   "reason": "The only file named rel1.0.dita in the repository is extension-points/rel1.0.dita.",
+   "seconds": null
+  },
+  {
+   "kind": "rename-id",
+   "old": "reference/extended-functionality.dita#code-reference/coderef-by-content",
+   "truth": {
+    "path": "reference/extended-functionality.dita",
+    "topic": "code-reference",
+    "element": "coderef-by-content-details"
+   },
+   "element": "div",
+   "attribute": "conref",
+   "uses": 1,
+   "stage": "history",
+   "verdict": "fix",
+   "new_value": "../reference/extended-functionality.dita#code-reference/coderef-by-content-details",
+   "outcome": "right",
+   "reason": "In the previous version of extended-functionality.dita the id \"coderef-by-content\" was on the <div> \"DITA-OT supports the token pointer in the URI fragment to extract a li\". The same <div>, text unchanged, now has the id \"coderef-by-content-details\".",
+   "seconds": null
+  },
+  {
+   "kind": "rename-key",
+   "old": "books",
+   "truth": {
+    "key": "books-topic"
+   },
+   "element": "xref",
+   "attribute": "keyref",
+   "uses": 1,
+   "stage": "planner",
+   "verdict": "covered",
+   "new_value": null,
+   "outcome": "right",
+   "reason": "Repaired by one edit at the source. Fix at the source: give key \"books-topic\" the second name \"books\". Repairs 3 references in 3 files with one edit.",
+   "seconds": null
+  },
+  {
+   "kind": "rename-key",
+   "old": "store-api",
+   "truth": {
+    "key": "store-api-topic"
+   },
+   "element": "xref",
+   "attribute": "keyref",
+   "uses": 1,
+   "stage": "planner",
+   "verdict": "covered",
+   "new_value": null,
+   "outcome": "right",
+   "reason": "Repaired by one edit at the source. Fix at the source: give key \"store-api-topic\" the second name \"store-api\". Repairs 5 references in 5 files with one edit.",
+   "seconds": null
+  },
+  {
+   "kind": "rename-id",
+   "old": "parameters/ant-parameters-details.dita#base-html/args.csspath.details",
+   "truth": {
+    "path": "parameters/ant-parameters-details.dita",
+    "topic": "base-html",
+    "element": "args.csspath.details-details"
+   },
+   "element": "div",
+   "attribute": "conref",
+   "uses": 1,
+   "stage": "history",
+   "verdict": "fix",
+   "new_value": "#base-html/args.csspath.details-details",
+   "outcome": "right",
+   "reason": "In the previous version of ant-parameters-details.dita the id \"args.csspath.details\" was on the <div> \"Corresponds to the XSLT parameter CSSPATH. DITA-OT will copy the file \". The same <div>, text unchanged, now has the id \"args.csspath.details-details\".",
+   "seconds": null
+  },
+  {
+   "kind": "rename-id",
+   "old": "topics/sample-pdf-theme.dita#ID/headers-footers",
+   "truth": {
+    "path": "topics/sample-pdf-theme.dita",
+    "topic": "ID",
+    "element": "headers-footers-details"
+   },
+   "element": "xref",
+   "attribute": "href",
+   "uses": 1,
+   "stage": "history",
+   "verdict": "fix",
+   "new_value": "#ID/headers-footers-details",
+   "outcome": "right",
+   "reason": "In the previous version of sample-pdf-theme.dita the id \"headers-footers\" was on the <example> \"Setting up headers and footers The documentation theme includes sample\". The same <example>, text unchanged, now has the id \"headers-footers-details\".",
+   "seconds": null
+  }
+ ],
+ "table": {
+  "rename-key": {
+   "right": 3,
+   "wrong": 0,
+   "missed": 0,
+   "by_rule": 0,
+   "wrong_marked_fix": 0
+  },
+  "move-file": {
+   "right": 3,
+   "wrong": 0,
+   "missed": 0,
+   "by_rule": 3,
+   "wrong_marked_fix": 0
+  },
+  "rename-file": {
+   "right": 3,
+   "wrong": 0,
+   "missed": 0,
+   "by_rule": 0,
+   "wrong_marked_fix": 0
+  },
+  "delete-file": {
+   "right": 3,
+   "wrong": 0,
+   "missed": 0,
+   "by_rule": 0,
+   "wrong_marked_fix": 0
+  },
+  "rename-id": {
+   "right": 3,
+   "wrong": 0,
+   "missed": 0,
+   "by_rule": 0,
+   "wrong_marked_fix": 0
+  }
+ },
+ "backend": "cli",
+ "mode": "planner",
+ "note": "The three rename-key rows were rescored after the run: the planner repaired them with an edit at the source (verdict \"covered\"), which the first scoring counted as missed."
+}
