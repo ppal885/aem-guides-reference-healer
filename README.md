@@ -41,7 +41,7 @@ python3 refcheck.py samples/ref-demo/v2
 python3 refheal.py samples/ref-demo/v2
 ```
 
-The first runs the 59 tests (no network, no model). The second lists the 11 broken references of the small sample. The third repairs them with the fixed pipeline and writes a report and a patch to `out-refs/`.
+The first runs the 64 tests (no network, no model). The second lists the 11 broken references of the small sample. The third repairs them with the fixed pipeline and writes a report and a patch to `out-refs/`.
 
 The evaluations call the model and take minutes:
 
@@ -205,6 +205,7 @@ What keeps it safe:
 - **Repair or ask is decided on a fact, not on how sure the model sounded.** For an answer of a finder agent, code compares the text the reference showed before (from the previous version) with the text at the new target. Word for word the same: repaired. Any difference: the author is asked, with both texts. Where the texts cannot be read, a second run of the finder must name the same target without doubt.
 - **The reviewer runs on another model** than the finder (`REFHEAL_REVIEWER_MODEL`; by default Sonnet reviews what the default model found). Both are Claude models.
 - **It remembers what its agents found.** A finding is kept (`out/agent-findings.json`) and used again while the broken value, the text behind it and the file or maps it lives in are unchanged. A check after "Fix all" then pays only for the planner.
+- **It remembers what the planner decided.** A decision is kept with everything the planner saw for that broken target (value, number of references, the finding, the ways out, an author's answer). While all of that is the same, the next check uses the decision again without asking the planner, and code checks it again as it does a fresh one. One changed target in a round and the planner is asked for that round. Kept for 7 days; delete `out/agent-findings.json` to start fresh.
 - **One answer per reference where two pieces could be meant.** When a finder returns two candidates, one more model call reads the sentence around every reference and proposes the candidate that topic needs. Such a group is always for review.
 - **A budget.** Finder agents take the 40 broken targets with the most references per check (`REFHEAL_MAX_GROUPS`); the rest say so in their row and wait for the next check, which reuses what is already found.
 - **It learns from the author.** An accepted repair is stored and used in the next check without asking. The rename behind it is stored too, so the same old target reached through another attribute (an `xref` to an element whose `conref` was answered) needs no second question. Candidates the author passed over are not proposed again. "Forget this answer" in the compare box takes an answer back.
@@ -221,7 +222,8 @@ What keeps it safe:
 | The planner three times on the same 1,251 references, scored against the known right answer (`planeval.py`) | **0 wrong repairs, 0 wrong proposals, 0 missed.** Repair or ask was **the same in all three runs**: 710 applied, 432 asked, 109 gone; 34 of 34 targets got the same decision. 129 to 169 s per run (run again on 14 Nov 2026 with the ways out). In all three runs the planner suggested the same way out for the removed pieces: put the caution note back (46 references), remove the 63 references to the time-limited notice. That is two pieces, so it shows the suggestion is stable here, not that it is right in general. Before the text rule it applied 909, 895 and 840. | `eval/refs/planner-eval.json`, `planner-eval-before-stability.json` |
 | The fixed pipeline on the same 1,251 references (`planeval.py --mode pipeline`) | 0 wrong, 0 missed. Applied 895, 949 and 895. 70 to 74 s per run. | `eval/refs/pipeline-eval.json` |
 | Nine references with two plausible targets each (`rankeval.py`, 2 runs) | The right target was proposed first for **9 of 9** in both runs; none was applied without asking. With one answer per broken target it was 8 of 9: two topics shared one old target and meant different pieces. | `eval/refs/rank-eval.json`, `rank-eval-one-answer-per-target.json` |
-| Two checks in a row inside AEM (348 broken references, 11 targets for finder agents) | First check 135 s. Second check **55 s**: all 11 findings reused, only the planner ran. | [docs/RUN.md](docs/RUN.md) |
+| Two checks in a row inside AEM (348 broken references, 11 targets for finder agents) | First check 135 s. Second check **55 s**: all 11 findings reused, only the planner ran. (Before the planner's decisions were remembered; see the next row.) | [docs/RUN.md](docs/RUN.md) |
+| Three checks in a row inside AEM on the unchanged sample (1,251 broken references, 34 targets), 14 Nov 2026 | First check **163 s** (the planner decided). Second **13 s** and third **11 s**: every finding and every planner decision reused, no model call; the report was the same (710 repairs, 432 to review, 109 gone). Not measured: the check after a "Fix all", where the remaining targets should be reused in the same way. | [docs/RUN.md](docs/RUN.md) |
 | The planner on the public DITA-OT docs with 15 seeded breaks (`refeval.py --mode planner`, 319 files) | 15 of 15 right, none wrong: 12 by rewriting references, 3 key renames by one edit at the source. **It took 47 minutes**: handed over as plain files, 475 references count as broken (most point at files the build generates), in 388 groups, and each group without a repair got a finder agent. | `eval/refs/real-docs-planner-eval.json` |
 | 32 references that are broken in the public DITA-OT docs (pipeline) | 14 repaired, 7 to review, 6 without a repair (27 groups) | [docs/EVAL-REFS.md](docs/EVAL-REFS.md) |
 | 15 seeded breaks with a known answer (pipeline) | 15 right | [docs/EVAL-REFS.md](docs/EVAL-REFS.md) |
@@ -229,7 +231,6 @@ What keeps it safe:
 Read the limits before quoting these:
 
 - **Scale is bounded, not solved.** One finder agent per broken target was 47 minutes for 388 targets. There is now a limit of 40 targets per check and findings are reused, but the limit is unit-tested only: the 388-target run was not repeated, and references to files a build generates are still counted as broken when the content comes as plain files.
-- **The second check still takes 55 s** in AEM, because the planner itself runs again and decides again.
 - **On this sample the planner is not more accurate than the fixed pipeline, and it is about twice as slow.** Both made no wrong repair. What the planner adds is not accuracy here: the plan with reasons, the re-check on a copy, the memory, and the look back at the last "Fix all".
 - **The text rule makes it stricter.** It applies 710 where it applied 840 to 909 before. The difference is content whose wording changed a little (a moved paragraph that gained the word "atlasctl", a section with a new title). Those are now questions.
 - **How it repairs still varies.** In one of three runs the planner chose nine edits at the source for references it rewrote one by one in the others. What is applied and what is asked did not vary.
@@ -256,7 +257,7 @@ Read the limits before quoting these:
 | `reporthtml.py` | Shared pieces of the HTML report `refheal.py` writes. |
 | `samples/` | `ref-demo` (8 files, 11 broken references), `gen_large.py` (writes the 225-file sample, with content for internal readers and a DITAVAL), `gen_rank.py` (nine two-candidate cases), `load_large_demo.sh` (loads or resets the large sample in the local AEM and gives its "AEM Sites" output the DITAVAL filter), `set_output_filter.py`. |
 | `eval/` | Saved inputs and answers of the evaluations. |
-| `tests/` | `python3 -m unittest discover -s tests` (59 tests, no network, no model). |
+| `tests/` | `python3 -m unittest discover -s tests` (64 tests, no network, no model). |
 | `docs/` | `RUN.md` start and demo steps, `DEMO.md` the 5-minute script, `EVAL-REFS.md` the evaluation on public documentation. |
 
 ## Product code

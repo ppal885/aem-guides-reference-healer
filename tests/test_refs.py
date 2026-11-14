@@ -544,6 +544,63 @@ class RememberedFindings(unittest.TestCase):
         self.assertEqual(cache, {})
 
 
+class RememberedDecisions(unittest.TestCase):
+    """What the planner decided is kept between checks and used again, without asking it, while
+    everything it saw for a broken target is the same."""
+
+    files = RememberedFindings.files
+    found = RememberedFindings.found
+    LIB, OLD = RememberedFindings.LIB, RememberedFindings.OLD
+
+    def session(self, cache, files=None):
+        return refplan.Session(files or self.files(), log=lambda message: None, cache=cache, choose=lambda *a: {})
+
+    def first_check(self, cache):
+        session = self.session(cache)
+        group = session.current["groups"]["r1-g1"]
+        self.found(group)
+        session._to_cache(session.current["repo"], group)
+        session._settle(session.current["repo"], group)
+        session.tool_decide({"group_ids": ["r1-g1"], "decision": "ask_author", "reason": "The note was split in two."})
+        return session
+
+    def test_the_next_check_decides_the_same_without_the_planner(self):
+        cache = {}
+        self.first_check(cache)
+        again = self.session(cache)
+        self.assertEqual(again.replay(), 1)
+        self.assertEqual(again.current["groups"], {})
+        self.assertIn("Decided to ask you about 2 references (1 question). Why: The note was split in two.", again.plan)
+        self.assertEqual({r["verdict"] for r in again.result()["repairs"]}, {"review"})
+
+    def test_a_first_check_has_nothing_to_use_again(self):
+        session = self.session({})
+        self.assertEqual(session.replay(), 0)
+        self.assertEqual(len(session.current["groups"]), 1)
+
+    def test_one_more_reference_and_the_planner_is_asked_again(self):
+        cache = {}
+        self.first_check(cache)
+        more = self.files() + [{"id": "GUID-t3", "path": "/d/t3.dita", "previous": [],
+                                "xml": TOPIC % '<note conref="GUID-lib.dita#lib/backup"/>'}]
+        session = self.session(cache, more)
+        self.assertEqual(session.replay(), 0)
+        self.assertIsNone(session.current["groups"]["r1-g1"]["decision"])
+
+    def test_code_checks_a_remembered_decision_again(self):
+        cache = {}
+        first = self.first_check(cache)
+        key = first._decision_key(first.current["groups"]["r1-g1"])
+        cache[key]["decision"] = "repair_references"      # the finding only has verdict "review"
+        again = self.session(cache)
+        again.replay()
+        self.assertEqual({r["verdict"] for r in again.result()["repairs"]}, {"review"})
+
+    def test_an_evaluation_without_a_cache_always_asks_the_planner(self):
+        session = refplan.Session(self.files(), log=lambda message: None)
+        self.assertEqual(session.replay(), 0)
+
+
 class LiveView(unittest.TestCase):
     def test_every_change_of_who_does_what_is_sent_as_rows(self):
         seen = []

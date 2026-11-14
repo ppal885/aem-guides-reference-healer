@@ -5,7 +5,55 @@
  "runs": [
   {
    "run": 1,
-   "seconds": 129,
+   "seconds": 161,
+   "references": 1251,
+   "scores": {
+    "applied right": 710,
+    "asked, right": 432,
+    "none, right": 109
+   },
+   "source_edits": 0,
+   "planner_steps": 8,
+   "plan": [
+    "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
+    "19 of those 34 were only renamed: the file's previous version proves it, no AI needed.",
+    "Sent 15 to finder agents, each answer checked by a reviewer agent: 12 found under a new name or place, 3 removed for good.",
+    "Decided to repair 710 references. Why: The file history shows the same content under a new name, for example \"console-name\" is now \"web-console-name\", so the references follow your colleague's rename.",
+    "Decided to ask you about 357 references (8 questions). Why: A likely new home was found, but the wording or location changed, for example \"account-limits\" is now \"organisation-limits\", so please read both before accepting.",
+    "Decided to ask you about 75 references (4 questions). Why: The only match is a merged note that covers both plan limits and region lock, so each topic would gain a sentence it did not show before.",
+    "For 46 references whose content is gone I suggest putting the piece back. Why: The removed note warns that the operation \"can take up to an hour for large resources\"; a warning should not vanish from topics that carry it.",
+    "For 63 references whose content is gone I suggest removing them. Why: The removed notice said the old settings page is \"still available until the end of the year\"; it is time-limited and the topics read well without it.",
+    "Tried the plan on a copy and checked again: 710 references work now, 541 left for you.",
+    "Next: Review the proposals waiting for you and accept or reject each one; the renamed references are already repaired. Look first at the removed \"can take up to an hour\" warning, which I recommend restoring, then the merged plan-and-region note."
+   ]
+  },
+  {
+   "run": 2,
+   "seconds": 151,
+   "references": 1251,
+   "scores": {
+    "applied right": 710,
+    "asked, right": 432,
+    "none, right": 109
+   },
+   "source_edits": 0,
+   "planner_steps": 8,
+   "plan": [
+    "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
+    "19 of those 34 were only renamed: the file's previous version proves it, no AI needed.",
+    "Sent 15 to finder agents, each answer checked by a reviewer agent: 12 found under a new name or place, 3 removed for good.",
+    "Decided to repair 512 references. Why: The file history shows the same content under a new name, so each reference is pointed at the new name and the clean-up stays intact.",
+    "Decided to repair 198 references. Why: The key has the same value under a new name, for example Atlas Console, so references follow the new name and the rename is kept.",
+    "Decided to ask you about 432 references (12 questions). Why: A likely target was found, but its text differs from what these topics showed before, so please read both before accepting.",
+    "For 46 references whose content is gone I suggest putting the piece back. Why: The removed note warns that an operation can take up to an hour; a warning should not vanish from topics, and nothing replaces it.",
+    "For 63 references whose content is gone I suggest removing them. Why: The notice says the old settings page stays until the end of the year; it is time-limited and looks retired, and topics read well without it.",
+    "Tried the plan on a copy and checked again: 710 references work now, 541 left for you.",
+    "Next: Please review the proposed targets whose wording changed, and confirm restoring the removed slow-operation warning and removing the retired old-settings-page notice."
+   ]
+  },
+  {
+   "run": 3,
+   "seconds": 135,
    "references": 1251,
    "scores": {
     "applied right": 710,
@@ -18,60 +66,12 @@
     "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
     "19 of those 34 were only renamed: the file's previous version proves it, no AI needed.",
     "Sent 15 to finder agents, each answer checked by a reviewer agent: 12 found under a new name or place, 3 removed for good.",
-    "Decided to repair 710 references. Why: The file history proves each target was only renamed with its content unchanged, so pointing to the new name keeps your colleague's clean-up intact.",
-    "Decided to ask you about 432 references (12 questions). Why: A likely target was found, but its wording differs from what these topics showed before, so please read both versions before accepting.",
-    "For 46 references whose content is gone I suggest putting the piece back. Why: The removed note warns that the operation \"can take up to an hour for large resources\"; a warning should not vanish from topics that carry it.",
-    "For 63 references whose content is gone I suggest removing them. Why: The notice said the old settings page is available \"until the end of the year\", so it was time-limited and the topics read well without it.",
+    "Decided to repair 710 references. Why: The file history proves each target was only renamed with its text unchanged, and pointing to the new name keeps your colleague's renames intact.",
+    "For 46 references whose content is gone I suggest putting the piece back. Why: The removed note warns that the operation can take up to an hour for large resources; a warning should not vanish from topics that carry it.",
+    "For 63 references whose content is gone I suggest removing them. Why: The removed notice said the old settings page stays available until the end of the year; it is time-limited and the topics read well without it.",
+    "Decided to ask you about 432 references (12 questions). Why: A likely target was found, but its text differs from what the topics showed before, so please read both versions before accepting.",
     "Tried the plan on a copy and checked again: 710 references work now, 541 left for you.",
-    "Next: Review the proposed targets whose wording changed and choose what to do with the two removed pieces; nothing has been applied for these. Start with the removed warning that an operation can take up to an hour, which I recommend restoring."
-   ]
-  },
-  {
-   "run": 2,
-   "seconds": 169,
-   "references": 1251,
-   "scores": {
-    "applied right": 710,
-    "asked, right": 432,
-    "none, right": 109
-   },
-   "source_edits": 0,
-   "planner_steps": 8,
-   "plan": [
-    "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
-    "19 of those 34 were only renamed: the file's previous version proves it, no AI needed.",
-    "Sent 15 to finder agents, each answer checked by a reviewer agent: 12 found under a new name or place, 3 removed for good.",
-    "Decided to repair 710 references. Why: The file history shows the same content under a new name, so the references follow your colleague's rename instead of undoing it.",
-    "Decided to ask you about 306 references (7 questions). Why: A likely new target was found, but its wording differs from what these topics showed before, so please read both texts before accepting.",
-    "Decided to ask you about 126 references (5 questions). Why: The old text was split or merged, so the proposed target adds or drops a sentence; please check it fits these topics before accepting.",
-    "For 46 references whose content is gone I suggest putting the piece back. Why: The removed note warns that the operation \"can take up to an hour for large resources\"; a warning should not vanish from topics that carry it.",
-    "For 63 references whose content is gone I suggest removing them. Why: The removed notice said the old settings page is \"still available until the end of the year\"; it is time-limited and topics read well without it.",
-    "Tried the plan on a copy and checked again: 710 references work now, 541 left for you.",
-    "Next: Review the proposals left for you and accept or reject each; none of them was applied, including the two recommendations for removed content."
-   ]
-  },
-  {
-   "run": 3,
-   "seconds": 154,
-   "references": 1251,
-   "scores": {
-    "applied right": 710,
-    "asked, right": 432,
-    "none, right": 109
-   },
-   "source_edits": 0,
-   "planner_steps": 8,
-   "plan": [
-    "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
-    "19 of those 34 were only renamed: the file's previous version proves it, no AI needed.",
-    "Sent 15 to finder agents, each answer checked by a reviewer agent: 12 found under a new name or place, 3 removed for good.",
-    "Decided to repair 710 references. Why: The version history shows the same content under a new name, text unchanged, so pointing to the new name keeps your colleagues' renames intact.",
-    "Decided to ask you about 75 references (4 questions). Why: The quota and region notes were merged into one, so each topic would gain a sentence it never showed; check the extra sentence fits.",
-    "Decided to ask you about 357 references (8 questions). Why: A likely replacement was found, but its wording differs from what the topics showed before, so please read both before accepting.",
-    "For 46 references whose content is gone I suggest putting the piece back. Why: The removed note warns that the operation \"can take up to an hour for large resources\"; a warning should not vanish from topics that carry it.",
-    "For 63 references whose content is gone I suggest removing them. Why: The removed notice said the old settings page is available \"until the end of the year\"; it is time-bound, and the topics read well without it.",
-    "Tried the plan on a copy and checked again: 710 references work now, 541 left for you.",
-    "Next: Review the proposals waiting for you and accept or correct each one; the safe renames are already repaired. Start with the removed warning about operations that can take up to an hour, which I recommend putting back."
+    "Next: Review the proposed targets whose text changed and choose a way out for the removed content. Start with the removed warning that an operation can take up to an hour, which I recommend restoring."
    ]
   }
  ],
