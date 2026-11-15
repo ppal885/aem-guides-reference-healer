@@ -126,6 +126,12 @@ Found while checking that everything built so far really works (14 Nov 2026), an
 | Resetting the sample did not finish on a clean folder | The loader posted the map to an address that only works when the map exists |
 | Counts drifted after several "Fix all" and reset rounds (758 ready instead of 710) | Old versions stayed in AEM's history. The loader removes the sample's folders first |
 
+Found in the editor's version history (15 Nov 2026), and worked around:
+
+| What | Fix |
+|---|---|
+| Comparing two versions of a repaired topic showed both sides, but did not mark the repaired reference as added or deleted | The comparison comes from a library outside the editor's repository (`xmlDiff` in `@rh/jui-app`). It treats two elements as one changed element only when `href` or `data` differs, so a changed `conref`, `keyref` or `conkeyref` is not a change to it. The version history dialog now gives both documents a temporary attribute that carries those references and takes it out of the result (`controllers/dialogs/reference_change_marks.ts`). Seen in AEM: the old key text struck through in red, "Starter plan" in green. The real fix belongs in the library: add the reference attributes to its `pathAttrs` |
+
 Found by using the panel the way a tester would, on a second copy (15 Nov 2026), and fixed:
 
 | What | Fix |
