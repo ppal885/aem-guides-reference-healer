@@ -106,3 +106,11 @@ To try it: run the check, press "Fix all", let the check run again. The plan the
 `./samples/load_large_demo.sh` also uploads one topic to `/content/dam/large-demo-outside` that reuses a warning of the map. The plan then says "1 file outside this map also points into the files that changed".
 
 Evaluations: `python3 planeval.py` (planner), `python3 planeval.py --mode pipeline` (fixed pipeline, for comparison), `python3 rankeval.py` (ranking), `python3 refeval.py <folder> --mode planner` (seeded breaks in a real repository).
+
+## The image and duplicate id sample (added 15 Nov 2026)
+
+```bash
+./samples/load_image_demo.sh
+```
+
+Loads `/content/dam/image-demo`. Run Health check on `m.ditamap` with a preset that has "Broken links" and "Duplicate IDs" (on this machine: "Broken references and duplicate ids demo"). Expected: two image repairs ready, one key reference covered by the repair in the map, one key rename to review, and five Duplicate IDs warnings that say where references land. "Fix all" changes the map and the topic and no id.

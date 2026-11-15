@@ -64,10 +64,14 @@ def is_dita(tree):
     return name in TOPIC_TAGS or name.endswith("map") or tree.get("id") is not None and tree.find("title") is not None
 
 
+def is_dita_path(path):
+    return path.lower().endswith((".dita", ".ditamap", ".xml"))
+
+
 class Repo:
     """Everything a reference can point at: files, topic ids, element ids and keys."""
 
-    def __init__(self, root=None, files=None):
+    def __init__(self, root=None, files=None, assets=None, missing=None):
         """From a folder on disk, or from files handed over by a repository server.
 
         files is a list of {"path", "xml", "id"}. In AEM Guides a reference is stored as the
@@ -82,9 +86,29 @@ class Repo:
         # list per place a map includes the file. An output publishes the file if one of them passes.
         self.map_conditions = {}
         self.other_files = set()
+        # Paths of files that are not DITA (images, PDFs, code) and exist in the repository, when the
+        # server handed them over. None: not told, so such a target cannot be checked here.
+        # An entry is a path, or {"path", "id"}: AEM Guides stores an image reference as the image's
+        # GUID file name too ("GUID-1234.png"), so the id becomes an alias like a DITA file's.
+        # missing: {stored name: path} for references whose target is gone; the repository still
+        # knows which path the stored name stood for, and that path is what a repair is found by.
+        self.assets = None if assets is None else set()
         self.alias = {}      # stored file name -> path
         self.previous = {}   # path -> earlier versions of the file, newest first, indexed like self.files
         self.stored_name = {}  # path -> stored file name
+        for asset in assets or ():
+            path = ((asset.get("path") if isinstance(asset, dict) else asset) or "").lstrip("/")
+            guid = asset.get("id") if isinstance(asset, dict) else None
+            if not path:
+                continue
+            self.assets.add(path)
+            if guid and guid.upper().startswith("GUID-"):
+                name = guid if "." in guid else guid + os.path.splitext(path)[1]
+                self.alias[name] = path
+                self.stored_name[path] = name
+        for name, path in (missing or {}).items():
+            if name and path:
+                self.alias.setdefault(os.path.basename(name), path.lstrip("/"))
         if files is None:
             self._load()
         else:
@@ -168,7 +192,9 @@ class Repo:
             self._collect_refs(rel, raw, tree)
 
     def _index(self, rel, tree):
-        entry = {"title": "", "tag": local(tree.tag), "topics": {}, "elements": {}}
+        # copies: {(topic id, element id): how many elements carry it}, for ids used more than once
+        # in a topic. A reference to such an id lands on the first element, so that is the one indexed.
+        entry = {"title": "", "tag": local(tree.tag), "topics": {}, "elements": {}, "copies": {}}
         title = next((e for e in tree.iter() if local(e.tag) in ("title", "glossterm")), None)
         entry["title"] = text_of(title) if title is not None else ""
 
@@ -179,6 +205,8 @@ class Repo:
             if is_topic and el_id:
                 entry["topics"][el_id] = name
                 topic_id = el_id
+            elif el_id and (topic_id, el_id) in entry["elements"]:
+                entry["copies"][(topic_id, el_id)] = entry["copies"].get((topic_id, el_id), 1) + 1
             elif el_id:
                 entry["elements"][(topic_id, el_id)] = {"tag": name, "text": text_of(el, 90),
                                                         "content": text_of(el, 100000)}
@@ -307,7 +335,10 @@ class Repo:
             if definition["external"] or not definition["target"]:
                 return None
             if definition["target"] not in self.files:
-                return None if definition["target"] in self.other_files else "key-target-missing"
+                if is_dita_path(definition["target"]) and definition["target"] not in self.other_files:
+                    return "key-target-missing"
+                # A key for an image or another asset: broken only when it is known to be missing.
+                return "key-target-missing" if self.asset_exists(definition["target"]) is False else None
             if element_id:
                 entry = self.files[definition["target"]]
                 matches = [v for (topic, eid), v in entry["elements"].items() if eid == element_id]
@@ -319,18 +350,37 @@ class Repo:
         target, topic_id, element_id = self.split_target(ref)
         if ref["element"] == "coderef":
             # A coderef fragment is a line range in a code file, not an id.
-            exists = target in self.files or target in self.other_files
-            return None if exists else "file-missing"
+            return "file-missing" if self.asset_exists(target) is False else None
         if attr == "href":
             is_dita = (ref.get("format") in (None, "dita", "ditamap")
                        and target.lower().endswith((".dita", ".ditamap", ".xml")))
             if not is_dita:
-                if self.root is None:
-                    return None  # only DITA files are handed over; other assets cannot be checked here
-                exists = target in self.files or target in self.other_files or os.path.exists(os.path.join(self.root, target))
-                return None if exists else "file-missing"
+                # None: only DITA files were handed over; other assets cannot be checked here.
+                return "file-missing" if self.asset_exists(target) is False else None
             return self.check_address(target, topic_id, element_id)
         return self.check_address(target, topic_id, element_id, ref["element"])
+
+    def copies_at(self, ref, value):
+        """How many elements carry the id that ref would point at with this value, when more than
+        one does in that topic; 0 otherwise. Such a reference lands on the first of them."""
+        if ref["attribute"] in ("keyref", "conkeyref"):
+            key, _, element_id = value.partition("/")
+            definition = self.definition_of(key)
+            target, topic_id = (definition or {}).get("target"), None
+        else:
+            target, topic_id, element_id = self.split_target(dict(ref, value=value))
+        copies = (self.files.get(target) or {}).get("copies") or {}
+        return max([count for (topic, eid), count in copies.items()
+                    if eid == element_id and topic_id in (None, topic)] or [0]) if element_id else 0
+
+    def asset_exists(self, target):
+        """True or False for a file that is not DITA; None when this cannot be told (the server
+        handed over DITA files only and no list of the other assets)."""
+        if target in self.files or target in self.other_files or (self.assets is not None and target in self.assets):
+            return True
+        if self.root is not None:
+            return os.path.exists(os.path.join(self.root, target))
+        return None if self.assets is None else False
 
     def definition_of(self, key):
         """The definition a key ends at. A key may be defined by pointing at another key."""

@@ -43,6 +43,13 @@ These came up as corrections and are worth keeping to.
 - **Keys and passwords never go into a file or a chat.** A key is set in the owner's own terminal. The local AEM uses the SDK's default login and is bound to `127.0.0.1` for that reason.
 - **Commit when asked; never push without being asked.**
 
+## Decisions of 15 Nov 2026 (later in the day)
+
+- A duplicated id is never changed. The owner: it is a warning, the author may have kept it on purpose, and it must look the same in the author's view after a repair. The finding only says where references land.
+- Images: AEM tells the agents which files that are not DITA exist and which path a dangling GUID name stood for. Without that list such a target is not judged at all.
+- The CLI is called with `--strict-mcp-config`: the owner's MCP servers added about 34,000 input tokens to a call, by chance.
+- Where this belongs in the product: the list stays in the Content Health Report; the agents would move to the AI Assistant's platform (`src/extensions/kea` was read; it has whole-map tools and an approved save).
+
 ## How it is built
 
 ```
@@ -77,6 +84,7 @@ What the agent keeps between checks, in `out/` next to the sidecar (not in git):
 |---|---|
 | `author-answers.json` | accepted repairs, the renames learned from them, candidates passed over, kinds of source edit that did not hold |
 | `agent-findings.json` | what finder and reviewer concluded, reused while the broken value, its old text and the file it lives in are unchanged |
+| `usage-log.jsonl` | one line per stored check: model calls, failed calls, tokens, money when the CLI reports it |
 | `last-fix-all-<map>.json` | what the last "Fix all" on that map wrote, read by that map's next check (one file per map since 15 Nov 2026) |
 
 ## The product code

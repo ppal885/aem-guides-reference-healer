@@ -17,4 +17,4 @@ Before you say a change works:
 python3 -m unittest discover -s tests
 ```
 
-For a change in how repairs are decided, also run `python3 planeval.py --runs 3` and `python3 rankeval.py --runs 2` (they call the model and take minutes) and update the "Measured" table in the README with what came out.
+For a change in how repairs are decided, also run `python3 planeval.py --runs 3` and `python3 rankeval.py --runs 2` (they call the model and take minutes) and update the "Measured" table in the README with what came out. For a change in a system prompt, also run `python3 injecteval.py --runs 2`.

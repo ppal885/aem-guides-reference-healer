@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">
+<map id="m"><title>Image test</title>
+<keydef keys="brand-logo" href="images/logo.png" format="png"/>
+<keydef keys="wiring" href="images/wiring.png" format="png"/>
+<topicref href="a.dita"/>
+</map>
