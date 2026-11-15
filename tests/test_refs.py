@@ -719,6 +719,64 @@ class WaysOutEvaluation(unittest.TestCase):
         self.assertEqual(wayouteval.suggestions(out), {"slow": "restore", "beta": None, "webinar": "not gone: review"})
 
 
+class StoredFilesOfSeveralRequests(unittest.TestCase):
+    """The sidecar answers several requests at once; what one stores must survive the other."""
+
+    def setUp(self):
+        import tempfile
+        self.folder = tempfile.mkdtemp()
+
+    def test_each_map_has_its_own_record_of_its_last_fix_all(self):
+        one, two = refplan.applied_path("/content/dam/a/a.ditamap"), refplan.applied_path("/content/dam/b/b.ditamap")
+        self.assertNotEqual(one, two)
+        self.assertEqual(one, refplan.applied_path("/content/dam/a/a.ditamap"))
+        self.assertEqual(refplan.applied_path(None), refplan.APPLIED_PATH)
+        self.assertEqual(os.path.dirname(one), os.path.dirname(refplan.APPLIED_PATH))
+
+    def test_a_check_adds_its_findings_to_what_another_check_stored_meanwhile(self):
+        path = os.path.join(self.folder, "findings.json")
+        refplan._write(path, {"a": {"when": 1}})
+        mine_started_with = refplan._read(path)
+        refplan._write(path, {"a": {"when": 1}, "theirs": {"when": 2}})     # the other check finished first
+        mine_now = dict(mine_started_with, mine={"when": 3})
+        self.assertEqual(refplan.merge_cache(path, mine_started_with, mine_now),
+                         {"a": {"when": 1}, "theirs": {"when": 2}, "mine": {"when": 3}})
+        self.assertEqual(sorted(refplan._read(path)), ["a", "mine", "theirs"])
+
+    def test_a_file_is_written_whole_and_leaves_nothing_behind(self):
+        path = os.path.join(self.folder, "answers.json")
+        refplan._write(path, {"answers": {"k": "v"}})
+        refplan._write(path, {"answers": {"k": "w"}})
+        self.assertEqual(refplan._read(path), {"answers": {"k": "w"}})
+        self.assertEqual(os.listdir(self.folder), ["answers.json"])
+
+    def test_answers_given_at_the_same_time_are_all_kept(self):
+        import threading
+        path = os.path.join(self.folder, "answers.json")
+        threads = [threading.Thread(target=refplan.remember, args=("conref", "old-%d" % n, "new-%d" % n, path))
+                   for n in range(25)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(len(refplan.load_memory(path)["answers"]), 25)
+
+    def test_two_blocks_of_audit_lines_do_not_interleave(self):
+        import threading
+        path = os.path.join(self.folder, "audit.jsonl")
+        entry = dict(AuditRecord.ENTRY)
+        threads = [threading.Thread(target=audit.record, args=("/m.ditamap", "user%d" % n, [entry] * 40, path))
+                   for n in range(6)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        rows = audit.entries(path=path)
+        self.assertEqual(len(rows), 240)
+        blocks = [rows[i:i + 40] for i in range(0, 240, 40)]
+        self.assertTrue(all(len({row["accepted_by"] for row in block}) == 1 for block in blocks))
+
+
 class LiveView(unittest.TestCase):
     def test_every_change_of_who_does_what_is_sent_as_rows(self):
         seen = []

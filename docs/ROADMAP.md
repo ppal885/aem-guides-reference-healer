@@ -93,6 +93,10 @@ Needs: the editor knows the signed-in user; the sidecar gets it with the feedbac
 - ~~The planner's decisions remembered like the findings~~ Built on 14 Nov 2026: a second check of an unchanged map takes 11 to 13 s in AEM instead of 55, and the check after "Fix all" 15 s.
 - The 40-target budget tried on a set with hundreds of targets.
 - ~~A switch to write repairs without Track Changes marks~~ Decided on 15 Nov 2026: no marks at all; the audit record, the "Repaired" list and the versions say what changed.
+- ~~The panel calls the sidecar's own address~~ Built on 15 Nov 2026: it calls AEM, which checks the login and signs the audit entry.
+- ~~An audit entry that cannot be sent is lost without a word~~ Built on 15 Nov 2026: kept in the browser session, said to the author, sent again.
+- ~~Two maps checked together overwrite each other's stored files~~ Built on 15 Nov 2026: lock, one-step file replace, "Fix all" record per map.
+- Open from the same review: author answers are shared by all maps; the whole map goes to the agents in one request; when the model cannot be reached the check quietly falls back to the rules.
 
 ## Not planned, on purpose
 

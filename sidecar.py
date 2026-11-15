@@ -137,7 +137,7 @@ def serve(port, model=None):
                     length = int(self.headers.get("Content-Length", "0"))
                     body = json.loads(self.rfile.read(length).decode("utf-8"))
                     if self.path == "/applied":
-                        stored = refplan.record_applied(body.get("edits"), body.get("failed"))
+                        stored = refplan.record_applied(body.get("edits"), body.get("failed"), map_path=body.get("map"))
                         _log("Fix all recorded: %d edits" % stored)
                         self.send_json(200, {"recorded": stored})
                     elif body.get("forget"):

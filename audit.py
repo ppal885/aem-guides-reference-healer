@@ -9,11 +9,14 @@ import csv
 import io
 import json
 import os
+import threading
 import time
 
 PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out", "audit-log.jsonl")
 
 # One row per changed reference, in the order of the columns of the download.
+_LOCK = threading.Lock()
+
 FIELDS = ("when", "accepted_by", "map", "file", "location", "attribute", "was", "now", "action", "settled_by",
           "reason", "text_before", "text_after")
 ACTIONS = ("repair", "put back", "text kept", "reference removed")
@@ -37,9 +40,9 @@ def record(map_path, accepted_by, entries, path=None, now=None):
         kept.append(row)
     if kept:
         os.makedirs(os.path.dirname(path or PATH), exist_ok=True)
-        with open(path or PATH, "a", encoding="utf-8") as handle:
-            for row in kept:
-                handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+        # One press of a button is one block of lines: two authors' blocks do not interleave.
+        with _LOCK, open(path or PATH, "a", encoding="utf-8") as handle:
+            handle.write("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in kept))
     return len(kept)
 
 
