@@ -38,7 +38,7 @@ Click the repair text on the "trial-resource-limits" row. A paragraph was split 
 
 ## 4. Fix all (1 min)
 
-Press "Fix all", then confirm. 220 files, each saved as a new version. The 710 rows leave the list at once and the bar says the check starts again in 30 seconds (do not click in the list meanwhile, or it waits for you to press Regenerate). Its plan starts with what became of the repairs: "Since the last Fix all: N repairs saved and resolve."
+Press "Fix all", then confirm. 220 files, saved into their working copies (the editor shows their version with a star; no version is made). The 710 rows leave the list at once and the bar says the check starts again in 30 seconds (do not click in the list meanwhile, or it waits for you to press Regenerate). Its plan starts with what became of the repairs: "Since the last Fix all: N repairs saved and resolve."
 
 What is left: the references the planner asked about and the ones with nothing to point at. Those are the ones worth an author's time.
 
@@ -60,7 +60,7 @@ The planner cannot write to the repository; it works on a copy, and a person pre
 
 ## If asked
 
-- **Why are the repairs not tracked changes?** They were. 220 topics then had to be opened and accepted, which is the work this was meant to save. The audit record, the "Repaired" list and a version per file say what changed.
+- **Why are the repairs not tracked changes?** They were. 220 topics then had to be opened and accepted, which is the work this was meant to save. The audit record and the "Repaired" list say what changed.
 - **Is this in the product?** It runs in a local AEM built from a branch: inside the real Content Health job, in the real report panel, with the real editor. It is a prototype, not reviewed or merged.
 - **What does the planner add over a fixed pipeline?** Not accuracy on this sample: the fixed pipeline also made no wrong repair, in half the time. The planner adds the plan with reasons, the re-check on a copy, the memory of answers, and the look back at what the last "Fix all" did.
 - **Why did it ask about 432?** It repairs by itself only when the text at the new target is word for word what the reference showed before. Any change of wording is a question, with both texts.

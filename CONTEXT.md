@@ -27,6 +27,7 @@ Judging criteria, in the organisers' words: agentic workflow (task decomposition
 | 14 Nov | The "Fix all" button keeps the product's plain blue style; only the AI entry point looks like the product's AI Assistant button | The owner asked for it |
 | 14 Nov | Repairs in topics are written as the editor's own Track Changes marks | The owner's idea; every repair is then visible in the document and can be accepted or rejected there |
 | 15 Nov | **No Track Changes marks.** Repairs and ways out are written plainly | The owner: with marks the manual work is the same (220 topics to open and accept), and the audit record already says what changed. Do not bring the marks back unasked
+| 15 Nov | **No new version.** A repair is saved into the file's working copy; the editor shows the version with a star | The owner: "version kyun kar doge, na koi warning di; current working copy mein rakho, star laga ke". Do not create versions unasked
 | 14 Nov | Everything shown in the editor uses the editor's own components, icons and highlight | "Editor UI se consistent honi chahiye" |
 | 14 Nov | **External (web) links are out.** The rule that checked them, its repair agent, its evaluation and its documents were removed from all three code bases | The owner: not impactful enough for the idea. Do not bring it back unasked |
 
@@ -142,7 +143,7 @@ Read the "Measured" table and the limits in the README. The short version, to ke
 
 ## State on 14 Nov 2026
 
-- Tests: 77 here, 628 in the editor's Content Health folders, and the Java module's tests pass.
+- Tests: 77 here, 629 in the editor's Content Health folders, and the Java module's tests pass.
 - The local AEM holds `/content/dam/large-demo` (after a "Fix all": 492 findings left), `/content/dam/large-demo-outside`, `/content/dam/ref-demo`.
 - All four capabilities of the idea text have been seen working inside AEM.
 

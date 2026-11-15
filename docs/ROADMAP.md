@@ -126,6 +126,20 @@ Found while checking that everything built so far really works (14 Nov 2026), an
 | Resetting the sample did not finish on a clean folder | The loader posted the map to an address that only works when the map exists |
 | Counts drifted after several "Fix all" and reset rounds (758 ready instead of 710) | Old versions stayed in AEM's history. The loader removes the sample's folders first |
 
+Found by using the panel the way a tester would, on a second copy (15 Nov 2026), and fixed:
+
+| What | Fix |
+|---|---|
+| After a row's "Replace link" the topic opened somewhere else, without the outline around the repaired element | The outline is shown again once the editor has drawn the saved topic |
+| "1 files are open with edits that are not saved", without saying which | "1 file is open with edits that are not saved: migration_archive_17.dita. Save or close it, then press "Fix all" again." |
+| That message said to apply again, and the "Fix all" button was gone until the next check | The button stays for the repairs that were not written; seen as "Fix all (3)" |
+| "Confirm: change 1 files", "Repaired 3 references in 1 files" | Singular for one |
+| A row's "Replace link" did not say that the topic has other open references | It does, like a row of the "Repaired" list |
+
+Tried and found working: Cancel during a check; "Fix all" with one topic open and unsaved (that file is left alone, the other 219 are written); the check after it (544, then 541); no row action past the edge of the list at 760 px.
+
+Not looked at in that round: whether Cancel also stops the agents in the sidecar; changing the map during the wait; a file locked by another author.
+
 Found in a full rehearsal on a second copy of the sample (15 Nov 2026), and fixed:
 
 | What | Fix |
