@@ -229,7 +229,7 @@ Rules for the answer:
 
 REVIEW_SYSTEM = """You review a proposed repair of a broken reference in DITA documentation.
 
-You get the reference as the author wrote it (element, broken value, link text, the sentence around it) and the proposed target (file title, type, and for an element its type and text). Decide whether a reader who follows the repaired reference lands on what the sentence promises, and for a content reference whether the pulled-in content fits the place it is pulled into.
+You get the reference as the author wrote it (element, broken value, link text, the sentence around it) and the proposed target (file title, type, and for an element its type and text). When the repository still has an earlier version, you also get "broken_target_showed_before": what the reference pulled in or pointed at before the target was changed. That is the strongest evidence. A right repair shows the same thing, possibly reworded, split or moved; a target that only shares a name or a few words with the old one, or says something else, is wrong, however close its id is. Judge the meaning, not the wording: the same rule, limit or instruction said in other words is the same thing. When the old piece was split into several, the right one is the piece for the product or case the referencing topic is about. Decide whether a reader who follows the repaired reference lands on what the sentence promises, and for a content reference whether the pulled-in content fits the place it is pulled into.
 
 Reply with one JSON object and nothing else: {"agree": true or false, "reason": "<one sentence>"}""" + DATA_RULE
 
@@ -266,6 +266,24 @@ def rule_fix(repo, ref):
             if resolves(repo, ref, proposal):
                 return dict(proposal, reason="The key \"%s\" exists and differs from \"%s\" only in punctuation or case." % (close[0], key))
     return history_fix(repo, ref)
+
+
+def never_defined(repo, ref):
+    """Why a key reference is broken when no key was ever there to rename: the map and the maps it
+    includes define no keys at all, today or in an earlier version. '' otherwise.
+
+    Seen on 15 Nov 2026 with a slice of the DITA-OT documentation: its topics use keys that the
+    full documentation defines in a separate map, which the slice does not include. Finder agents
+    searched for each key and reported "no repair found", as if the keys had been removed.
+    """
+    if ref["attribute"] not in ("keyref", "conkeyref") or ref.get("reason") != "key-undefined" or repo.keys:
+        return ""
+    key = ref["value"].partition("/")[0]
+    if any(old_file["keys"] for versions in repo.previous.values() for old_file in versions):
+        return ""
+    return ("The key \"%s\" is not defined. This map defines no keys at all, now or in an earlier version, so the key "
+            "was not renamed or removed: its definition is missing. Add a key definition for \"%s\" to the map, or "
+            "include the map that holds your key definitions." % (key, key))
 
 
 def renamed_element(repo, target, topic_id, element_id):
@@ -450,6 +468,27 @@ def describe_target(repo, ref, proposal):
 
 # ---- pipeline ------------------------------------------------------------------------------
 
+def review_proposal(repo, ref, proposal, backend, model):
+    """What the reviewer agent says of one proposed target: {"agree": True, False or None, "reason"}.
+    None: the reviewer could not be asked."""
+    try:
+        import sidecar
+        sidecar.BACKEND = backend
+        asked = {"reference": {"element": ref["element"], "attribute": ref["attribute"], "broken_value": ref["value"],
+                               "link_text": ref["link_text"], "sentence": ref["context"], "in_topic": ref["topic_title"]},
+                 "proposed_target": describe_target(repo, ref, proposal)}
+        # What the reference showed before it broke, from the file's earlier version. Without it the
+        # reviewer judged by the id and the sentence alone and took a decoy with a similar id for right
+        # (hardeval.py, 15 Nov 2026).
+        before = text_at(repo, ref, ref["value"], previous=True)
+        if before:
+            asked["broken_target_showed_before"] = before
+        review = sidecar.call_model(REVIEW_SYSTEM, json.dumps(asked, ensure_ascii=False, indent=1), reviewer_model(backend, model))
+        return {"agree": bool(review.get("agree")), "reason": str(review.get("reason", ""))[:300]}
+    except Exception as exc:
+        return {"agree": None, "reason": "review failed: %s" % str(exc)[:120]}
+
+
 def heal_one(repo, ref, backend, model, with_history, log):
     """Stages 2 to 4 for one broken reference."""
     result = {"stage": None, "verdict": "none", "new_value": None, "confidence": "low", "reason": "", "caveat": "",
@@ -499,17 +538,7 @@ def heal_one(repo, ref, backend, model, with_history, log):
     result["candidates"] = ranked_candidates(repo, ref, answer, tools, result["new_value"])
 
     # Stage 4: reviewer.
-    target = describe_target(repo, ref, answer)
-    try:
-        import sidecar
-        sidecar.BACKEND = backend
-        review = sidecar.call_model(REVIEW_SYSTEM, json.dumps({
-            "reference": {"element": ref["element"], "attribute": ref["attribute"], "broken_value": ref["value"],
-                          "link_text": ref["link_text"], "sentence": ref["context"], "in_topic": ref["topic_title"]},
-            "proposed_target": target}, ensure_ascii=False, indent=1), reviewer_model(backend, model))
-        result["review"] = {"agree": bool(review.get("agree")), "reason": str(review.get("reason", ""))[:300]}
-    except Exception as exc:
-        result["review"] = {"agree": None, "reason": "review failed: %s" % str(exc)[:120]}
+    result["review"] = review_proposal(repo, ref, answer, backend, model)
     agreed = result["review"]["agree"] is True
     result["checks"].append("reviewer agrees" if agreed else "reviewer does not agree" if result["review"]["agree"] is False else "reviewer gave no verdict")
     result["verdict"] = "fix" if (agreed and result["confidence"] == "high" and not result["caveat"]) else "review"

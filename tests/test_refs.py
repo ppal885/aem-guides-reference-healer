@@ -1083,3 +1083,104 @@ class RepairsThatLandOnADuplicatedId(unittest.TestCase):
                                      '<topic id="t"><title>T</title><body><p id="x">first</p><p id="x">second</p></body></topic>'}])
         self.assertEqual(repo.files["d/t.dita"]["elements"][("t", "x")]["text"], "first")
         self.assertEqual(repo.files["d/t.dita"]["copies"], {("t", "x"): 2})
+
+
+class WhatAnAuthorAccepts(unittest.TestCase):
+    """The evaluation of repairs shown to review: would accepting the first candidate be right?"""
+
+    def row(self, old, right, reviewer):
+        return ({"attribute": "conref", "old": old, "new": "x", "detail": {"reviewer": reviewer}}, right)
+
+    def test_references_and_broken_targets_are_counted_apart_by_what_the_reviewer_said(self):
+        import revieweval
+        table = revieweval.tally([self.row("lib.dita#lib/a", True, True), self.row("lib.dita#lib/a", True, True),
+                                  self.row("lib.dita#lib/b", True, False), self.row("lib.dita#lib/b", False, False),
+                                  self.row("lib.dita#lib/c", True, None)])
+        self.assertEqual(table["reviewer agreed"], {"references": [2, 2], "targets": [1, 1]})
+        # One of the two references to "b" would be repaired wrong: the target does not count as right.
+        self.assertEqual(table["reviewer disagreed"], {"references": [1, 2], "targets": [0, 1]})
+        self.assertEqual(table["no reviewer"], {"references": [1, 1], "targets": [1, 1]})
+
+    def test_a_wrong_proposal_is_listed_once_with_how_many_references_it_would_touch(self):
+        import revieweval
+        wrong = revieweval.wrong_ones([self.row("lib.dita#lib/b", False, False), self.row("lib.dita#lib/b", False, False),
+                                       self.row("lib.dita#lib/a", True, True)])
+        self.assertEqual([(w["old"], w["reviewer"], w["references"]) for w in wrong],
+                         [("lib.dita#lib/b", "reviewer disagreed", 2)])
+
+
+class TheSampleWithDecoys(unittest.TestCase):
+    """How hardeval.py scores a reference whose obvious new target is the wrong one."""
+
+    CASE = {"file": "a.dita", "attribute": "conref", "old": "lib.dita#lib/timeout", "right": "lib.dita#lib/request-limit"}
+    GONE = dict(CASE, right=None)
+
+    def repair(self, new, verdict="review", reviewer=False, offered=()):
+        return {"new": new, "verdict": verdict,
+                "detail": {"reviewer": reviewer, "candidates": [{"value": value} for value in (offered or ([new] if new else []))]}}
+
+    def test_a_decoy_is_a_wrong_proposal_and_it_counts_whether_the_right_one_was_listed(self):
+        import hardeval
+        decoy, right = "lib.dita#lib/session-timeout", "lib.dita#lib/request-limit"
+        self.assertEqual(hardeval.score(self.CASE, self.repair(decoy)), ("first wrong", "review", "disagreed", False))
+        self.assertEqual(hardeval.score(self.CASE, self.repair(decoy, offered=[decoy, right]))[3], True)
+        self.assertEqual(hardeval.score(self.CASE, self.repair(right, reviewer=True))[:3], ("first right", "review", "agreed"))
+        self.assertEqual(hardeval.score(self.CASE, None)[:2], ("missed", "none"))
+
+    def test_for_content_that_is_gone_the_right_answer_is_no_proposal(self):
+        import hardeval
+        self.assertEqual(hardeval.score(self.GONE, {"new": None, "verdict": "none"})[0], "first right")
+        self.assertEqual(hardeval.score(self.GONE, self.repair("lib.dita#lib/preview-note"))[0], "first wrong")
+
+    def test_the_summary_counts_what_was_applied_wrong_and_what_the_reviewer_caught(self):
+        import hardeval
+        rows = [{"outcome": "first wrong", "verdict": "fix", "reviewer": "agreed", "right_in_list": False, "proposed": "x"},
+                {"outcome": "first wrong", "verdict": "review", "reviewer": "disagreed", "right_in_list": True, "proposed": "x"},
+                {"outcome": "first right", "verdict": "review", "reviewer": "disagreed", "right_in_list": True, "proposed": "y"},
+                {"outcome": "first right", "verdict": "none", "reviewer": "no reviewer", "right_in_list": False, "proposed": None}]
+        result = hardeval.summary(rows)
+        self.assertEqual((result["applied_without_asking_and_wrong"], result["wrong_proposals"],
+                          result["wrong_proposals_the_reviewer_caught"], result["wrong_proposals_with_the_right_one_in_the_list"]),
+                         (1, 2, 1, 1))
+        self.assertEqual((result["right_proposals"], result["right_proposals_the_reviewer_doubted"]), (1, 1))
+
+    def test_the_sample_on_disk_has_eight_broken_references_and_none_settled_by_a_rule(self):
+        root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "samples", "hard-demo")
+        self.assertEqual(len([r for r in refcheck.Repo(os.path.join(root, "v2")).broken() if not r["generated"]]), 8)
+        self.assertEqual(refcheck.Repo(os.path.join(root, "v1")).broken(), [])
+
+
+class KeysThatWereNeverDefined(unittest.TestCase):
+    """A map without any key definition whose topics use keys: nothing was renamed, so no agent
+    searches. Seen with a slice of the DITA-OT documentation, whose keys live in a map of their own."""
+
+    TOPIC = ('<topic id="t"><title>T</title><body><p>Install with <xref keyref="homebrew"/> or <xref keyref="docker"/>. '
+             'Again: <xref keyref="docker"/>.</p></body></topic>')
+
+    def plan(self, map_xml, previous=()):
+        files = [{"id": "G1", "path": "/d/m.ditamap", "xml": map_xml, "previous": list(previous)},
+                 {"id": "G2", "path": "/d/t.dita", "xml": self.TOPIC}]
+        return refplan.plan_files({"files": files}, model="no-such-model", log=lambda message: None, memory={})
+
+    def test_they_are_settled_by_a_rule_without_a_model_and_say_what_to_add(self):
+        out = self.plan('<map><title>M</title><topicref href="t.dita"/></map>')
+        self.assertEqual(out["usage"]["model_calls"], 0)
+        self.assertEqual({(r["old"], r["verdict"], r["stage"]) for r in out["repairs"]},
+                         {("homebrew", "none", "rule"), ("docker", "none", "rule")})
+        self.assertIn('Add a key definition for "docker" to the map', next(r["reason"] for r in out["repairs"] if r["old"] == "docker"))
+        self.assertTrue(all("ways_out" not in (r.get("detail") or {}) for r in out["repairs"]))
+        self.assertIn("3 references point to 2 keys that this map does not define", out["plan"][1])
+        self.assertIn("docker, homebrew", out["plan"][1])
+        self.assertNotIn("renamed, moved or removed", out["plan"][0])
+
+    def test_a_map_that_defines_other_keys_still_goes_to_the_agents(self):
+        defined = '<map><title>M</title><keydef keys="brew" href="https://brew.sh" scope="external"/><topicref href="t.dita"/></map>'
+        repo = refcheck.Repo(files=[{"id": "G1", "path": "/d/m.ditamap", "xml": defined}, {"id": "G2", "path": "/d/t.dita", "xml": self.TOPIC}])
+        self.assertEqual([refheal.never_defined(repo, ref) for ref in repo.broken()], ["", "", ""])
+
+    def test_a_map_that_had_keys_in_an_earlier_version_still_goes_to_the_agents(self):
+        now = '<map><title>M</title><topicref href="t.dita"/></map>'
+        before = '<map><title>M</title><keydef keys="docker-site" href="https://docker.com" scope="external"/><topicref href="t.dita"/></map>'
+        repo = refcheck.Repo(files=[{"id": "G1", "path": "/d/m.ditamap", "xml": now, "previous": [before]},
+                                    {"id": "G2", "path": "/d/t.dita", "xml": self.TOPIC}])
+        self.assertEqual({refheal.never_defined(repo, ref) for ref in repo.broken()}, {""})

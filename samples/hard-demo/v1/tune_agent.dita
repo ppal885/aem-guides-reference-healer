@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="tune_agent">
+  <title>Tune the agent</title>
+  <body>
+    <p>Set <codeph>workers</codeph> in <filepath>agent.conf</filepath>.</p><note conref="lib.dita#lib/restart-note"/>
+  </body>
+</topic>

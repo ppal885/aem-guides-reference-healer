@@ -1,0 +1,58 @@
+[
+ {
+  "file": "api_errors.dita",
+  "attribute": "conref",
+  "old": "lib.dita#lib/timeout",
+  "right": "lib.dita#lib/request-limit",
+  "decoy": "lib.dita#lib/session-timeout"
+ },
+ {
+  "file": "service_b200.dita",
+  "attribute": "conref",
+  "old": "lib.dita#lib/warn-power",
+  "right": "lib.dita#lib/warn-power-b200",
+  "decoy": "lib.dita#lib/warn-power-a100"
+ },
+ {
+  "file": "exports.dita",
+  "attribute": "conref",
+  "old": "lib.dita#lib/beta-note",
+  "right": null,
+  "decoy": "lib.dita#lib/preview-note"
+ },
+ {
+  "file": "security.dita",
+  "attribute": "conref",
+  "old": "lib.dita#lib/tls-required",
+  "right": "lib.dita#lib/min-tls",
+  "decoy": "lib.dita#lib/tls-optional"
+ },
+ {
+  "file": "tune_agent.dita",
+  "attribute": "conref",
+  "old": "lib.dita#lib/restart-note",
+  "right": "lib.dita#lib/reload-config",
+  "decoy": "lib.dita#lib/restart-after-cert"
+ },
+ {
+  "file": "invite_users.dita",
+  "attribute": "href",
+  "old": "limits.dita#limits/max-users",
+  "right": "quotas.dita#quotas/user-quota",
+  "decoy": "limits.dita#limits/max-guests"
+ },
+ {
+  "file": "failed_upgrade.dita",
+  "attribute": "keyref",
+  "old": "support-email",
+  "right": "help-contact",
+  "decoy": "support-phone"
+ },
+ {
+  "file": "move_linux.dita",
+  "attribute": "href",
+  "old": "install_linux.dita",
+  "right": "linux_setup.dita",
+  "decoy": "install_linux_arm.dita"
+ }
+]

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="lib">
+  <title>Shared notes</title>
+  <body>
+    <p id="session-timeout">A session ends after 30 minutes without activity.</p>
+    <p id="request-limit">The service cancels any request that runs for more than 30 seconds.</p>
+    <note id="warn-power-a100">Disconnect the power before you open the A100 cabinet.</note>
+    <note id="warn-power-b200">Disconnect both power feeds before you open the B200 cabinet.</note>
+    <note id="preview-note">Scheduled reports are in preview. Their format can change.</note>
+    <p id="tls-optional">TLS is optional for connections inside the private network.</p>
+    <p id="min-tls">The lowest TLS version the service accepts is 1.2.</p>
+    <note id="restart-after-cert">Restart the agent after you replace its certificate.</note>
+    <note id="reload-config">After you edit the configuration file of the agent, restart it.</note>
+  </body>
+</topic>

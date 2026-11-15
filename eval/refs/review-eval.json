@@ -1,0 +1,157 @@
+{
+ "backend": "cli",
+ "runs": [
+  {
+   "run": 1,
+   "seconds": 307,
+   "samples": {
+    "large-demo": {
+     "accepting_the_first_candidate": {
+      "reviewer agreed": {
+       "references": [
+        299,
+        299
+       ],
+       "targets": [
+        8,
+        8
+       ]
+      },
+      "reviewer disagreed": {
+       "references": [
+        133,
+        133
+       ],
+       "targets": [
+        4,
+        4
+       ]
+      },
+      "no reviewer": {
+       "references": [
+        0,
+        0
+       ],
+       "targets": [
+        0,
+        0
+       ]
+      }
+     },
+     "wrong": []
+    },
+    "rank-demo": {
+     "accepting_the_first_candidate": {
+      "reviewer agreed": {
+       "references": [
+        4,
+        4
+       ],
+       "targets": [
+        4,
+        4
+       ]
+      },
+      "reviewer disagreed": {
+       "references": [
+        4,
+        4
+       ],
+       "targets": [
+        3,
+        3
+       ]
+      },
+      "no reviewer": {
+       "references": [
+        0,
+        0
+       ],
+       "targets": [
+        0,
+        0
+       ]
+      }
+     },
+     "wrong": []
+    }
+   }
+  },
+  {
+   "run": 2,
+   "seconds": 294,
+   "samples": {
+    "large-demo": {
+     "accepting_the_first_candidate": {
+      "reviewer agreed": {
+       "references": [
+        331,
+        331
+       ],
+       "targets": [
+        8,
+        8
+       ]
+      },
+      "reviewer disagreed": {
+       "references": [
+        82,
+        82
+       ],
+       "targets": [
+        3,
+        3
+       ]
+      },
+      "no reviewer": {
+       "references": [
+        19,
+        19
+       ],
+       "targets": [
+        1,
+        1
+       ]
+      }
+     },
+     "wrong": []
+    },
+    "rank-demo": {
+     "accepting_the_first_candidate": {
+      "reviewer agreed": {
+       "references": [
+        3,
+        3
+       ],
+       "targets": [
+        3,
+        3
+       ]
+      },
+      "reviewer disagreed": {
+       "references": [
+        5,
+        5
+       ],
+       "targets": [
+        4,
+        4
+       ]
+      },
+      "no reviewer": {
+       "references": [
+        0,
+        0
+       ],
+       "targets": [
+        0,
+        0
+       ]
+      }
+     },
+     "wrong": []
+    }
+   }
+  }
+ ]
+}

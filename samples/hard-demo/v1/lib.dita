@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="lib">
+  <title>Shared notes</title>
+  <body>
+    <p id="timeout">A request that takes longer than 30 seconds is cancelled.</p>
+    <note id="warn-power">Disconnect the power before you open the cabinet.</note>
+    <note id="beta-note">Scheduled exports are in beta. Do not rely on them for audits.</note>
+    <p id="tls-required">Connections must use TLS 1.2 or later.</p>
+    <note id="restart-note">Restart the agent after you change its configuration file.</note>
+  </body>
+</topic>

@@ -399,6 +399,11 @@ class Session:
                 self._recall(repo, group)
             elif group["known"]["new_value"] in self._declined(refs[0]):
                 group["known"].update(verdict="review", caveat="This repair was declined in an earlier check.")
+            missing = "" if group["known"] else refheal.never_defined(repo, refs[0])
+            if missing:
+                # Nothing to find and nothing to put back: settled here, without an agent.
+                group["known"] = {"new_value": None, "verdict": "none", "how": "rule", "reason": missing, "caveat": "",
+                                  "never_defined": True}
             self._source_option(repo, group)
             groups[group["id"]] = group
         self.rounds.append({"repo": repo, "groups": groups})
@@ -989,7 +994,10 @@ class Session:
                   "reference because it worked out this topic's keys before the map was right; it does so again when "
                   "the topic is saved.")
         return [{"file": "/" + file, "line": lines.get((file, attribute, value), 0), "attribute": attribute, "old": value,
-                 "new": None, "target": None, "caveat": "", "used_in": ["/" + file], "stage": "planner",
+                 "new": None, "target": None, "caveat": "", "used_in": ["/" + file],
+                 # A key reference that resolves is settled by a rule: it says what is the case, no search was made.
+                 "stage": "rule" if attribute in ("keyref", "conkeyref") and (file, attribute, value) not in self.waiting
+                 else "planner",
                  "verdict": "pending" if (file, attribute, value) in self.waiting else "none",
                  "reason": waiting if (file, attribute, value) in self.waiting
                  else by_key if attribute in ("keyref", "conkeyref") else differs}
@@ -1050,6 +1058,10 @@ class Session:
                     gone = last or group
                     known = gone["known"] or {}
                     entry.update(verdict="none", stage=known.get("how"), reason=known.get("reason") or gone["reason"])
+                    if known.get("never_defined"):
+                        # No piece was removed, so there is no way out to offer: the reason says what to add.
+                        repairs.append(entry)
+                        continue
                     if "ways_out" not in entry["detail"]:
                         entry["detail"]["ways_out"] = self._ways_out_detail(gone, group, chains)
                     suggested = entry["detail"]["ways_out"].get("recommended")
@@ -1096,6 +1108,13 @@ class Session:
                 "candidates": [{"value": c["new_value"], "target": refheal.target_label(repo, first, c["new_value"]),
                                 "likelihood": c["likelihood"], "why": _whole_sentences(c["why"], 240),
                                 "now": refheal.text_at(repo, first, c["new_value"])[:300]} for c in ranked[:3]],
+                # What the reviewer agent said of the first candidate: True, False, or None when no
+                # reviewer saw it (a rule, an earlier answer of an author). For the evaluation of
+                # what an author accepts, and for a panel that wants to show it.
+                "reviewer": known.get("reviewer"),
+                # For a key that was never defined: what is the case and what to add. The box then
+                # says this instead of "before it broke" and "no candidate", which are not true of it.
+                "missing_definition": known["reason"] if known.get("never_defined") else "",
                 "references": len(group["refs"]), "files": len(files), "file_names": files[:6],
                 "published_under": self._published_under(repo, group),
                 "outside": [os.path.basename(f) for f in self._used_outside(repo, group)[:6]],
@@ -1222,10 +1241,26 @@ def _plan_files(payload, backend="cli", model=None, log=print, progress=None, me
         out = session.result()
         out["plan"] = looked_back
         return out
-    proven = sum(1 for g in first.values() if g["known"])
-    session.plan.append("Found %s in %d files. They all come from %d ids and keys that were renamed, moved or removed." % (
-        _count(sum(len(g["refs"]) for g in first.values()), "broken reference"), len(session.rounds[0]["repo"].files),
-        len(first)))
+    undefined = [g for g in first.values() if (g["known"] or {}).get("never_defined")]
+    proven = sum(1 for g in first.values() if g["known"]) - len(undefined)
+    changed = len(first) - len(undefined)
+    references = sum(len(g["refs"]) for g in first.values())
+    renamed = references - sum(len(g["refs"]) for g in undefined)
+    origin = ("" if not changed else
+              " They all come from %d ids and keys that were renamed, moved or removed." % changed if not undefined else
+              " %s from %d ids and keys that were renamed, moved or removed." % (
+                  "%s of them %s" % (format(renamed, ","), "comes" if renamed == 1 else "come"), changed))
+    session.plan.append("Found %s in %d files.%s" % (
+        _count(references, "broken reference"), len(session.rounds[0]["repo"].files), origin))
+    if undefined:
+        session.plan.append("%s to %s that this map does not define: the map defines no keys at all, now or in an earlier "
+                            "version. Nothing was renamed, so there is nothing to repair and no agent searched for them. "
+                            "Add the key definitions to the map, or include the map that holds them: %s." % (
+                                _count(sum(len(g["refs"]) for g in undefined), "reference").capitalize() + (
+                                    " points" if sum(len(g["refs"]) for g in undefined) == 1 else " point"),
+                                _count(len(undefined), "key"),
+                                ", ".join(sorted(g["refs"][0]["value"].partition("/")[0] for g in undefined))))
+        session.step("undefined", "done", "Scanner", "%s not defined in this map: no agent needed" % _count(len(undefined), "key"))
     session.plan += looked_back
     outside = {f for g in first.values() for f in session._used_outside(session.current["repo"], g)}
     if outside:
@@ -1253,7 +1288,9 @@ def _plan_files(payload, backend="cli", model=None, log=print, progress=None, me
         session.step("planner-memory", "done", "Memory", "Reused the planner's decisions for %s, each checked again by code"
                      % _count(replayed, "broken target"))
     steps = []
-    if session.current["groups"]:
+    # Keys that were never defined are settled by a rule; when nothing else is open, no agent is asked.
+    open_groups = [g for g in session.current["groups"].values() if not (g["known"] or {}).get("never_defined")]
+    if open_groups:
         steps = _ask_planner(session, backend, model, log, progress)
         if stored and session.cache is not None and session.summary:
             session.cache["summary"] = {"when": time.time(), "text": session.summary, "for": sorted(session.decided_keys)}

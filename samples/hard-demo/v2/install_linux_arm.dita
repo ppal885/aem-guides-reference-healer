@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="install_linux_arm">
+  <title>Install on Linux (ARM)</title>
+  <body>
+    <p>Download the package for ARM servers and run the installer as root.</p>
+  </body>
+</topic>

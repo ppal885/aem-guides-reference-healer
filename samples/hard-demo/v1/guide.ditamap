@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">
+<map id="guide">
+  <title>Atlas guide</title>
+  <keydef keys="support-email"><topicmeta><keywords><keyword>support@atlas.example</keyword></keywords></topicmeta></keydef>
+  <topicref href="lib.dita"/>
+  <topicref href="limits.dita"/>
+  <topicref href="install_linux.dita"/>
+  <topicref href="api_errors.dita"/>
+  <topicref href="service_b200.dita"/>
+  <topicref href="exports.dita"/>
+  <topicref href="security.dita"/>
+  <topicref href="tune_agent.dita"/>
+  <topicref href="invite_users.dita"/>
+  <topicref href="failed_upgrade.dita"/>
+  <topicref href="move_linux.dita"/>
+</map>
