@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">
+<map id="guide">
+  <title>Atlas guide</title>
+  <keydef keys="support-phone"><topicmeta><keywords><keyword>+1 555 0100</keyword></keywords></topicmeta></keydef>
+  <keydef keys="help-contact"><topicmeta><keywords><keyword>help@atlas.example</keyword></keywords></topicmeta></keydef>
+  <topicref href="lib.dita"/>
+  <topicref href="limits.dita"/>
+  <topicref href="quotas.dita"/>
+  <topicref href="linux_setup.dita"/>
+  <topicref href="install_linux_arm.dita"/>
+  <topicref href="api_errors.dita"/>
+  <topicref href="service_b200.dita"/>
+  <topicref href="exports.dita"/>
+  <topicref href="security.dita"/>
+  <topicref href="tune_agent.dita"/>
+  <topicref href="invite_users.dita"/>
+  <topicref href="failed_upgrade.dita"/>
+  <topicref href="move_linux.dita"/>
+</map>

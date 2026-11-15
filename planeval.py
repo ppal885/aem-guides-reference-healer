@@ -106,6 +106,9 @@ def main():
         else:
             out = refplan.plan_files(fresh, backend=args.backend, log=lambda message: None, memory={})
         counts = collections.Counter(score(r, names) for r in out["repairs"])
+        # Which targets went wrong, and what was proposed: a count alone does not say what to look at.
+        wrong = collections.Counter((r["attribute"], r["old"], r.get("new") or "", r["verdict"]) for r in out["repairs"]
+                                    if score(r, names) in ("applied wrong", "asked, wrong", "missed"))
         seen = {}
         for repair in out["repairs"]:
             seen[(repair["attribute"], repair["old"].rsplit("/", 2)[-1] if repair["attribute"] in ("href", "conref") else repair["old"])] = repair["verdict"]
@@ -113,9 +116,14 @@ def main():
             per_target[target].append(verdict)
         runs.append({"run": number, "seconds": round(time.time() - started), "references": len(out["repairs"]),
                      "scores": dict(counts), "source_edits": len(out["source_fixes"]),
-                     "planner_steps": out["stats"].get("planner_steps"), "plan": out.get("plan")})
+                     "planner_steps": out["stats"].get("planner_steps"), "plan": out.get("plan"),
+                     "wrong": [{"attribute": a, "old": o, "proposed": n, "verdict": v, "references": c}
+                               for (a, o, n, v), c in wrong.items()]})
         print("run %d: %3d s  %s  edits at the source: %d" % (
             number, runs[-1]["seconds"], "  ".join("%s %d" % (k, v) for k, v in sorted(counts.items())), len(out["source_fixes"])))
+        for item in runs[-1]["wrong"]:
+            print("   wrong: %s %s -> %s (%s, %d references)" % (item["attribute"], item["old"][-44:], item["proposed"][-44:] or "(nothing)",
+                                                                  item["verdict"], item["references"]))
     same = sum(1 for verdicts in per_target.values() if len(set(verdicts)) == 1)
     differing = {"%s %s" % target: verdicts for target, verdicts in per_target.items() if len(set(verdicts)) > 1}
     result = {"sample": os.path.relpath(args.sample, HERE), "mode": args.mode, "backend": args.backend, "runs": runs,

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="failed_upgrade">
+  <title>If the upgrade fails</title>
+  <body>
+    <p>Send the log file to <keyword keyref="support-email"/>.</p>
+  </body>
+</topic>

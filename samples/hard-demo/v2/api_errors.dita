@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="api_errors">
+  <title>API errors</title>
+  <body>
+    <p>A 504 means the call ran too long.</p><p conref="lib.dita#lib/timeout"/>
+  </body>
+</topic>

@@ -1,0 +1,347 @@
+{
+ "sample": "samples/hard-demo",
+ "backend": "cli",
+ "cases": 8,
+ "reviewer_alone": "agreed",
+ "runs": [
+  {
+   "scores": {
+    "first right": 8
+   },
+   "applied_without_asking_and_wrong": 0,
+   "wrong_proposals": 0,
+   "wrong_proposals_the_reviewer_caught": 0,
+   "wrong_proposals_with_the_right_one_in_the_list": 0,
+   "right_proposals": 7,
+   "right_proposals_the_reviewer_doubted": 0,
+   "run": 1,
+   "seconds": 136,
+   "usage": {
+    "model_calls": 49,
+    "failed_calls": 0,
+    "input_tokens": 137669,
+    "of_which_read_from_cache": 82343,
+    "output_tokens": 7681,
+    "cost_usd": 0.7419,
+    "first_failure": null,
+    "shared_with_another_check": false
+   },
+   "rows": [
+    {
+     "file": "api_errors.dita",
+     "old": "lib.dita#lib/timeout",
+     "right": "lib.dita#lib/request-limit",
+     "proposed": "lib.dita#lib/request-limit",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "agreed",
+     "right_in_list": true,
+     "caveat": "The text is not what this reference showed before; read both before accepting."
+    },
+    {
+     "file": "service_b200.dita",
+     "old": "lib.dita#lib/warn-power",
+     "right": "lib.dita#lib/warn-power-b200",
+     "proposed": "lib.dita#lib/warn-power-b200",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "agreed",
+     "right_in_list": true,
+     "caveat": "The text is not what this reference showed before; read both before accepting."
+    },
+    {
+     "file": "exports.dita",
+     "old": "lib.dita#lib/beta-note",
+     "right": null,
+     "proposed": null,
+     "outcome": "first right",
+     "verdict": "none",
+     "reviewer": "no reviewer",
+     "right_in_list": false,
+     "caveat": ""
+    },
+    {
+     "file": "security.dita",
+     "old": "lib.dita#lib/tls-required",
+     "right": "lib.dita#lib/min-tls",
+     "proposed": "lib.dita#lib/min-tls",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "agreed",
+     "right_in_list": true,
+     "caveat": "The text is not what this reference showed before; read both before accepting."
+    },
+    {
+     "file": "tune_agent.dita",
+     "old": "lib.dita#lib/restart-note",
+     "right": "lib.dita#lib/reload-config",
+     "proposed": "lib.dita#lib/reload-config",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "agreed",
+     "right_in_list": true,
+     "caveat": "The text is not what this reference showed before; read both before accepting."
+    },
+    {
+     "file": "invite_users.dita",
+     "old": "limits.dita#limits/max-users",
+     "right": "quotas.dita#quotas/user-quota",
+     "proposed": "quotas.dita#quotas/user-quota",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "agreed",
+     "right_in_list": true,
+     "caveat": "The text is not what this reference showed before; read both before accepting."
+    },
+    {
+     "file": "failed_upgrade.dita",
+     "old": "support-email",
+     "right": "help-contact",
+     "proposed": "help-contact",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "agreed",
+     "right_in_list": true,
+     "caveat": "The address differs from the old one (help@atlas.example instead of support@atlas.example) and no history shows a rename. Confirm that log files for failed upgrades should go to the help contact addre"
+    },
+    {
+     "file": "move_linux.dita",
+     "old": "install_linux.dita",
+     "right": "linux_setup.dita",
+     "proposed": "linux_setup.dita#linux_setup",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "agreed",
+     "right_in_list": true,
+     "caveat": "The rename is inferred from the title only (no file history). Check that the generic Linux install topic, not the ARM-specific one, is what the move procedure should point to."
+    }
+   ]
+  },
+  {
+   "scores": {
+    "first right": 8
+   },
+   "applied_without_asking_and_wrong": 0,
+   "wrong_proposals": 0,
+   "wrong_proposals_the_reviewer_caught": 0,
+   "wrong_proposals_with_the_right_one_in_the_list": 0,
+   "right_proposals": 7,
+   "right_proposals_the_reviewer_doubted": 2,
+   "run": 2,
+   "seconds": 164,
+   "usage": {
+    "model_calls": 50,
+    "failed_calls": 0,
+    "input_tokens": 138950,
+    "of_which_read_from_cache": 85014,
+    "output_tokens": 8342,
+    "cost_usd": 0.7509,
+    "first_failure": null,
+    "shared_with_another_check": false
+   },
+   "rows": [
+    {
+     "file": "api_errors.dita",
+     "old": "lib.dita#lib/timeout",
+     "right": "lib.dita#lib/request-limit",
+     "proposed": "lib.dita#lib/request-limit",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "agreed",
+     "right_in_list": true,
+     "caveat": "The text is not what this reference showed before; read both before accepting."
+    },
+    {
+     "file": "service_b200.dita",
+     "old": "lib.dita#lib/warn-power",
+     "right": "lib.dita#lib/warn-power-b200",
+     "proposed": "lib.dita#lib/warn-power-b200",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "agreed",
+     "right_in_list": true,
+     "caveat": "The text is not what this reference showed before; read both before accepting."
+    },
+    {
+     "file": "exports.dita",
+     "old": "lib.dita#lib/beta-note",
+     "right": null,
+     "proposed": null,
+     "outcome": "first right",
+     "verdict": "none",
+     "reviewer": "no reviewer",
+     "right_in_list": false,
+     "caveat": ""
+    },
+    {
+     "file": "security.dita",
+     "old": "lib.dita#lib/tls-required",
+     "right": "lib.dita#lib/min-tls",
+     "proposed": "lib.dita#lib/min-tls",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "disagreed",
+     "right_in_list": true,
+     "caveat": "The text is not what this reference showed before; read both before accepting."
+    },
+    {
+     "file": "tune_agent.dita",
+     "old": "lib.dita#lib/restart-note",
+     "right": "lib.dita#lib/reload-config",
+     "proposed": "lib.dita#lib/reload-config",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "disagreed",
+     "right_in_list": true,
+     "caveat": "The text is not what this reference showed before; read both before accepting."
+    },
+    {
+     "file": "invite_users.dita",
+     "old": "limits.dita#limits/max-users",
+     "right": "quotas.dita#quotas/user-quota",
+     "proposed": "quotas.dita#quotas/user-quota",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "agreed",
+     "right_in_list": true,
+     "caveat": "The text is not what this reference showed before; read both before accepting."
+    },
+    {
+     "file": "failed_upgrade.dita",
+     "old": "support-email",
+     "right": "help-contact",
+     "proposed": "help-contact",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "agreed",
+     "right_in_list": true,
+     "caveat": "The address is not the same as before (help@atlas.example instead of support@atlas.example), and no history shows a rename. Confirm that help@atlas.example is where upgrade logs should be sent."
+    },
+    {
+     "file": "move_linux.dita",
+     "old": "install_linux.dita",
+     "right": "linux_setup.dita",
+     "proposed": "linux_setup.dita#linux_setup",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "agreed",
+     "right_in_list": true,
+     "caveat": "The rename is inferred from the title only. If the new server in this topic is ARM-based, install_linux_arm.dita (\"Install on Linux (ARM)\") may be the intended target instead."
+    }
+   ]
+  },
+  {
+   "scores": {
+    "first right": 8
+   },
+   "applied_without_asking_and_wrong": 0,
+   "wrong_proposals": 0,
+   "wrong_proposals_the_reviewer_caught": 0,
+   "wrong_proposals_with_the_right_one_in_the_list": 0,
+   "right_proposals": 7,
+   "right_proposals_the_reviewer_doubted": 1,
+   "run": 3,
+   "seconds": 135,
+   "usage": {
+    "model_calls": 49,
+    "failed_calls": 0,
+    "input_tokens": 135544,
+    "of_which_read_from_cache": 86398,
+    "output_tokens": 7714,
+    "cost_usd": 0.6879,
+    "first_failure": null,
+    "shared_with_another_check": false
+   },
+   "rows": [
+    {
+     "file": "api_errors.dita",
+     "old": "lib.dita#lib/timeout",
+     "right": "lib.dita#lib/request-limit",
+     "proposed": "lib.dita#lib/request-limit",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "agreed",
+     "right_in_list": true,
+     "caveat": "The text is not what this reference showed before; read both before accepting."
+    },
+    {
+     "file": "service_b200.dita",
+     "old": "lib.dita#lib/warn-power",
+     "right": "lib.dita#lib/warn-power-b200",
+     "proposed": "lib.dita#lib/warn-power-b200",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "agreed",
+     "right_in_list": true,
+     "caveat": "The B200 note now says to disconnect both power feeds, which differs from the old generic wording; confirm this is the intended text for this topic."
+    },
+    {
+     "file": "exports.dita",
+     "old": "lib.dita#lib/beta-note",
+     "right": null,
+     "proposed": null,
+     "outcome": "first right",
+     "verdict": "none",
+     "reviewer": "no reviewer",
+     "right_in_list": false,
+     "caveat": ""
+    },
+    {
+     "file": "security.dita",
+     "old": "lib.dita#lib/tls-required",
+     "right": "lib.dita#lib/min-tls",
+     "proposed": "lib.dita#lib/min-tls",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "disagreed",
+     "right_in_list": true,
+     "caveat": "The text is not what this reference showed before; read both before accepting."
+    },
+    {
+     "file": "tune_agent.dita",
+     "old": "lib.dita#lib/restart-note",
+     "right": "lib.dita#lib/reload-config",
+     "proposed": "lib.dita#lib/reload-config",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "agreed",
+     "right_in_list": true,
+     "caveat": "The text is not what this reference showed before; read both before accepting."
+    },
+    {
+     "file": "invite_users.dita",
+     "old": "limits.dita#limits/max-users",
+     "right": "quotas.dita#quotas/user-quota",
+     "proposed": "quotas.dita#quotas/user-quota",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "agreed",
+     "right_in_list": true,
+     "caveat": "The text is not what this reference showed before; read both before accepting."
+    },
+    {
+     "file": "failed_upgrade.dita",
+     "old": "support-email",
+     "right": "help-contact",
+     "proposed": "help-contact",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "agreed",
+     "right_in_list": true,
+     "caveat": "Both the key name and the address changed (support@ to help@), and history does not show a direct rename. Please confirm that help@atlas.example is where upgrade log files should be sent."
+    },
+    {
+     "file": "move_linux.dita",
+     "old": "install_linux.dita",
+     "right": "linux_setup.dita",
+     "proposed": "linux_setup.dita#linux_setup",
+     "outcome": "first right",
+     "verdict": "review",
+     "reviewer": "agreed",
+     "right_in_list": true,
+     "caveat": "No history was available to confirm that install_linux.dita was renamed to linux_setup.dita. Check that the general Linux install topic is intended and not the ARM variant."
+    }
+   ]
+  }
+ ]
+}
