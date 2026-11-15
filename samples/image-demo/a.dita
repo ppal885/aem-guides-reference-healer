@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="a"><title>Images and ids</title><body>
+<p id="intro">Logo: <image keyref="product-logo"/></p>
+<p id="intro">A copy of the first paragraph, pasted.</p>
+<fig id="f1"><title>Wiring</title><image keyref="wiring"/></fig>
+<p><image href="images/panel.png"/></p>
+<p>Good: <image keyref="brand-logo"/> and <image href="images/logo.png"/></p>
+<note id="n1">First note.</note>
+<note id="n1">Second note with the same id.</note>
+<note id="n1">Third note with the same id.</note>
+</body></topic>

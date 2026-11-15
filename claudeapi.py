@@ -29,8 +29,21 @@ def client():
 
 
 def _create(**request):
-    """One Messages request. Opts in to server-side refusal fallback, and drops it for the rest of
-    the run if this endpoint does not accept the parameter."""
+    """One Messages request, noted in usage.py whether it answers or fails. The API reports
+    tokens, not money, so no cost is recorded for this backend."""
+    import usage
+    try:
+        response = _send(**request)
+    except Exception as exc:
+        usage.note(False, error=exc)
+        raise
+    usage.note(True, *usage.tokens_of(response.usage), cached=usage.cached_of(response.usage))
+    return response
+
+
+def _send(**request):
+    """Opts in to server-side refusal fallback, and drops it for the rest of the run if this
+    endpoint does not accept the parameter."""
     global _fallbacks_supported
     if _fallbacks_supported:
         try:

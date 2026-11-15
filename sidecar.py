@@ -35,21 +35,36 @@ BACKEND = "cli"
 
 
 def call_model(system, user, model=None):
+    """One model call that must answer with a JSON object. Every call, good or failed, is noted
+    in usage.py, so a check can say what it cost and whether the model answered."""
+    import usage
     if BACKEND == "sdk":
         import claudeapi
         return claudeapi.call_model(system, user, model)
+    # --strict-mcp-config: the agents get no MCP servers. Without it the CLI adds the tool lists of
+    # every MCP server of the person who started the sidecar whenever they connect in time: measured
+    # on 15 Nov 2026, the same one-line call was 930 or 34,700 input tokens, by chance.
     cmd = ["claude", "-p", "--output-format", "json", "--system-prompt", system,
-           "--tools", "", "--no-session-persistence"]
+           "--tools", "", "--no-session-persistence", "--strict-mcp-config"]
     if model:
         cmd += ["--model", model]
-    with tempfile.TemporaryDirectory() as cwd:
-        proc = subprocess.run(cmd, input=user, capture_output=True, text=True, timeout=600, cwd=cwd)
-    if proc.returncode != 0:
-        raise RuntimeError("claude CLI failed: %s" % (proc.stderr or proc.stdout)[:400])
-    envelope = json.loads(proc.stdout)
-    if envelope.get("is_error"):
-        raise RuntimeError("claude CLI error: %s" % str(envelope.get("result"))[:400])
-    return parse_json(envelope.get("result", ""))
+    envelope = {}
+    try:
+        with tempfile.TemporaryDirectory() as cwd:
+            proc = subprocess.run(cmd, input=user, capture_output=True, text=True, timeout=600, cwd=cwd)
+        if proc.returncode != 0:
+            raise RuntimeError("claude CLI failed: %s" % (proc.stderr or proc.stdout)[:400])
+        envelope = json.loads(proc.stdout)
+        if envelope.get("is_error"):
+            raise RuntimeError("claude CLI error: %s" % str(envelope.get("result"))[:400])
+        answer = parse_json(envelope.get("result", ""))
+    except Exception as exc:
+        usage.note(False, *usage.tokens_of(envelope.get("usage") or {}), cost_usd=envelope.get("total_cost_usd"), error=exc,
+                   cached=usage.cached_of(envelope.get("usage") or {}))
+        raise
+    usage.note(True, *usage.tokens_of(envelope.get("usage") or {}), cost_usd=envelope.get("total_cost_usd"),
+               cached=usage.cached_of(envelope.get("usage") or {}))
+    return answer
 
 
 def parse_json(text):
@@ -109,6 +124,10 @@ def serve(port, model=None):
                     self.wfile.write(data)
                 else:
                     self.send_json(200, {"summary": audit.summary(rows), "entries": rows})
+            elif self.path == "/usage":
+                # What each check cost: model calls, failed calls, tokens, money when known.
+                import usage
+                self.send_json(200, {"checks": usage.entries()[-50:]})
             elif self.path == "/health":
                 self.send_json(200, {"status": "ok"})
             else:

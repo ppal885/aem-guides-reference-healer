@@ -30,6 +30,7 @@ import time
 import agentloop
 import refcheck
 import refheal
+import usage
 import wayout
 
 # What the planner learned from authors, kept between checks:
@@ -220,7 +221,7 @@ CHOOSE_SYSTEM = """A shared piece of DITA content was changed and references to 
 
 You get what the old target showed, the candidates with what each shows now, and the references: the topic each sits in and the sentence around it. For every reference choose the candidate that fits what that topic needs there. When nothing in the topic or sentence tells them apart, choose candidate 1.
 
-Reply with one JSON object and nothing else: {"choices": [{"reference": <number>, "candidate": <number>}]}"""
+Reply with one JSON object and nothing else: {"choices": [{"reference": <number>, "candidate": <number>}]}""" + refheal.DATA_RULE
 MAX_PLANNER_CALLS = 14
 MAX_ROUNDS = 4
 ACTIONS = ("repair_references", "repair_at_source", "ask_author", "leave_broken") + tuple(wayout.KINDS)
@@ -257,7 +258,7 @@ How to work:
 4. Call apply_and_recheck. Read what is still broken. An edit can uncover a second break in the same reference (a renamed key hid a renamed id). Handle the next round the same way.
 5. Finish when the recheck shows nothing left that you can settle. The summary is two short sentences for the author: what they should do next, and what to look at first. The counts are shown elsewhere; do not repeat them.
 
-A wrong repair is worse than none: a conref to the wrong element silently publishes wrong content. When in doubt, ask the author."""
+A wrong repair is worse than none: a conref to the wrong element silently publishes wrong content. When in doubt, ask the author.""" + refheal.DATA_RULE
 
 FINISH = {"name": "finish", "description": "End the job.",
           "properties": {"summary": {"type": "string", "description": "for the author, two short plain sentences: what to do next and what to look at first"}},
@@ -320,7 +321,7 @@ class Session:
 
     def __init__(self, files, backend="cli", model=None, log=print, progress=None, memory=None, reported=None,
                  outside=None, timeline=None, cache=None, max_groups=None,
-                 choose=None):
+                 choose=None, assets=None, missing=None):
         self.backend, self.model, self.log = backend, model, log
         # Who is doing what, as rows for a live view: [{"id", "state", "who", "text"}], state is
         # "done", "active" or "waiting". on_timeline gets the whole list after every change.
@@ -343,6 +344,8 @@ class Session:
         self.progress = progress or (lambda text: None)   # one line on what is happening now, for a live view
         self.original = [dict(f) for f in files]
         self.files = [dict(f) for f in files]
+        self.assets = assets   # the files that are not DITA and exist, when the server told us
+        self.missing = missing  # {stored name: path} of targets that are gone, when the server told us
         self.rounds = []          # [{"repo", "groups": {id: group}}], the last one is open
         self.edits = []           # per round: [(file, attribute, old, new)]
         self.source_edits = []    # [(file, element, attribute, current, new, label, group ids)]
@@ -377,7 +380,7 @@ class Session:
     # ---- rounds ----------------------------------------------------------------------------
 
     def _open_round(self):
-        repo = refcheck.Repo(files=self.files)
+        repo = refcheck.Repo(files=self.files, assets=self.assets, missing=self.missing)
         groups, by_key = {}, {}
         for ref in repo.broken():
             if ref["generated"] or (ref["file"], ref["attribute"], ref["value"]) in self.left:
@@ -980,10 +983,16 @@ class Session:
         waiting = "Repaired by the last Fix all. AEM has not indexed the change yet; this leaves the list by itself."
         differs = ("AEM reports this reference as broken, but its target exists in the files of this map. AEM's check "
                    "and the planner's differ here.")
+        # Seen on 15 Nov 2026: a key's definition was repaired in the map, and AEM kept listing the
+        # topic's reference to that key until the topic itself was saved again.
+        by_key = ("Nothing to edit here: the key is defined in the map and its target exists. AEM still lists this "
+                  "reference because it worked out this topic's keys before the map was right; it does so again when "
+                  "the topic is saved.")
         return [{"file": "/" + file, "line": lines.get((file, attribute, value), 0), "attribute": attribute, "old": value,
                  "new": None, "target": None, "caveat": "", "used_in": ["/" + file], "stage": "planner",
                  "verdict": "pending" if (file, attribute, value) in self.waiting else "none",
-                 "reason": waiting if (file, attribute, value) in self.waiting else differs}
+                 "reason": waiting if (file, attribute, value) in self.waiting
+                 else by_key if attribute in ("keyref", "conkeyref") else differs}
                 for file, attribute, value in self.aem_only]
 
     # ---- the result ------------------------------------------------------------------------
@@ -1021,6 +1030,11 @@ class Session:
                 if not broken_now and value != ref["value"]:
                     entry.update(verdict="fix", new=value, target=refheal.target_label(final["repo"], ref, value),
                                  reason=(group["known"] or {}).get("reason", ""))
+                    # A target id that several elements carry: the repair is right for the first of
+                    # them only, so it is shown for a look and not applied by "Fix all".
+                    twice = refheal.duplicate_caveat(final["repo"], ref, value)
+                    if twice:
+                        entry.update(verdict="review", caveat=twice)
                 elif not broken_now:
                     entry.update(verdict="covered", stage="planner",
                                  reason="Repaired by one edit at the source. " + source_label.get(group["id"], ""))
@@ -1029,7 +1043,9 @@ class Session:
                                      if (file, attribute, old) == (ref["file"], ref["attribute"], value)), None)
                     entry.update(verdict="review", new=proposal, stage=last["known"]["how"],
                                  target=refheal.target_label(final["repo"], ref, proposal) if proposal else None,
-                                 reason=last["known"]["reason"], caveat=last["known"]["caveat"] or last["reason"])
+                                 reason=last["known"]["reason"], caveat=" ".join(filter(None, [
+                                     last["known"]["caveat"] or last["reason"],
+                                     refheal.duplicate_caveat(final["repo"], ref, proposal)])))
                 else:
                     gone = last or group
                     known = gone["known"] or {}
@@ -1144,6 +1160,25 @@ def _ask_planner(session, backend, model, log, progress):
 
 
 def plan_files(payload, backend="cli", model=None, log=print, progress=None, memory=None, timeline=None):
+    """_plan_files, plus what the check cost and whether the model answered: both go into the
+    plan the author reads, into "usage" of the answer and, for a stored check, into the usage log."""
+    mark, started = usage.start(), time.time()
+    try:
+        out = _plan_files(payload, backend, model, log, progress, memory, timeline)
+    except BaseException:
+        usage.finish(mark)
+        raise
+    totals = usage.finish(mark)
+    warning = usage.warning(totals)
+    out["plan"] = ([warning] if warning else []) + list(out.get("plan") or []) + [usage.sentence(totals)]
+    out["usage"] = totals
+    log("usage: %s" % json.dumps(totals))
+    if memory is None:
+        usage.record(payload.get("map"), totals, round(time.time() - started))
+    return out
+
+
+def _plan_files(payload, backend="cli", model=None, log=print, progress=None, memory=None, timeline=None):
     """For a repository server. Same input and output as refheal.heal_files, plus "plan".
 
     Optional in the payload: "reported" [{"file", "attribute", "value"}], what the repository's own
@@ -1159,7 +1194,8 @@ def plan_files(payload, backend="cli", model=None, log=print, progress=None, mem
     progress("Scanning %d files for broken references." % len(files))
     stored = memory is None
     session = Session(files, backend, model, log, progress, load_memory() if stored else memory,
-                      reported=payload.get("reported"), outside=payload.get("used_outside"), timeline=timeline)
+                      reported=payload.get("reported"), outside=payload.get("used_outside"), timeline=timeline,
+                      assets=payload.get("assets"), missing=payload.get("missing_paths"))
     log("planner input: %d files, %s references reported by the repository, %d files with users outside the map"
         % (len(files), len(payload["reported"]) if isinstance(payload.get("reported"), list) else "no",
            sum(1 for v in (payload.get("used_outside") or {}).values() if v)))
