@@ -24,6 +24,7 @@ import hashlib
 import json
 import os
 import re
+import threading
 import time
 
 import agentloop
@@ -63,10 +64,39 @@ def _read(path):
         return None
 
 
+# The sidecar answers several requests at once (two maps checked side by side, an author's answer
+# during a check). Everything that reads a stored file, changes it and writes it back does so
+# under this lock, so one request does not write over what another has just stored.
+_LOCK = threading.RLock()
+
+
 def _write(path, data):
+    """Writes the whole file or nothing: a reader never sees a half-written file."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as handle:
+    temporary = "%s.%d.%d.tmp" % (path, os.getpid(), threading.get_ident())
+    with open(temporary, "w", encoding="utf-8") as handle:
         json.dump(data, handle, indent=1, ensure_ascii=False)
+    os.replace(temporary, path)
+
+
+def applied_path(map_path=None):
+    """Where the record of the last "Fix all" of a map is kept: one file per map, so the check of
+    one map neither reads nor clears what was applied in another."""
+    if not map_path:
+        return APPLIED_PATH
+    name = hashlib.sha1(map_path.encode("utf-8")).hexdigest()[:12]
+    return APPLIED_PATH[:-len(".json")] + "-" + name + ".json"
+
+
+def merge_cache(path, started_with, now):
+    """Stores what one check added to the findings and decisions, on top of what is in the file
+    now: another check may have stored its own in the meantime. Returns what was written."""
+    with _LOCK:
+        stored = _read(path)
+        stored = stored if isinstance(stored, dict) else {}
+        stored.update({key: value for key, value in now.items() if started_with.get(key) != value})
+        _write(path, stored)
+        return stored
 
 
 def load_memory(path=None):
@@ -126,45 +156,48 @@ def remember(attribute, old, new, path=None, rejected=None):
     if not all(isinstance(v, str) and v.strip() for v in (attribute, old, new)) or old == new:
         raise ValueError("attribute, old and new must be different, non-empty strings")
     path = path or MEMORY_PATH
-    memory, key = load_memory(path), "%s|%s" % (attribute, old)
-    memory["answers"][key] = new
-    memory["renames"] = [r for r in memory["renames"] if r.get("source") != key] + _renames(attribute, old, new)
-    declined = [v for v in (rejected or []) if isinstance(v, str) and v and v != new]
-    kept = [v for v in memory["rejected"].get(key, []) if v != new]
-    if kept or declined:
-        memory["rejected"][key] = list(dict.fromkeys(kept + declined))
-    else:
-        memory["rejected"].pop(key, None)
-    _write(path, memory)
-    return len(memory["answers"])
+    with _LOCK:
+        memory, key = load_memory(path), "%s|%s" % (attribute, old)
+        memory["answers"][key] = new
+        memory["renames"] = [r for r in memory["renames"] if r.get("source") != key] + _renames(attribute, old, new)
+        declined = [v for v in (rejected or []) if isinstance(v, str) and v and v != new]
+        kept = [v for v in memory["rejected"].get(key, []) if v != new]
+        if kept or declined:
+            memory["rejected"][key] = list(dict.fromkeys(kept + declined))
+        else:
+            memory["rejected"].pop(key, None)
+        _write(path, memory)
+        return len(memory["answers"])
 
 
 def reject(attribute, old, new, path=None):
     """Records that old -> new is not the repair: an author said so, or AEM kept reporting it."""
     path = path or MEMORY_PATH
-    memory, key = load_memory(path), "%s|%s" % (attribute, old)
-    if memory["answers"].get(key) == new:
-        forget(attribute, old, path)
-        memory = load_memory(path)
-    memory["rejected"][key] = list(dict.fromkeys(memory["rejected"].get(key, []) + [new]))
-    _write(path, memory)
+    with _LOCK:
+        memory, key = load_memory(path), "%s|%s" % (attribute, old)
+        if memory["answers"].get(key) == new:
+            forget(attribute, old, path)
+            memory = load_memory(path)
+        memory["rejected"][key] = list(dict.fromkeys(memory["rejected"].get(key, []) + [new]))
+        _write(path, memory)
 
 
 def forget(attribute, old, path=None):
     """Drops an accepted answer and what was learned from it. Returns whether there was one."""
     path = path or MEMORY_PATH
-    memory, key = load_memory(path), "%s|%s" % (attribute, old)
-    had = memory["answers"].pop(key, None) is not None
-    memory["renames"] = [r for r in memory["renames"] if r.get("source") != key]
-    _write(path, memory)
-    return had
+    with _LOCK:
+        memory, key = load_memory(path), "%s|%s" % (attribute, old)
+        had = memory["answers"].pop(key, None) is not None
+        memory["renames"] = [r for r in memory["renames"] if r.get("source") != key]
+        _write(path, memory)
+        return had
 
 
-def record_applied(edits, failed=None, path=None):
-    """What "Fix all" wrote, for the next check: [{"file", "attribute", "old", "new"}]."""
+def record_applied(edits, failed=None, path=None, map_path=None):
+    """What "Fix all" wrote in one map, for that map's next check: [{"file", "attribute", "old", "new"}]."""
     kept = [{k: e[k] for k in ("file", "attribute", "old", "new")} for e in edits or []
             if isinstance(e, dict) and all(isinstance(e.get(k), str) and e.get(k) for k in ("file", "attribute", "old", "new"))]
-    _write(path or APPLIED_PATH, {"when": time.time(), "checks": 0, "edits": kept,
+    _write(path or applied_path(map_path), {"when": time.time(), "checks": 0, "edits": kept,
                                   "failed": [f for f in failed or [] if isinstance(f, str)]})
     return len(kept)
 
@@ -1132,19 +1165,22 @@ def plan_files(payload, backend="cli", model=None, log=print, progress=None, mem
            sum(1 for v in (payload.get("used_outside") or {}).values() if v)))
     cache = (_read(CACHE_PATH) or {}) if stored else None
     session.cache = cache if isinstance(cache, dict) or cache is None else {}
-    applied = _read(APPLIED_PATH) if stored else None
+    started_with = dict(session.cache or {})
+    applied_file = applied_path(payload.get("map"))
+    applied = _read(applied_file) if stored else None
     looked_back, failed, finished = session.look_back(applied)
     if stored and applied:
         for attribute, old, new in failed:
             reject(attribute, old, new)
         if session.distrust:
-            memory_now = load_memory()
-            memory_now["no_source_edit"] = sorted(set(memory_now["no_source_edit"]) | set(session.distrust))
-            _write(MEMORY_PATH, memory_now)
+            with _LOCK:
+                memory_now = load_memory()
+                memory_now["no_source_edit"] = sorted(set(memory_now["no_source_edit"]) | set(session.distrust))
+                _write(MEMORY_PATH, memory_now)
         if finished:
-            os.remove(APPLIED_PATH)
+            os.remove(applied_file)
         else:
-            _write(APPLIED_PATH, dict(applied, checks=applied.get("checks", 0) + 1))
+            _write(applied_file, dict(applied, checks=applied.get("checks", 0) + 1))
     first = session.current["groups"]
     if not first:
         out = session.result()
@@ -1192,7 +1228,7 @@ def plan_files(payload, backend="cli", model=None, log=print, progress=None, mem
     progress("Planner finished. Building the report.")
     session.finish_unfinished()
     if stored and session.cache is not None:
-        _write(CACHE_PATH, session.cache)
+        merge_cache(CACHE_PATH, started_with, session.cache)
     out = session.result()
     out["stats"].update(planner_steps=len(steps), planner_decisions_reused=replayed, seconds=round(time.time() - started),
                         findings_reused_from_an_earlier_check=session.reused)

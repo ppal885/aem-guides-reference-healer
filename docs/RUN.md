@@ -98,7 +98,7 @@ cd ~/starling/core && mvn -Puuid,env-aem65 -Denv=aem65 -pl content-health instal
 The sidecar keeps two files in `out/`:
 
 - `author-answers.json`: accepted repairs, the renames learned from them, candidates passed over, and kinds of edit at the source that did not hold. `GET http://127.0.0.1:8766/memory` shows it. Delete the file for a clean demo.
-- `last-fix-all.json`: what the last "Fix all" wrote. The next check reads it and says in the plan what became of those repairs.
+- `last-fix-all-<map>.json`: what the last "Fix all" on one map wrote (one file per map, so two maps do not overwrite each other). That map's next check reads it and says in the plan what became of those repairs.
 
 To try it: run the check, press "Fix all", let the check run again. The plan then starts with "Since the last Fix all: N repairs saved and resolve." References AEM has not re-indexed are listed as "AEM reports this reference as broken, but its target exists"; after keys were renamed back in the map this took more than ten minutes to clear.
 

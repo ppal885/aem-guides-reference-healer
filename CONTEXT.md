@@ -27,7 +27,7 @@ Judging criteria, in the organisers' words: agentic workflow (task decomposition
 | 14 Nov | The "Fix all" button keeps the product's plain blue style; only the AI entry point looks like the product's AI Assistant button | The owner asked for it |
 | 14 Nov | Repairs in topics are written as the editor's own Track Changes marks | The owner's idea; every repair is then visible in the document and can be accepted or rejected there |
 | 15 Nov | **No Track Changes marks.** Repairs and ways out are written plainly | The owner: with marks the manual work is the same (220 topics to open and accept), and the audit record already says what changed. Do not bring the marks back unasked
-| 15 Nov | **No new version.** A repair is saved into the file's working copy; the editor shows the version with a star | The owner: "version kyun kar doge, na koi warning di; current working copy mein rakho, star laga ke". Do not create versions unasked
+| 15 Nov | **A new version per repaired file, and the panel says so.** (Tried without a version for a few hours the same day, after "version kyun kar doge, na koi warning di"; reversed with "naya version bana de rahe, that is a good approach") | The version history then shows the repair and it can be reverted. What was missing was the warning, not the version: keep the wording that says a version is made
 | 14 Nov | Everything shown in the editor uses the editor's own components, icons and highlight | "Editor UI se consistent honi chahiye" |
 | 14 Nov | **External (web) links are out.** The rule that checked them, its repair agent, its evaluation and its documents were removed from all three code bases | The owner: not impactful enough for the idea. Do not bring it back unasked |
 
@@ -51,6 +51,10 @@ AEM Guides, Content Health job
         |                             broken references and the files outside the map that use them
         v
   sidecar  sidecar.py --serve 8766    POST /heal-refs, /feedback, /applied, /audit; GET /progress, /memory, /audit
+        ^                             Only AEM calls the sidecar. The panel in the editor calls AEM at
+        |                             /bin/guides/v1/contenthealth/repair/{progress,feedback,applied,audit}
+  editor panel -> AEM servlet         (signed-in user and CSRF token needed); AEM passes these four on and
+                                      writes the signed-in user into each audit entry itself.
         |
         v
   planner agent      (refplan.py)     tools: overview, investigate, decide, apply_and_recheck, finish
@@ -73,7 +77,7 @@ What the agent keeps between checks, in `out/` next to the sidecar (not in git):
 |---|---|
 | `author-answers.json` | accepted repairs, the renames learned from them, candidates passed over, kinds of source edit that did not hold |
 | `agent-findings.json` | what finder and reviewer concluded, reused while the broken value, its old text and the file it lives in are unchanged |
-| `last-fix-all.json` | what the last "Fix all" wrote, read by the next check |
+| `last-fix-all-<map>.json` | what the last "Fix all" on that map wrote, read by that map's next check (one file per map since 15 Nov 2026) |
 
 ## The product code
 
@@ -144,7 +148,7 @@ Read the "Measured" table and the limits in the README. The short version, to ke
 
 ## State on 14 Nov 2026
 
-- Tests: 77 here, 629 in the editor's Content Health folders, and the Java module's tests pass.
+- Tests: 77 here, 630 in the editor's Content Health folders, and the Java module's tests pass.
 - The local AEM holds `/content/dam/large-demo` (after a "Fix all": 492 findings left), `/content/dam/large-demo-outside`, `/content/dam/ref-demo`.
 - All four capabilities of the idea text have been seen working inside AEM.
 
