@@ -129,7 +129,13 @@ def serve(port, model=None):
                 import usage
                 self.send_json(200, {"checks": usage.entries()[-50:]})
             elif self.path == "/health":
-                self.send_json(200, {"status": "ok"})
+                # Also says how the model is reached: "cli" waits for each whole answer, "sdk"
+                # streams it. last_stream: how the last streamed answer arrived (empty before one).
+                state = {"status": "ok", "backend": BACKEND, "streaming": BACKEND == "sdk"}
+                if BACKEND == "sdk":
+                    import claudeapi
+                    state["last_stream"] = dict(claudeapi.LAST_STREAM)
+                self.send_json(200, state)
             else:
                 self.send_json(404, {"error": "not found"})
 

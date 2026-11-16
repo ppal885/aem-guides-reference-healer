@@ -5,6 +5,7 @@ ANTHROPIC_AUTH_TOKEN). Set them in your own terminal; never write them into a fi
 """
 import os
 import threading
+import time
 
 import anthropic
 
@@ -12,6 +13,9 @@ import sidecar
 
 MODEL = "claude-opus-5-5"
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
+
+# How the last streamed request arrived; GET /health of the sidecar shows it.
+LAST_STREAM = {}
 
 _client = None
 _client_lock = threading.Lock()
@@ -59,9 +63,22 @@ def _stream(**request):
     """One request, streamed, returned as the complete message. Nothing is shown while it
     arrives: streaming is used so that a long answer (up to 16,000 tokens, with thinking) does
     not sit behind one silent HTTP response until a timeout cuts it. The tools the agents use
-    take short inputs, so their inputs are not streamed eagerly."""
+    take short inputs, so their inputs are not streamed eagerly.
+
+    How the answer arrived is logged, so that one can see streaming at work: when the first piece
+    came, how many pieces, and when the last. Without streaming the first piece would be the last."""
+    started = time.time()
+    first, pieces = None, 0
     with client().beta.messages.stream(**request) as stream:
-        return stream.get_final_message()
+        for _ in stream:
+            pieces += 1
+            if first is None:
+                first = time.time() - started
+        message = stream.get_final_message()
+    LAST_STREAM.update(first_piece_seconds=round(first or 0, 2), pieces=pieces, seconds=round(time.time() - started, 2))
+    sidecar._log("stream: first piece after %.1f s, %d pieces, done after %.1f s" % (
+        LAST_STREAM["first_piece_seconds"], pieces, LAST_STREAM["seconds"]))
+    return message
 
 
 def call_model(system, user, model=None):
