@@ -268,9 +268,15 @@ def rule_fix(repo, ref):
     return history_fix(repo, ref) or topic_id_fix(repo, ref)
 
 
+# Words a link adds or drops without meaning another thing: "start the pay run" is "Start pay run".
+SMALL_WORDS = {"the", "a", "an", "to", "of"}
+
+
 def _says(link_text, target_text):
-    """True when the text of a link is found in the text of what it would point at."""
-    squash = lambda text: re.sub(r"[^a-z0-9]", "", (text or "").lower())
+    """True when the text of a link is found in the text of what it would point at. Case, spaces,
+    punctuation and the small words above do not count."""
+    squash = lambda text: "".join(word for word in re.findall(r"[a-z0-9]+", (text or "").lower())
+                                  if word not in SMALL_WORDS)
     link = squash(link_text)
     return len(link) >= 4 and link in squash(target_text)
 

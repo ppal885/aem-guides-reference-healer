@@ -1,0 +1,214 @@
+{
+ "sample": "samples/large-demo",
+ "mode": "planner",
+ "backend": "cli",
+ "runs": [
+  {
+   "run": 1,
+   "seconds": 276,
+   "references": 1251,
+   "scores": {
+    "applied right": 178,
+    "asked, wrong": 94,
+    "asked, right": 870,
+    "none, right": 109
+   },
+   "source_edits": 0,
+   "model_calls": 209,
+   "input_tokens": 674900,
+   "output_tokens": 45406,
+   "planner_steps": 11,
+   "plan": [
+    "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
+    "9 broken targets could mean two different pieces. I read the sentence around each reference and chose per reference (account-limits: 63 and 4; console-name: 43 and 17; cli-name: 26 and 16; sso-product: 27 and 13; retention-days: 18 and 18; data-loss: 25 and 3; data-loss: 21 and 5; mfa-required: 24 and 1; billing-impact: 21 and 3).",
+    "Sent 34 to finder agents, each answer checked by a reviewer agent: 31 found under a new name or place, 3 removed for good.",
+    "Decided to repair 178 references. Why: The target still exists under a new name with the same title, for example the section \"Permission denied\" is now error-403, so the references are rewritten.",
+    "Decided to ask you about 945 references (26 questions). Why: A likely replacement was found by subject only and no history proves it, for example data-loss may now be permanent-delete, so please confirm it.",
+    "Decided to ask you about 19 references (1 question). Why: The warning about deleted keys seems to still exist in the shared warnings file under a renamed key, but this is not proven, so please confirm.",
+    "Decided to leave 109 references broken. Why: The shared legacy-interface note and the slow-operation warning were removed with no replacement; I could not read their old text, so please decide what the topics\u2026",
+    "Tried the plan on a copy and checked again: 178 references work now, 1,073 left for you.",
+    "Next: Please go through the proposed replacements and confirm or correct each one; the references with a proven new name are already repaired.",
+    "AI use in this check: 209 model calls, 674,900 tokens in and 45,406 out, about $5.41."
+   ],
+   "wrong": [
+    {
+     "attribute": "keyref",
+     "old": "console-name",
+     "proposed": "product-name",
+     "verdict": "review, reviewer agreed",
+     "references": 17
+    },
+    {
+     "attribute": "conkeyref",
+     "old": "warnings/data-loss",
+     "proposed": "shared-warnings/irreversible-key",
+     "verdict": "review, reviewer disagreed",
+     "references": 5
+    },
+    {
+     "attribute": "href",
+     "old": "../reference/limits.dita#limits/account-limits",
+     "proposed": "GUID-eval-0205.dita#limits/rate-limits",
+     "verdict": "review, reviewer disagreed",
+     "references": 4
+    },
+    {
+     "attribute": "keyref",
+     "old": "cli-name",
+     "proposed": "web-console-name",
+     "verdict": "review, reviewer agreed",
+     "references": 16
+    },
+    {
+     "attribute": "keyref",
+     "old": "retention-days",
+     "proposed": "product-name",
+     "verdict": "review, reviewer disagreed",
+     "references": 18
+    },
+    {
+     "attribute": "conkeyref",
+     "old": "warnings/mfa-required",
+     "proposed": "shared-warnings/irreversible-key",
+     "verdict": "review, reviewer agreed",
+     "references": 1
+    },
+    {
+     "attribute": "conref",
+     "old": "../shared/warnings.dita#warnings/data-loss",
+     "proposed": "GUID-eval-0043.dita#warnings/irreversible-key",
+     "verdict": "review, reviewer disagreed",
+     "references": 3
+    },
+    {
+     "attribute": "conref",
+     "old": "../shared/warnings.dita#warnings/billing-impact",
+     "proposed": "GUID-eval-0043.dita#warnings/plan-and-region-limits",
+     "verdict": "review, reviewer disagreed",
+     "references": 3
+    },
+    {
+     "attribute": "keyref",
+     "old": "sso-product",
+     "proposed": "product-name",
+     "verdict": "review, reviewer disagreed",
+     "references": 27
+    }
+   ]
+  },
+  {
+   "run": 2,
+   "seconds": 261,
+   "references": 1251,
+   "scores": {
+    "applied right": 239,
+    "asked, wrong": 101,
+    "asked, right": 802,
+    "none, right": 109
+   },
+   "source_edits": 0,
+   "model_calls": 211,
+   "input_tokens": 714327,
+   "output_tokens": 43064,
+   "planner_steps": 11,
+   "plan": [
+    "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
+    "9 broken targets could mean two different pieces. I read the sentence around each reference and chose per reference (account-limits: 63 and 4; console-name: 43 and 17; sso-product: 27 and 13; retention-days: 24 and 12; data-loss: 25 and 3; data-loss: 21 and 5; mfa-required: 24 and 1; billing-impact: 20 and 5; billing-impact: 21 and 3).",
+    "Sent 34 to finder agents, each answer checked by a reviewer agent: 31 found under a new name or place, 3 removed for good.",
+    "Decided to repair 220 references. Why: The target still exists under a new name with the same content, for example the section titled \"Permission denied\" now has the id error-403.",
+    "Decided to repair 19 references. Why: The check confirmed the same content still exists under a new name, so the references can point to it safely.",
+    "Decided to ask you about 903 references (25 questions). Why: A likely target was found by subject only, with no history proving the rename, so please confirm the proposed content fits each topic.",
+    "Decided to leave 109 references broken. Why: The shared legacy interface paragraph and the slow-operation note were removed with no replacement; decide whether the topics still need that text.",
+    "Tried the plan on a copy and checked again: 239 references work now, 1,012 left for you.",
+    "Next: Please go through the proposed targets that were found by subject only and confirm or correct each one, then decide what the topics should say where the legacy interface paragraph and the slow-operation note were removed.",
+    "AI use in this check: 211 model calls, 714,327 tokens in and 43,064 out, about $5.66."
+   ],
+   "wrong": [
+    {
+     "attribute": "keyref",
+     "old": "console-name",
+     "proposed": "product-name",
+     "verdict": "review, reviewer agreed",
+     "references": 17
+    },
+    {
+     "attribute": "conkeyref",
+     "old": "warnings/data-loss",
+     "proposed": "shared-warnings/irreversible-key",
+     "verdict": "review, reviewer disagreed",
+     "references": 5
+    },
+    {
+     "attribute": "href",
+     "old": "../reference/limits.dita#limits/account-limits",
+     "proposed": "GUID-eval-0205.dita#limits/rate-limits",
+     "verdict": "review, reviewer disagreed",
+     "references": 4
+    },
+    {
+     "attribute": "keyref",
+     "old": "retention-days",
+     "proposed": "identity-product",
+     "verdict": "review, reviewer disagreed",
+     "references": 12
+    },
+    {
+     "attribute": "keyref",
+     "old": "retention-days",
+     "proposed": "product-name",
+     "verdict": "review, reviewer disagreed",
+     "references": 24
+    },
+    {
+     "attribute": "conkeyref",
+     "old": "warnings/mfa-required",
+     "proposed": "shared-warnings/irreversible-key",
+     "verdict": "review, reviewer agreed",
+     "references": 1
+    },
+    {
+     "attribute": "conref",
+     "old": "../shared/warnings.dita#warnings/data-loss",
+     "proposed": "GUID-eval-0043.dita#warnings/irreversible-key",
+     "verdict": "review, reviewer disagreed",
+     "references": 3
+    },
+    {
+     "attribute": "conkeyref",
+     "old": "warnings/billing-impact",
+     "proposed": "shared-warnings/plan-and-region-limits",
+     "verdict": "review, reviewer disagreed",
+     "references": 5
+    },
+    {
+     "attribute": "conref",
+     "old": "../shared/warnings.dita#warnings/billing-impact",
+     "proposed": "GUID-eval-0043.dita#warnings/plan-and-region-limits",
+     "verdict": "review, reviewer disagreed",
+     "references": 3
+    },
+    {
+     "attribute": "keyref",
+     "old": "sso-product",
+     "proposed": "product-name",
+     "verdict": "review, reviewer disagreed",
+     "references": 27
+    }
+   ]
+  }
+ ],
+ "previous_versions": false,
+ "second_run": true,
+ "targets": 34,
+ "targets_decided_the_same_in_every_run": 32,
+ "targets_that_differed": {
+  "keyref cli-name": [
+   "review",
+   "fix"
+  ],
+  "conkeyref warnings/irreversible-key": [
+   "review",
+   "fix"
+  ]
+ }
+}
