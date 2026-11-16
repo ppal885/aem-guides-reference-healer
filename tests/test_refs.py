@@ -184,6 +184,63 @@ class WholeRunWithoutAModel(unittest.TestCase):
             refheal.heal_files({"nope": 1})
 
 
+class OnlyTheTopicIdIsOutOfDate(unittest.TestCase):
+    """The file is there and the element is there; the topic id in the reference is the old one.
+    Settled in code, without a model (seen on content that was not ours, 16 Nov 2026)."""
+
+    TOPIC = ('<topic id="new-id"><title>Billing</title><body>'
+             '<section id="wrap"><title>Wrap-up</title><p>Close the case.</p></section>'
+             '<section id="d180e703"><title>Escalation</title><p>Call the desk.</p></section>'
+             '<p>Go to <xref href="%s">%s</xref>.</p></body></topic>')
+
+    def broken(self, href, text, more=()):
+        files = [{"id": "G1", "path": "/d/a.dita", "xml": self.TOPIC % (href, text)}] + list(more)
+        repo = refcheck.Repo(files=files)
+        refs = [r for r in repo.broken() if r["value"] == href]
+        self.assertEqual([r["reason"] for r in refs], ["topic-missing"])
+        return repo, refs[0]
+
+    def test_it_is_repaired_when_the_link_text_is_found_in_the_target(self):
+        repo, ref = self.broken("#old-id/d180e703", "Escalation")
+        quick = refheal.rule_fix(repo, ref)
+        self.assertEqual((quick["verdict"], quick["caveat"]), ("fix", ""))
+        self.assertEqual(refheal.new_value(repo, ref, quick), "#new-id/d180e703")
+        self.assertIn("only the topic id", quick["reason"])
+
+    def test_a_target_that_says_something_else_goes_to_the_author(self):
+        for element_id in ("d180e703", "wrap"):
+            repo, ref = self.broken("#old-id/" + element_id, "step 9")
+            quick = refheal.rule_fix(repo, ref)
+            self.assertEqual((quick["verdict"], refheal.new_value(repo, ref, quick)), ("review", "#new-id/" + element_id))
+            self.assertIn("lands on the right element", quick["caveat"])
+
+    def test_an_element_that_is_not_in_the_file_is_left_to_the_agents(self):
+        repo, ref = self.broken("#old-id/gone", "Wrap-up")
+        self.assertIsNone(refheal.rule_fix(repo, ref))
+
+    def test_an_id_that_two_topics_of_the_file_use_is_left_to_the_agents(self):
+        two = ('<dita><topic id="one"><title>One</title><body><p id="x">A</p></body></topic>'
+               '<topic id="two"><title>Two</title><body><p id="x">B</p></body></topic></dita>')
+        repo, ref = self.broken("b.dita#old/x", "see", [{"id": "G2", "path": "/d/b.dita", "xml": two}])
+        self.assertIsNone(refheal.rule_fix(repo, ref))
+
+    def test_a_link_to_the_only_topic_of_a_file(self):
+        other = '<topic id="limits-new"><title>Usage limits</title><body><p>Text</p></body></topic>'
+        more = [{"id": "G2", "path": "/d/b.dita", "xml": other}]
+        repo, ref = self.broken("b.dita#limits-old", "Usage limits", more)
+        quick = refheal.rule_fix(repo, ref)
+        self.assertEqual((quick["verdict"], quick["topic_id"]), ("fix", "limits-new"))
+        repo, ref = self.broken("b.dita#limits-old", "the other procedure", more)
+        self.assertEqual(refheal.rule_fix(repo, ref)["verdict"], "review")
+
+    def test_the_planner_settles_it_without_an_agent_and_keeps_the_verdict(self):
+        files = [{"id": "G1", "path": "/d/a.dita", "xml": self.TOPIC % ("#old-id/d180e703", "Wrap-up")}]
+        session = refplan.Session(files, log=lambda message: None, choose=lambda *a: {})
+        group = next(iter(session.current["groups"].values()))
+        self.assertEqual((group["known"]["how"], group["known"]["verdict"]), ("rule", "review"))
+        self.assertIn("lands on the right element", group["known"]["caveat"])
+
+
 if __name__ == "__main__":
     unittest.main()
 
