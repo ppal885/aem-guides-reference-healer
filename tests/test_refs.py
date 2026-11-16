@@ -281,6 +281,33 @@ class TheLinkTextIsCheckedBeforeARepairIsAccepted(unittest.TestCase):
         repo, ref = self.reference('<xref href="gone.dita#x/y">Wrap-up</xref>')
         self.assertEqual(refheal.link_text_caveat(repo, ref, "nowhere.dita#x/y"), "")
 
+    def test_a_finders_repair_with_this_warning_is_not_applied_by_fix_all(self):
+        old = '<topic id="lib"><title>Lib</title><body><section id="old"><title>Escalation</title><p>Call the desk.</p></section></body></topic>'
+        new = old.replace('id="old"', 'id="new"')
+        files = [{"id": "GUID-lib", "path": "/d/lib.dita", "xml": new, "previous": [old]},
+                 {"id": "GUID-t1", "path": "/d/t1.dita", "xml": TOPIC % '<p><xref href="GUID-lib.dita#lib/old">Wrap-up</xref></p>'}]
+
+        def verdict(found_by_agent):
+            session = refplan.Session(files, log=lambda message: None)
+            group = session.tool_overview({})["groups"][0]
+            if found_by_agent:
+                found_by_an_agent(session, group["broken_value"])
+            session.tool_decide({"group_ids": [group["id"]], "decision": "repair_references", "reason": "test"})
+            session.tool_apply_and_recheck({})
+            repair = session.result()["repairs"][0]
+            return repair["verdict"], repair["new"], repair["caveat"]
+
+        self.assertEqual(verdict(False), ("fix", "GUID-lib.dita#lib/new", ""))
+        asked = verdict(True)
+        self.assertEqual(asked[:2], ("review", "GUID-lib.dita#lib/new"))
+        self.assertIn('"Wrap-up"', asked[2])
+
+    def test_small_words_do_not_make_a_text_another_text(self):
+        self.assertTrue(refheal._says("start the pay run", "Select Start pay run."))
+        self.assertTrue(refheal._says("Close a pay period", "Close pay period"))
+        self.assertFalse(refheal._says("the", "the"))
+        self.assertFalse(refheal._says("stop the pay run", "Select Start pay run."))
+
     def test_the_planner_adds_it_once_and_not_to_a_rename_the_history_proves(self):
         repo, ref = self.reference('<xref href="gone.dita#x/y">Wrap-up</xref>')
         add = refplan.Session._with_text_check

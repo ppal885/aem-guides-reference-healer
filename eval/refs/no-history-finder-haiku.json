@@ -1,0 +1,208 @@
+{
+ "sample": "samples/large-demo",
+ "mode": "planner",
+ "backend": "cli",
+ "runs": [
+  {
+   "run": 1,
+   "seconds": 216,
+   "references": 1251,
+   "scores": {
+    "asked, right": 875,
+    "missed": 206,
+    "asked, wrong": 79,
+    "none, right": 91
+   },
+   "source_edits": 0,
+   "model_calls": 171,
+   "input_tokens": 514678,
+   "output_tokens": 69318,
+   "failed_calls": 1,
+   "cost_usd": 1.17,
+   "planner_steps": 7,
+   "plan": [
+    "Warning: the AI did not answer 1 of 171 calls (Extra data: line 2 column 1 (char 78)). What it could not look at was not repaired by guesswork: those references are left for you to review, or have no proposal. Run the check again when the AI answers.",
+    "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
+    "3 broken targets could mean two different pieces. I read the sentence around each reference and chose per reference (sso-product: 27 and 13; data-loss: 21 and 5; billing-impact: 20 and 4).",
+    "Sent 34 to finder agents, each answer checked by a reviewer agent: 28 found under a new name or place, 6 removed for good.",
+    "Decided to ask you about 979 references (29 questions). Why: A likely new target exists, but no history confirms the rename; for example, a data-loss warning may not fit an export topic.",
+    "Decided to leave 272 references broken. Why: No replacement was found: the free plan, account limits, storage limits, legacy interface paragraph and slow-operation warning seem gone; free plan may now be Starter.",
+    "Tried the plan on a copy and checked again: 0 references work now, 1,251 left for you.",
+    "Next: Every broken reference still needs your decision, because no rename could be confirmed from the history; please confirm or reject each proposed new target.",
+    "AI use in this check: 171 model calls, 514,678 tokens in and 69,318 out, about $1.17."
+   ],
+   "wrong": [
+    {
+     "attribute": "keyref",
+     "old": "free-plan",
+     "proposed": "",
+     "verdict": "none, no reviewer",
+     "references": 60
+    },
+    {
+     "attribute": "conkeyref",
+     "old": "warnings/data-loss",
+     "proposed": "shared-warnings/irreversible-key",
+     "verdict": "review, reviewer disagreed",
+     "references": 5
+    },
+    {
+     "attribute": "href",
+     "old": "../reference/limits.dita#limits/account-limits",
+     "proposed": "",
+     "verdict": "none, no reviewer",
+     "references": 67
+    },
+    {
+     "attribute": "href",
+     "old": "../reference/limits.dita#limits/storage-limits",
+     "proposed": "",
+     "verdict": "none, no reviewer",
+     "references": 54
+    },
+    {
+     "attribute": "conkeyref",
+     "old": "warnings/billing-impact",
+     "proposed": "shared-warnings",
+     "verdict": "review, reviewer disagreed",
+     "references": 25
+    },
+    {
+     "attribute": "conref",
+     "old": "../shared/warnings.dita#warnings/billing-impact",
+     "proposed": "GUID-eval-0043.dita#warnings/plan-and-region-limits",
+     "verdict": "review, reviewer agreed",
+     "references": 4
+    },
+    {
+     "attribute": "keyref",
+     "old": "sso-product",
+     "proposed": "product-name",
+     "verdict": "review, reviewer disagreed",
+     "references": 27
+    },
+    {
+     "attribute": "conref",
+     "old": "../shared/warnings.dita#warnings/region-lock",
+     "proposed": "",
+     "verdict": "none, no reviewer",
+     "references": 25
+    },
+    {
+     "attribute": "conref",
+     "old": "../shared/warnings.dita#warnings/slow-operation",
+     "proposed": "GUID-eval-0043.dita#warnings/service-interruption",
+     "verdict": "review, reviewer disagreed",
+     "references": 18
+    }
+   ]
+  },
+  {
+   "run": 2,
+   "seconds": 201,
+   "references": 1251,
+   "scores": {
+    "asked, right": 967,
+    "asked, wrong": 90,
+    "missed": 85,
+    "none, right": 109
+   },
+   "source_edits": 0,
+   "model_calls": 175,
+   "input_tokens": 564103,
+   "output_tokens": 69510,
+   "failed_calls": 0,
+   "cost_usd": 1.49,
+   "planner_steps": 8,
+   "plan": [
+    "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
+    "6 broken targets could mean two different pieces. I read the sentence around each reference and chose per reference (account-limits: 53 and 10 and 4; console-name: 40 and 20; storage-limits: 48 and 6; data-loss: 25 and 3; data-loss: 21 and 5; irreversible-key: 16 and 3).",
+    "Sent 34 to finder agents, each answer checked by a reviewer agent: 29 found under a new name or place, 5 removed for good.",
+    "Decided to ask you about 1,128 references (32 questions). Why: A likely replacement was found by meaning only, for example rate-limits for api-rate-limits, but no history confirms it, so please check.",
+    "Decided to ask you about 60 references (1 question). Why: No key names a free plan any more; it may have become the Starter plan, or the free plan may have been dropped.",
+    "Decided to leave 63 references broken. Why: The shared paragraph about the legacy user interface is gone and nothing replaces it; decide whether these topics still need that sentence.",
+    "Tried the plan on a copy and checked again: 0 references work now, 1,251 left for you.",
+    "Next: Please check each proposed replacement and confirm the ones that fit, because none of these renames could be proved from the file history.",
+    "AI use in this check: 175 model calls, 564,103 tokens in and 69,510 out, about $1.49."
+   ],
+   "wrong": [
+    {
+     "attribute": "keyref",
+     "old": "console-name",
+     "proposed": "cli-tool-name",
+     "verdict": "review, reviewer agreed",
+     "references": 20
+    },
+    {
+     "attribute": "keyref",
+     "old": "free-plan",
+     "proposed": "",
+     "verdict": "none, no reviewer",
+     "references": 60
+    },
+    {
+     "attribute": "conkeyref",
+     "old": "warnings/data-loss",
+     "proposed": "shared-warnings/irreversible-key",
+     "verdict": "review, reviewer disagreed",
+     "references": 5
+    },
+    {
+     "attribute": "href",
+     "old": "../reference/limits.dita#limits/account-limits",
+     "proposed": "GUID-eval-0205.dita#limits/rate-limits",
+     "verdict": "review, reviewer disagreed",
+     "references": 10
+    },
+    {
+     "attribute": "href",
+     "old": "../reference/limits.dita#limits/account-limits",
+     "proposed": "GUID-eval-0205.dita#limits/network-limits",
+     "verdict": "review, reviewer disagreed",
+     "references": 4
+    },
+    {
+     "attribute": "href",
+     "old": "../reference/limits.dita#limits/storage-limits",
+     "proposed": "GUID-eval-0205.dita#limits",
+     "verdict": "review, reviewer disagreed",
+     "references": 48
+    },
+    {
+     "attribute": "conref",
+     "old": "../shared/warnings.dita#warnings/data-loss",
+     "proposed": "GUID-eval-0043.dita#warnings/irreversible-key",
+     "verdict": "review, reviewer disagreed",
+     "references": 3
+    },
+    {
+     "attribute": "conref",
+     "old": "../shared/warnings.dita#warnings/region-lock",
+     "proposed": "",
+     "verdict": "none, no reviewer",
+     "references": 25
+    }
+   ]
+  }
+ ],
+ "previous_versions": false,
+ "second_run": false,
+ "model": "opus",
+ "finder_model": "haiku",
+ "targets": 34,
+ "targets_decided_the_same_in_every_run": 31,
+ "targets_that_differed": {
+  "href account-limits": [
+   "none",
+   "review"
+  ],
+  "href storage-limits": [
+   "none",
+   "review"
+  ],
+  "conref slow-operation": [
+   "review",
+   "none"
+  ]
+ }
+}

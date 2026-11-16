@@ -260,6 +260,17 @@ How to work:
 
 A wrong repair is worse than none: a conref to the wrong element silently publishes wrong content. When in doubt, ask the author.""" + refheal.DATA_RULE
 
+# Where the text before and after cannot be read (no previous version), a finder's "repair" can be
+# confirmed by a second run of the finder. Off since 17 Nov 2026: on the large sample without
+# previous versions it cost about 13% more model calls, caught no wrong repair in 2 runs and sent
+# right repairs to the author instead (eval/refs/no-history-second-run-*.json). The reviewer agent
+# still checks every answer. REFHEAL_SECOND_RUN=1 turns it on again.
+SECOND_RUN = os.environ.get("REFHEAL_SECOND_RUN", "0") == "1"
+
+# The model of the finder agents alone; the planner and the reviewer keep theirs. Empty: the
+# finders run on the model of the session. Set to measure a cheaper finder (planeval.py --finder-model).
+FINDER_MODEL = os.environ.get("REFHEAL_FINDER_MODEL") or None
+
 FINISH = {"name": "finish", "description": "End the job.",
           "properties": {"summary": {"type": "string", "description": "for the author, two short plain sentences: what to do next and what to look at first"}},
           "required": ["summary"]}
@@ -462,7 +473,8 @@ class Session:
         """Settles "repair" or "ask the author" for a finder's answer on a fact, not on how sure the
         model sounded in this run: the text the reference showed before, against the text at the
         new target. The same text is repaired, changed text is asked about. Where the two texts
-        cannot be read, a second run of the finder must name the same target without doubt."""
+        cannot be read, the finder's answer stands as the reviewer agent left it; with SECOND_RUN a
+        second run of the finder must also name the same target without doubt."""
         if not known["new_value"]:
             return
         was = _plain(refheal.text_at(repo, ref, ref["value"], previous=True, limit=100000))
@@ -476,9 +488,9 @@ class Session:
                 known.update(verdict="review", caveat=known["caveat"] or
                              "The text is not what this reference showed before; read both before accepting.")
             return
-        if known["verdict"] == "fix":
+        if known["verdict"] == "fix" and SECOND_RUN:
             if "second_run_agrees" not in known:
-                second = refheal.heal_one(repo, ref, self.backend, self.model, False, self.log)
+                second = refheal.heal_one(repo, ref, self.backend, FINDER_MODEL or self.model, False, self.log)
                 known["second_run_agrees"] = second["new_value"] == known["new_value"] and second["verdict"] == "fix"
             if not known["second_run_agrees"]:
                 known.update(verdict="review", caveat="A second, independent run of the finder agent did not confirm "
@@ -591,7 +603,7 @@ class Session:
         def run(group):
             self.step(group["id"], "active", "Finder agent", "%s: searching files, ids, keys and the previous version"
                       % self._short(group))
-            outcome = refheal.heal_one(repo, group["refs"][0], self.backend, self.model, False, self.log)
+            outcome = refheal.heal_one(repo, group["refs"][0], self.backend, FINDER_MODEL or self.model, False, self.log)
             group["known"] = {"new_value": outcome["new_value"], "verdict": outcome["verdict"], "how": "finder",
                               "candidates": outcome["candidates"],
                               "reason": outcome["reason"], "caveat": outcome["caveat"],
@@ -1081,7 +1093,13 @@ class Session:
                     twice = refheal.duplicate_caveat(final["repo"], ref, value)
                     if twice:
                         entry.update(verdict="review", caveat=twice)
-                    entry["caveat"] = self._with_text_check(entry["caveat"], final["repo"], ref, value, how)
+                    checked = self._with_text_check(entry["caveat"], final["repo"], ref, value, how)
+                    if checked != entry["caveat"] and how == "finder":
+                        # A finder's target that does not say what the link says is not applied by
+                        # "Fix all": the author looks first (seen 17 Nov 2026: such a repair went in
+                        # with 21 others and nobody read its warning).
+                        entry["verdict"] = "review"
+                    entry["caveat"] = checked
                 elif not broken_now:
                     entry.update(verdict="covered", stage="planner",
                                  reason="Repaired by one edit at the source. " + source_label.get(group["id"], ""))

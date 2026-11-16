@@ -36,6 +36,7 @@ sys.path.insert(0, os.path.join(HERE, "samples"))
 import gen_large  # noqa: E402
 import refheal  # noqa: E402
 import refplan  # noqa: E402
+import usage  # noqa: E402
 
 
 def expected_names():
@@ -93,18 +94,33 @@ def main():
     parser.add_argument("--mode", default="planner", choices=["planner", "pipeline"],
                         help="pipeline: the fixed order of refheal.py without the planner, for comparison")
     parser.add_argument("--out", default=None)
+    parser.add_argument("--no-history", action="store_true",
+                        help="hand over no previous versions, as on content that was imported without them")
+    parser.add_argument("--second-run", action="store_true",
+                        help="confirm a finder's repair by a second run where no text can be compared (refplan.SECOND_RUN)")
+    parser.add_argument("--finder-model", default=None,
+                        help="the model of the finder agents alone (refplan.FINDER_MODEL), e.g. haiku, sonnet, opus")
+    parser.add_argument("--model", default=None, help="the model of the session: planner and, without --finder-model, the finders")
     args = parser.parse_args()
+    if args.second_run:
+        refplan.SECOND_RUN = True
+    if args.finder_model:
+        refplan.FINDER_MODEL = args.finder_model
 
     args.out = args.out or os.path.join(HERE, "eval", "refs", "%s-eval.json" % args.mode)
     names, data = expected_names(), payload(args.sample)
+    if args.no_history:
+        for entry in data["files"]:
+            entry["previous"] = []
     runs, per_target = [], collections.defaultdict(list)
     for number in range(1, args.runs + 1):
         started = time.time()
+        calls_before = len(usage._calls)
         fresh = json.loads(json.dumps(data))
         if args.mode == "pipeline":
             out = refheal.heal_files(fresh, backend=args.backend, log=lambda message: None)
         else:
-            out = refplan.plan_files(fresh, backend=args.backend, log=lambda message: None, memory={})
+            out = refplan.plan_files(fresh, backend=args.backend, model=args.model, log=lambda message: None, memory={})
         counts = collections.Counter(score(r, names) for r in out["repairs"])
         # Which targets went wrong, and what was proposed: a count alone does not say what to look at.
         said = {True: "reviewer agreed", False: "reviewer disagreed", None: "no reviewer"}
@@ -118,9 +134,16 @@ def main():
             per_target[target].append(verdict)
         runs.append({"run": number, "seconds": round(time.time() - started), "references": len(out["repairs"]),
                      "scores": dict(counts), "source_edits": len(out["source_fixes"]),
+                     "model_calls": len(usage._calls) - calls_before,
+                     "input_tokens": sum(c["in"] for c in usage._calls[calls_before:]),
+                     "output_tokens": sum(c["out"] for c in usage._calls[calls_before:]),
+                     "failed_calls": sum(1 for c in usage._calls[calls_before:] if not c["ok"]),
+                     "cost_usd": round(sum(c["cost"] or 0 for c in usage._calls[calls_before:]), 2),
                      "planner_steps": out["stats"].get("planner_steps"), "plan": out.get("plan"),
                      "wrong": [{"attribute": a, "old": o, "proposed": n, "verdict": v, "references": c}
                                for (a, o, n, v), c in wrong.items()]})
+        print("        %d model calls (%d failed), %d tokens in, %d out, $%.2f as the CLI reports it" % (
+            runs[-1]["model_calls"], runs[-1]["failed_calls"], runs[-1]["input_tokens"], runs[-1]["output_tokens"], runs[-1]["cost_usd"]))
         print("run %d: %3d s  %s  edits at the source: %d" % (
             number, runs[-1]["seconds"], "  ".join("%s %d" % (k, v) for k, v in sorted(counts.items())), len(out["source_fixes"])))
         for item in runs[-1]["wrong"]:
@@ -129,6 +152,8 @@ def main():
     same = sum(1 for verdicts in per_target.values() if len(set(verdicts)) == 1)
     differing = {"%s %s" % target: verdicts for target, verdicts in per_target.items() if len(set(verdicts)) > 1}
     result = {"sample": os.path.relpath(args.sample, HERE), "mode": args.mode, "backend": args.backend, "runs": runs,
+              "previous_versions": not args.no_history, "second_run": refplan.SECOND_RUN,
+              "model": args.model or "the CLI's default", "finder_model": refplan.FINDER_MODEL or "as the session",
               "targets": len(per_target), "targets_decided_the_same_in_every_run": same, "targets_that_differed": differing}
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w") as handle:
