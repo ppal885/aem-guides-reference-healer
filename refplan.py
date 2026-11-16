@@ -1044,6 +1044,15 @@ class Session:
             if len(self.left) + sum(len(e) for e in self.edits) == before:
                 break
 
+    @staticmethod
+    def _with_text_check(caveat, repo, ref, value, how):
+        """The caveat, with the warning that the link's text is not found in the new target. Not for
+        a rename the version history proves (the link was to that element before, whatever its text
+        says), and not twice: the topic id rule says the same in its own words."""
+        if how == "history" or not value or "text of the link" in caveat.lower() or "link text" in caveat.lower():
+            return caveat
+        return " ".join(filter(None, [caveat, refheal.link_text_caveat(repo, ref, value)]))
+
     def result(self):
         first, final = self.rounds[0], self.rounds[-1]
         final_broken = {(r["file"], r["attribute"], r["value"]) for r in final["repo"].broken()}
@@ -1072,6 +1081,7 @@ class Session:
                     twice = refheal.duplicate_caveat(final["repo"], ref, value)
                     if twice:
                         entry.update(verdict="review", caveat=twice)
+                    entry["caveat"] = self._with_text_check(entry["caveat"], final["repo"], ref, value, how)
                 elif not broken_now:
                     entry.update(verdict="covered", stage="planner",
                                  reason="Repaired by one edit at the source. " + source_label.get(group["id"], ""))
@@ -1083,6 +1093,8 @@ class Session:
                                  reason=last["known"]["reason"], caveat=" ".join(filter(None, [
                                      last["known"]["caveat"] or last["reason"],
                                      refheal.duplicate_caveat(final["repo"], ref, proposal)])))
+                    entry["caveat"] = self._with_text_check(entry["caveat"], final["repo"], ref, proposal,
+                                                            last["known"]["how"])
                 else:
                     gone = last or group
                     known = gone["known"] or {}

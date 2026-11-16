@@ -711,6 +711,37 @@ def duplicate_caveat(repo, ref, value):
             "of them; check that it is the one meant. The ids are not changed." % copies)
 
 
+def link_text_caveat(repo, ref, value):
+    """What the author must know before accepting a repair of a link whose text is not found in the
+    new target. No model: it reads the link and the target as they are.
+
+    Seen on 16 Nov 2026 on content that was not ours: of 66 repairs that people accepted, 8 landed
+    on a target that does not say what the link says. "" when the text is found, and when there is
+    nothing to compare: reused content (conref), a key, a link without text of its own, a link
+    whose text was cut off, and a topic inside a file of several whose title is not kept."""
+    if not value or ref["attribute"] != "href" or ref.get("element") not in ("xref", "link"):
+        return ""
+    text = " ".join((ref.get("link_text") or "").split())
+    if len(re.sub(r"[^a-z0-9]", "", text.lower())) < 4 or len(text) >= 120:
+        return ""
+    target, topic_id, element_id = repo.split_target(dict(ref, value=value))
+    entry = repo.files.get(target)
+    if not entry:
+        return ""
+    if element_id:
+        element = entry["elements"].get((topic_id, element_id))
+        if not element:
+            return ""
+        target_text, what = element["content"], "the element it would point at"
+    elif topic_id and topic_id != next(iter(entry["topics"]), None):
+        return ""
+    else:
+        target_text, what = entry["title"], "the title of the topic it would point at (\"%s\")" % entry["title"]
+    if _says(text, target_text):
+        return ""
+    return "The text of the link (\"%s\") is not found in %s. Check that the link lands on the right place." % (text, what)
+
+
 def target_label(repo, ref, value):
     """A repair in words a person can read: AEM stores "GUID-1234.dita#topic/id", which says nothing."""
     if ref["attribute"] in ("keyref", "conkeyref"):

@@ -241,6 +241,57 @@ class OnlyTheTopicIdIsOutOfDate(unittest.TestCase):
         self.assertIn("lands on the right element", group["known"]["caveat"])
 
 
+class TheLinkTextIsCheckedBeforeARepairIsAccepted(unittest.TestCase):
+    """A proposed target that does not say what the link says gets a warning, without a model
+    (seen on content that was not ours, 16 Nov 2026: 8 of 66 accepted repairs)."""
+
+    BILLING = ('<topic id="billing"><title>Billing</title><body>'
+               '<section id="wrap"><title>Wrap-up</title><p>Close the case.</p></section>'
+               '<section id="escalate"><title>Escalation</title><p>Call the desk.</p></section></body></topic>')
+    LIMITS = '<topic id="limits"><title>Usage limits</title><body><p id="p1">Text</p></body></topic>'
+
+    def reference(self, markup):
+        repo = refcheck.Repo(files=[
+            {"id": "G1", "path": "/d/a.dita", "xml": '<topic id="a"><title>A</title><body><p>%s</p></body></topic>' % markup},
+            {"id": "G2", "path": "/d/billing.dita", "xml": self.BILLING},
+            {"id": "G3", "path": "/d/limits.dita", "xml": self.LIMITS}])
+        return repo, next(r for r in repo.refs if r["file"].endswith("a.dita"))
+
+    def test_a_target_that_says_what_the_link_says_gets_no_warning(self):
+        repo, ref = self.reference('<xref href="gone.dita#x/y">Wrap-up</xref>')
+        self.assertEqual(refheal.link_text_caveat(repo, ref, "billing.dita#billing/wrap"), "")
+        repo, ref = self.reference('<xref href="gone.dita">usage limits</xref>')
+        self.assertEqual(refheal.link_text_caveat(repo, ref, "limits.dita"), "")
+
+    def test_a_target_that_says_something_else_gets_a_warning(self):
+        repo, ref = self.reference('<xref href="gone.dita#x/y">Wrap-up</xref>')
+        caveat = refheal.link_text_caveat(repo, ref, "billing.dita#billing/escalate")
+        self.assertIn('"Wrap-up"', caveat)
+        self.assertIn("the element it would point at", caveat)
+        repo, ref = self.reference('<xref href="gone.dita">Email confirmation</xref>')
+        self.assertIn('"Usage limits"', refheal.link_text_caveat(repo, ref, "limits.dita"))
+
+    def test_nothing_is_said_when_there_is_nothing_to_compare(self):
+        repo, ref = self.reference('<ph conref="gone.dita#x/y"/>')
+        self.assertEqual(refheal.link_text_caveat(repo, ref, "billing.dita#billing/escalate"), "")
+        repo, ref = self.reference('<xref href="gone.dita#x/y"/>')
+        self.assertEqual(refheal.link_text_caveat(repo, ref, "billing.dita#billing/escalate"), "")
+        repo, ref = self.reference('<xref href="gone.dita#x/y">9</xref>')
+        self.assertEqual(refheal.link_text_caveat(repo, ref, "billing.dita#billing/escalate"), "")
+        repo, ref = self.reference('<xref href="gone.dita#x/y">Wrap-up</xref>')
+        self.assertEqual(refheal.link_text_caveat(repo, ref, "nowhere.dita#x/y"), "")
+
+    def test_the_planner_adds_it_once_and_not_to_a_rename_the_history_proves(self):
+        repo, ref = self.reference('<xref href="gone.dita#x/y">Wrap-up</xref>')
+        add = refplan.Session._with_text_check
+        new = "billing.dita#billing/escalate"
+        self.assertIn("Check that the link lands", add("", repo, ref, new, "finder"))
+        self.assertTrue(add("Based on the subject only.", repo, ref, new, "finder").startswith("Based on the subject only. The text"))
+        self.assertEqual(add("", repo, ref, new, "history"), "")
+        said = "The text of the link is not found in the element that has the id now."
+        self.assertEqual(add(said, repo, ref, new, "rule"), said)
+
+
 if __name__ == "__main__":
     unittest.main()
 
