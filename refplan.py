@@ -1296,10 +1296,15 @@ def _plan_files(payload, backend="cli", model=None, log=print, progress=None, me
         session.plan.append("%s outside this map also %s into the files that changed. I only see this map; those "
                             "references are not in this list." % (_count(len(outside), "file"), "points" if len(outside) == 1 else "point"))
     recalled = sum(1 for g in first.values() if g["known"] and g["known"]["how"] == "author")
-    proven -= recalled
+    by_rule = sum(1 for g in first.values() if g["known"] and g["known"]["how"] == "rule"
+                  and not g["known"].get("never_defined"))
+    proven -= recalled + by_rule
     if proven:
         session.plan.append("%d of those %d were only renamed: the file's previous version proves it, no AI needed."
                             % (proven, len(first)))
+    if by_rule:
+        session.plan.append("%d more %s settled by a rule in code that reads the files as they are now, no AI needed. "
+                            "No previous version proves these." % (by_rule, "was" if by_rule == 1 else "were"))
     if recalled:
         session.plan.append("%d more %s answered by an author in an earlier check; I used %s again." % (
             recalled, "was" if recalled == 1 else "were", "that answer" if recalled == 1 else "those answers"))
@@ -1307,6 +1312,8 @@ def _plan_files(payload, backend="cli", model=None, log=print, progress=None, me
         _count(sum(len(g["refs"]) for g in first.values()), "broken reference"), len(session.rounds[0]["repo"].files), len(first)))
     if proven:
         session.step("history", "done", "Version history", "Proved %s from the previous versions, no AI" % _count(proven, "rename"))
+    if by_rule:
+        session.step("rule", "done", "Rule", "Settled %s from the files as they are, no AI" % _count(by_rule, "target"))
     if recalled:
         session.step("memory", "done", "Memory", "Reused %s an author gave in an earlier check" % _count(recalled, "answer"))
     at = len(session.plan)
