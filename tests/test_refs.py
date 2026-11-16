@@ -1184,3 +1184,62 @@ class KeysThatWereNeverDefined(unittest.TestCase):
         repo = refcheck.Repo(files=[{"id": "G1", "path": "/d/m.ditamap", "xml": now, "previous": [before]},
                                     {"id": "G2", "path": "/d/t.dita", "xml": self.TOPIC}])
         self.assertEqual({refheal.never_defined(repo, ref) for ref in repo.broken()}, {""})
+
+
+try:
+    import claudeapi
+except ImportError:   # the anthropic package is only needed for the API backend
+    claudeapi = None
+
+
+@unittest.skipIf(claudeapi is None, "the anthropic package is not installed for this Python")
+class TheApiBackendStreams(unittest.TestCase):
+    """A request to the Claude API is streamed and handed on as the complete message."""
+
+    def setUp(self):
+        self.asked = []
+        test = self
+
+        class Stream:
+            def __init__(self, request):
+                test.asked.append(request)
+                if "fallbacks" in request and test.reject_fallbacks:
+                    import anthropic
+                    import httpx
+                    response = httpx.Response(400, request=httpx.Request("POST", "https://api.example/v1/messages"))
+                    raise anthropic.BadRequestError("fallbacks: unknown parameter", response=response, body=None)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def get_final_message(self):
+                usage = type("Usage", (), {"input_tokens": 12, "output_tokens": 3, "cache_read_input_tokens": 0,
+                                           "cache_creation_input_tokens": 0})()
+                text = type("Block", (), {"type": "text", "text": '{"agree": true}'})()
+                return type("Message", (), {"usage": usage, "stop_reason": "end_turn", "content": [text]})()
+
+        messages = type("Messages", (), {"stream": staticmethod(lambda **request: Stream(request))})()
+        fake = type("Client", (), {"beta": type("Beta", (), {"messages": messages})()})()
+        self.reject_fallbacks = False
+        self.real_client, self.real_flag = claudeapi.client, claudeapi._fallbacks_supported
+        claudeapi.client, claudeapi._fallbacks_supported = (lambda: fake), True
+
+    def tearDown(self):
+        claudeapi.client, claudeapi._fallbacks_supported = self.real_client, self.real_flag
+
+    def test_the_answer_of_a_streamed_request_is_the_whole_message(self):
+        import usage
+        mark = usage.start()
+        self.assertEqual(claudeapi.call_model("system", "user"), {"agree": True})
+        totals = usage.finish(mark)
+        self.assertEqual((totals["model_calls"], totals["input_tokens"], totals["output_tokens"]), (1, 12, 3))
+        self.assertEqual(self.asked[0]["fallbacks"], "default")
+
+    def test_an_endpoint_without_fallbacks_is_asked_again_without_them(self):
+        self.reject_fallbacks = True
+        self.assertEqual(claudeapi.call_model("system", "user"), {"agree": True})
+        self.assertEqual(["fallbacks" in request for request in self.asked], [True, False])
+        self.assertFalse(claudeapi._fallbacks_supported)

@@ -47,12 +47,21 @@ def _send(**request):
     global _fallbacks_supported
     if _fallbacks_supported:
         try:
-            return client().beta.messages.create(betas=[FALLBACK_BETA], fallbacks="default", **request)
+            return _stream(betas=[FALLBACK_BETA], fallbacks="default", **request)
         except anthropic.BadRequestError as exc:
             if "fallback" not in str(exc).lower():
                 raise
             _fallbacks_supported = False
-    return client().beta.messages.create(**request)
+    return _stream(**request)
+
+
+def _stream(**request):
+    """One request, streamed, returned as the complete message. Nothing is shown while it
+    arrives: streaming is used so that a long answer (up to 16,000 tokens, with thinking) does
+    not sit behind one silent HTTP response until a timeout cuts it. The tools the agents use
+    take short inputs, so their inputs are not streamed eagerly."""
+    with client().beta.messages.stream(**request) as stream:
+        return stream.get_final_message()
 
 
 def call_model(system, user, model=None):
