@@ -45,8 +45,33 @@ def local(tag):
     return tag.rsplit("}", 1)[-1] if isinstance(tag, str) else ""
 
 
+# Elements that sit inside a line of text. Every other element starts and ends a block, and a
+# reader sees a break there: a section's title and its first paragraph are two things.
+INLINE = {"ph", "b", "i", "u", "sup", "sub", "tt", "line-through", "overline", "codeph", "keyword", "term", "xref",
+          "uicontrol", "wintitle", "menucascade", "filepath", "varname", "cmdname", "option", "parmname", "apiname",
+          "userinput", "systemoutput", "q", "cite", "text", "tm", "abbreviated-form", "state", "msgph", "msgnum",
+          "synph", "shortcut", "indexterm", "fn"}
+
+
 def text_of(el, limit=200):
-    return re.sub(r"\s+", " ", "".join(el.itertext())).strip()[:limit]
+    """The text a reader sees in an element, on one line. Blocks are kept apart by a space: the
+    text used to be joined as it stands in the file, which ran a title into the paragraph after
+    it ("Storage limitsA bucket can hold ...")."""
+    parts = []
+
+    def walk(node):
+        parts.append(node.text or "")
+        for child in node:
+            block = local(child.tag) not in INLINE
+            if block:
+                parts.append(" ")
+            walk(child)
+            if block:
+                parts.append(" ")
+            parts.append(child.tail or "")
+
+    walk(el)
+    return re.sub(r"\s+", " ", "".join(parts)).strip()[:limit]
 
 
 def parse(path):

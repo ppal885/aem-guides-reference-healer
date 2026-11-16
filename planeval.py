@@ -107,8 +107,10 @@ def main():
             out = refplan.plan_files(fresh, backend=args.backend, log=lambda message: None, memory={})
         counts = collections.Counter(score(r, names) for r in out["repairs"])
         # Which targets went wrong, and what was proposed: a count alone does not say what to look at.
-        wrong = collections.Counter((r["attribute"], r["old"], r.get("new") or "", r["verdict"]) for r in out["repairs"]
-                                    if score(r, names) in ("applied wrong", "asked, wrong", "missed"))
+        said = {True: "reviewer agreed", False: "reviewer disagreed", None: "no reviewer"}
+        wrong = collections.Counter((r["attribute"], r["old"], r.get("new") or "",
+                                     "%s, %s" % (r["verdict"], said[(r.get("detail") or {}).get("reviewer")]))
+                                    for r in out["repairs"] if score(r, names) in ("applied wrong", "asked, wrong", "missed"))
         seen = {}
         for repair in out["repairs"]:
             seen[(repair["attribute"], repair["old"].rsplit("/", 2)[-1] if repair["attribute"] in ("href", "conref") else repair["old"])] = repair["verdict"]

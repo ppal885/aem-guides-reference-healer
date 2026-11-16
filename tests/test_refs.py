@@ -1215,6 +1215,9 @@ class TheApiBackendStreams(unittest.TestCase):
             def __exit__(self, *exc):
                 return False
 
+            def __iter__(self):
+                return iter(["message_start", "content_block_delta", "message_stop"])
+
             def get_final_message(self):
                 usage = type("Usage", (), {"input_tokens": 12, "output_tokens": 3, "cache_read_input_tokens": 0,
                                            "cache_creation_input_tokens": 0})()
@@ -1237,9 +1240,31 @@ class TheApiBackendStreams(unittest.TestCase):
         totals = usage.finish(mark)
         self.assertEqual((totals["model_calls"], totals["input_tokens"], totals["output_tokens"]), (1, 12, 3))
         self.assertEqual(self.asked[0]["fallbacks"], "default")
+        # How the answer arrived is kept, for the sidecar's /health and its log.
+        self.assertEqual(claudeapi.LAST_STREAM["pieces"], 3)
+        self.assertIn("first_piece_seconds", claudeapi.LAST_STREAM)
 
     def test_an_endpoint_without_fallbacks_is_asked_again_without_them(self):
         self.reject_fallbacks = True
         self.assertEqual(claudeapi.call_model("system", "user"), {"agree": True})
         self.assertEqual(["fallbacks" in request for request in self.asked], [True, False])
         self.assertFalse(claudeapi._fallbacks_supported)
+
+
+class TheTextOfAnElement(unittest.TestCase):
+    """What a reader sees in an element, as the compare box and the agents get it."""
+
+    def text(self, xml):
+        import xml.etree.ElementTree as ET
+        return refcheck.text_of(ET.fromstring(xml), 300)
+
+    def test_a_title_does_not_run_into_the_paragraph_after_it(self):
+        self.assertEqual(self.text('<section><title>Storage limits</title><p>A bucket can hold 5 TB.</p></section>'),
+                         "Storage limits A bucket can hold 5 TB.")
+
+    def test_list_items_are_kept_apart(self):
+        self.assertEqual(self.text('<ul><li>one</li><li>two</li></ul>'), "one two")
+
+    def test_an_inline_element_adds_no_space_of_its_own(self):
+        self.assertEqual(self.text('<p>Set <codeph>workers</codeph>, then re<b>start</b>ing helps.</p>'),
+                         "Set workers, then restarting helps.")

@@ -8,7 +8,7 @@ Before the demo: start the three pieces (`RUN.md`), run `./samples/load_large_de
 
 **Make the Health check panel tall before you start** (drag its top edge up to about half the window). At its default height the plan or the compare box fills it and the rows are out of sight.
 
-Timed on 15 Nov 2026 with nothing remembered: the first check took 3 min 11 s.
+Run from start to end on 16 Nov 2026 with nothing remembered, on a copy of the sample: the first check took 1 min 53 s (89 model calls, about $1.09 on the `claude` CLI), "Fix all" 15 s, the check after it 10 s. On 15 Nov, before the agents' calls were made leaner, the first check took 3 min 11 s.
 
 ## 1. The problem (30 s)
 
@@ -18,7 +18,7 @@ Timed on 15 Nov 2026 with nothing remembered: the first check took 3 min 11 s.
 
 ## 2. One check (3 min, start it and talk over it)
 
-Run Health check with the preset "Broken references demo". About three minutes. While it runs the panel lists who is working, row by row: the scanner, version history, the planner, each finder agent with a spinner while it searches and a green tick with its answer when the reviewer has checked it, then the planner's decisions and its re-check on a copy. Read two or three rows aloud as they turn green, and say who is working:
+Run Health check with the preset "Broken references demo". About two minutes. While it runs the panel lists who is working, row by row: the scanner, version history, the planner, each finder agent with a spinner while it searches and a green tick with its answer when the reviewer has checked it, then the planner's decisions and its re-check on a copy. Read two or three rows aloud as they turn green, and say who is working:
 
 - A **planner agent** got the whole job. It looks at everything that is broken and decides what to do.
 - It hands the hard ones to **finder agents**, and a **reviewer agent** checks each answer.
@@ -34,7 +34,7 @@ Read the bar above the rows ("1,251 findings checked: 710 repairs ready, 432 to 
 
 ## 3b. Compare before you accept (45 s)
 
-Click the repair text on the "trial-resource-limits" row. A paragraph was split in two, so the agent gives two candidates (about 80% and 12%), each with what it shows now and why, the 51 files a repair changes, and per output how many of those references it publishes ("AEM Sites: publishes 46 of 51; filtered out: 5 by audience="internal"": that output leaves internal content out, so the repair does not reach it there). Turn on "Only in <topic>" and give that one topic the second candidate; then open another row of the group and pick the first for all the rest. Run the check again later: it does not ask a second time about the ones answered for all.
+Scroll the list to the "trial-resource-limits" row and click its repair text (the row is not among the first ones; if you do not want to scroll, any row that says "Repair to review" opens the same box, with one candidate). A paragraph was split in two, so the agent gives two candidates (about 80% and 12%), each with what it shows now and why, the 51 files a repair changes, and per output how many of those references it publishes ("AEM Sites: publishes 46 of 51; filtered out: 5 by audience="internal"": that output leaves internal content out, so the repair does not reach it there). Turn on "Only in <topic>" and give that one topic the second candidate; then open another row of the group and pick the first for all the rest. Run the check again later: it does not ask a second time about the ones answered for all.
 
 ## 4. Fix all (1 min)
 
@@ -48,11 +48,19 @@ Open a "No repair found" row. The planner suggests a way out and says why: for t
 
 ## 4c. The record (20 s)
 
-Open "Repaired", press "Download audit record": one line per changed reference, with who accepted it, what settled it and the text before and after. Run the check again: it comes back in about 15 s, because nothing the planner saw has changed.
+Open "Repaired", press "Download audit record": one line per changed reference, with who accepted it, what settled it and the text before and after. Run the check again. Right after "Put it back" it takes about 45 s, because the shared file changed and the planner looks at what is left once more; run it a second time and it comes back in about 12 s, because nothing the planner saw has changed. For the demo, run it once before this step so that the quick one is the one people see.
 
 ## 4d. Before publishing (20 s, optional)
 
 Open the map console, press Generate on "AEM Sites". The editor asks first: how many broken references the last check found, and how many of them this output publishes after its filter. Press Cancel.
+
+## 4e. Not only renamed ids (1 min, optional)
+
+Two small maps show what else is handled. Load them with `./samples/load_image_demo.sh`; the second one is any map without key definitions.
+
+- **Images.** Open `/content/dam/image-demo/m.ditamap` and run Health check with a preset that has "Broken links" and "Duplicate IDs". An image that moved is found again by its name: one repair in the topic, and one at the key's definition in the map, which repairs the topic that uses the key without touching it. No AI was needed. A key that was renamed is shown to review.
+- **Duplicate ids.** The same check lists five warnings and changes none of them: "First of 3 ... the one a reference lands on", "Copy 2 of 3 ... never on this one". An author may have kept the id on purpose.
+- **Keys that were never defined.** On a map that defines no keys, a reference to a key is not searched for: "The key ... is not defined ... Add a key definition". Zero model calls, a few seconds.
 
 ## 5. Where it stops (30 s)
 
@@ -66,6 +74,6 @@ The planner cannot write to the repository; it works on a copy, and a person pre
 - **Why did it ask about 432?** It repairs by itself only when the text at the new target is word for word what the reference showed before. Any change of wording is a question, with both texts.
 - **How accurate is it?** `planeval.py` ran the planner three times on this sample and compared all 1,251 answers each time with the known right answer: no wrong repair, no wrong proposal, nothing missed, and the same split in every run (710 repaired, 432 asked, 109 gone). The sample is generated. With two plausible targets (`rankeval.py`, nine cases) the right one was first for 9 of 9 in both runs. On the public DITA-OT docs: 32 really broken references, 14 repaired, 7 for review, 6 without a repair. See `EVAL-REFS.md`.
 - **What happens when it is wrong?** Only repairs that passed every check are applied by "Fix all". Every changed file gets a version, so it can be reverted. The rest wait for an author.
-- **What does it cost?** Renames proven by version history cost nothing. Finder agents run once per broken target, not once per reference: 15 times here, in parallel. The planner itself took 7 steps.
+- **What does it cost?** Measured on 16 Nov 2026 on the `claude` CLI: the first check of this sample 89 model calls, 271,306 tokens in and 12,579 out, about $1.09; the check after "Fix all" 1 call, about $0.02. Renames proven by version history cost nothing. Finder agents run once per broken target, not once per reference: 15 times here, in parallel. Every check says its own numbers in the last line of the plan. Not measured on the API backend.
 - **How do references break at all, if the editor refuses to delete a reused element?** It refuses for `conref` only. Uploads, key changes in maps, elements reached through keys or `xref`, and moved files break them; this sample breaks them by upload.
-- **Is one minute for a thousand links real?** No. The first check with the planner takes about three minutes here; an unchanged map after that about 15 s; check, fix and re-check together about five. With 1,000 different broken targets it would take far longer.
+- **Is one minute for a thousand links real?** No. The first check with the planner takes about two minutes here; an unchanged map after that about 12 s; check, fix and re-check together about three. With 1,000 different broken targets it would take far longer.
