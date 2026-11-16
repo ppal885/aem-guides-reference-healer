@@ -1303,8 +1303,9 @@ def _plan_files(payload, backend="cli", model=None, log=print, progress=None, me
         session.plan.append("%d of those %d were only renamed: the file's previous version proves it, no AI needed."
                             % (proven, len(first)))
     if by_rule:
-        session.plan.append("%d more %s settled by a rule in code that reads the files as they are now, no AI needed. "
-                            "No previous version proves these." % (by_rule, "was" if by_rule == 1 else "were"))
+        session.plan.append("%d%s %s settled by a rule in code that reads the files as they are now, no AI needed. "
+                            "No previous version proves these." % (
+                                by_rule, " more" if proven else " of those %d" % len(first), "was" if by_rule == 1 else "were"))
     if recalled:
         session.plan.append("%d more %s answered by an author in an earlier check; I used %s again." % (
             recalled, "was" if recalled == 1 else "were", "that answer" if recalled == 1 else "those answers"))
