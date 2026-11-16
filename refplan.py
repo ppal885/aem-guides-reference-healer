@@ -241,7 +241,7 @@ You work with tools:
 
 The four decisions:
 - repair_references: rewrite each reference to the repair. Allowed only when the repair has verdict "fix".
-- repair_at_source: one edit where the target lives instead of one edit per reference. Offered only when code found it safe, and the option says what the edit is. An edit that adds a second name to a key is harmless and saves many edits. An edit that renames a key or an element id back undoes a colleague's rename and breaks any reference you repair to the new name in the same round, so choose it only when the saving is large and you decide every group that touches that key or id consistently.
+- repair_at_source: one edit where the target lives instead of one edit per reference. Offered only when code found it safe, and the option says what the edit is. An edit that adds a second name to a key is harmless and saves many edits. An edit that renames a key or an element id back undoes a colleague's rename and breaks any reference you repair to the new name in the same round, so choose it only when the saving is large and you decide every group that touches that key or id consistently. It is not accepted at all for a rename that the version history proves (the repair says so): that rename was made on purpose, so repair the references.
 - ask_author: a target was found but with doubt (verdict "review" or a caveat), or two readings are possible. The author sees the proposal and the doubt.
 - leave_broken: the content is gone and nothing replaces it. Say what it used to be so the author can decide what the topics should say.
 
@@ -290,6 +290,20 @@ def _one_sentence(text, limit=170):
 
 def _plain(text):
     return re.sub(r"\s+", " ", text or "").strip()
+
+
+WHOLE = 0.8
+
+
+def carries_whole(old_text, new_text):
+    """True when a target shows what the old one showed, reworded at most a little: at least 80%
+    of the old text's words are in it. A piece that holds half of the old text (the old one was
+    split) does not; a text of fewer than five words says too little to tell."""
+    old = re.findall(r"[a-z0-9]+", old_text.lower())
+    if len(old) < 5:
+        return False
+    new = set(re.findall(r"[a-z0-9]+", new_text.lower()))
+    return sum(1 for word in old if word in new) / len(old) >= WHOLE
 
 
 def _count(number, word):
@@ -688,6 +702,12 @@ class Session:
         described = [{"candidate": n, "target": refheal.target_label(repo, first, c["new_value"]),
                       "shows_now": refheal.text_at(repo, first, c["new_value"])[:300]} for n, c in enumerate(candidates, 1)]
         was = refheal.text_at(repo, first, first["value"], previous=True)[:400]
+        if carries_whole(was, described[0]["shows_now"]):
+            # The first candidate holds what the old target said: the content moved as a whole, so
+            # there are no two pieces to choose between. Without this, a second candidate that fits
+            # the sentence better took most references although it says something else (16 Nov 2026:
+            # the old file's topic "Limits" for 48 of 54 links whose sentence is "Limits are listed in").
+            return
         choice = {}
         for start in range(0, len(refs), 60):
             batch = refs[start:start + 60]
@@ -770,6 +790,14 @@ class Session:
                 return "the repair has verdict \"%s\", not \"fix\"; use ask_author" % known["verdict"]
         if action == "repair_at_source" and not group["source"]:
             return "no safe edit at the source exists for this group; use repair_references"
+        if action == "repair_at_source" and group["source"].get("mode") == "rename" and (known or {}).get("how") == "history":
+            # Decided on 16 Nov 2026: a rename the version history proves was made on purpose. The
+            # planner follows it; it does not put the old name back. In about one run of six it did,
+            # for nine targets at once, which is the opposite of what the same planner says in the
+            # other runs and makes "Fix all" edit the shared files. An author can still choose the
+            # edit at the source from the panel.
+            return ("the version history proves this was renamed on purpose; an edit at the source would undo "
+                    "the rename. Use repair_references")
         if action in wayout.KINDS:
             if known and known["new_value"]:
                 return "a repair is known for this group; a way out is for content that is gone"

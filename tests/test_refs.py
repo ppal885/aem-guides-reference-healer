@@ -188,6 +188,13 @@ if __name__ == "__main__":
     unittest.main()
 
 
+def found_by_an_agent(session, broken_value):
+    """Marks a group's repair as an agent's finding. The tests of what an edit at the source does
+    need one the planner may choose: it may not for a rename the version history proves."""
+    group_id = next(g["id"] for g in session.tool_overview({})["groups"] if g["broken_value"] == broken_value)
+    session.current["groups"][group_id]["known"]["how"] = "finder"
+
+
 class Planner(unittest.TestCase):
     """The planner's tools, driven by hand: what the agent may and may not do with them."""
 
@@ -218,6 +225,7 @@ class Planner(unittest.TestCase):
 
     def test_apply_and_recheck_reports_what_resolves_and_the_result_says_how_each_reference_was_settled(self):
         self.decide("lib.dita#lib/hot", "repair_references")
+        found_by_an_agent(self.session, "app")
         self.decide("app", "repair_at_source")
         self.decide("lib.dita#lib/help", "leave_broken")
         recheck = self.session.tool_apply_and_recheck({})
@@ -246,6 +254,7 @@ class Planner(unittest.TestCase):
             {"id": "GUID-t2", "path": "/d/t2.dita", "xml": TOPIC % '<note conkeyref="lib/burn-risk"/>'},
         ], log=lambda message: None)
         groups = {g["broken_value"]: g for g in session.tool_overview({})["groups"]}
+        found_by_an_agent(session, "lib/burn-risk")
         session.tool_decide({"group_ids": [groups["lib/burn-risk"]["id"]], "decision": "repair_at_source", "reason": "test"})
         session.tool_decide({"group_ids": [groups["lib/hot"]["id"]], "decision": "repair_references", "reason": "test"})
         recheck = session.tool_apply_and_recheck({})
@@ -1268,3 +1277,88 @@ class TheTextOfAnElement(unittest.TestCase):
     def test_an_inline_element_adds_no_space_of_its_own(self):
         self.assertEqual(self.text('<p>Set <codeph>workers</codeph>, then re<b>start</b>ing helps.</p>'),
                          "Set workers, then restarting helps.")
+
+
+class ContentThatMovedAsAWhole(unittest.TestCase):
+    """A section moved to another file under a new title. The finder may list the old file's topic
+    as a second candidate; the sentence around a link ("Limits are listed in ...") fits that topic
+    better, but the first candidate holds what the old section said. Seen on 16 Nov 2026: 48 of 54
+    links got the old file's topic."""
+
+    OLD = '<topic id="limits"><title>Limits</title><body><section id="storage-limits"><title>Storage limits</title><p>A bucket can hold objects of up to 5 TB each.</p></section></body></topic>'
+    NOW = '<topic id="limits"><title>Limits</title><body><p>See the reference of each service.</p></body></topic>'
+    MOVED = '<topic id="storage"><title>Storage reference</title><body><section id="object-size"><title>Object size limits</title><p>A bucket can hold objects of up to 5 TB each.</p></section></body></topic>'
+    USER = '<topic id="%s"><title>%s</title><body><p>Limits are listed in <xref href="limits.dita#limits/storage-limits"/>.</p></body></topic>'
+
+    def session(self, picks):
+        files = [{"id": "G1", "path": "/d/limits.dita", "xml": self.NOW, "previous": [self.OLD]},
+                 {"id": "G2", "path": "/d/storage.dita", "xml": self.MOVED},
+                 {"id": "G3", "path": "/d/a.dita", "xml": self.USER % ("a", "Delete a key")},
+                 {"id": "G4", "path": "/d/b.dita", "xml": self.USER % ("b", "Create a bucket")}]
+        asked = []
+
+        def choose(was, candidates, references):
+            asked.append(candidates)
+            return {n: picks for n in range(1, len(references) + 1)}
+        return refplan.Session(files, log=lambda message: None, choose=choose), asked
+
+    def found(self, session):
+        group = next(iter(session.current["groups"].values()))
+        repo, first = session.current["repo"], group["refs"][0]
+        right = repo.compose(first, target="d/storage.dita", topic_id="storage", element_id="object-size")
+        topic = repo.compose(first, target="d/limits.dita", topic_id="limits")
+        group["known"] = {"new_value": right, "verdict": "review", "how": "finder", "reason": "moved", "caveat": "",
+                          "candidates": [{"new_value": right, "likelihood": 90, "why": "same text"},
+                                         {"new_value": topic, "likelihood": 8, "why": "the old file"}]}
+        session._choose_per_reference(repo, group)
+        return group, right
+
+    def test_no_reference_is_given_the_second_candidate_and_the_chooser_is_not_asked(self):
+        session, asked = self.session(picks=2)
+        group, right = self.found(session)
+        self.assertEqual(asked, [])
+        self.assertNotIn("choice", group)
+        self.assertEqual(group["known"]["new_value"], right)
+
+    def test_what_counts_as_the_whole_text(self):
+        old = "Storage limits A bucket can hold objects of up to 5 TB each."
+        self.assertTrue(refplan.carries_whole(old, "Object size limits A bucket can hold objects of up to 5 TB each."))
+        self.assertFalse(refplan.carries_whole(old, "Limits"))
+        # A piece of a text that was split in two holds about half of it: the chooser is still asked.
+        self.assertFalse(refplan.carries_whole("Back up your data before you upgrade. Backups are kept for 30 days.",
+                                               "Back up your data before you upgrade."))
+        # Too short to tell.
+        self.assertFalse(refplan.carries_whole("Admin Console", "Admin Console"))
+
+
+class AProvenRenameIsNotUndone(unittest.TestCase):
+    """The version history proves an id was renamed. The planner may repair the references; it may
+    not put the old id back at the source, which would undo a colleague's rename."""
+
+    OLD = '<topic id="lib"><title>Lib</title><body><note id="backup">Back up first.</note></body></topic>'
+    NEW = OLD.replace('id="backup"', 'id="back-up-first"')
+    USER = '<topic id="%s"><title>%s</title><body><note conref="lib.dita#lib/backup"/></body></topic>'
+
+    def session(self):
+        files = [{"id": "G1", "path": "/d/lib.dita", "xml": self.NEW, "previous": [self.OLD]},
+                 {"id": "G2", "path": "/d/a.dita", "xml": self.USER % ("a", "A")},
+                 {"id": "G3", "path": "/d/b.dita", "xml": self.USER % ("b", "B")}]
+        return refplan.Session(files, log=lambda message: None, choose=lambda *a: {})
+
+    def test_the_edit_at_the_source_is_offered_to_the_author_but_refused_to_the_planner(self):
+        session = self.session()
+        group = next(iter(session.current["groups"].values()))
+        self.assertEqual((group["known"]["how"], group["source"]["mode"]), ("history", "rename"))
+
+        refused = session.tool_decide({"group_ids": [group["id"]], "decision": "repair_at_source", "reason": "one edit"})
+        self.assertEqual(refused["accepted"], [])
+        self.assertIn("would undo the rename", refused["rejected"][group["id"]])
+
+        taken = session.tool_decide({"group_ids": [group["id"]], "decision": "repair_references", "reason": "follow the rename"})
+        self.assertEqual(taken["accepted"], [group["id"]])
+        session.finish_unfinished()
+        result = session.result()
+        self.assertEqual({r["verdict"] for r in result["repairs"]}, {"fix"})
+        self.assertEqual(result["source_fixes"], [])
+        # The single edit is still known for the group, for an author who wants it.
+        self.assertEqual(group["source"]["new"], "backup")
