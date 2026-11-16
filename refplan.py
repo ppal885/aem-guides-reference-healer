@@ -407,8 +407,9 @@ class Session:
             quick = refheal.rule_fix(repo, refs[0])
             if quick:
                 proven = quick["reason"].startswith("In the previous version")
-                group["known"] = {"new_value": refheal.new_value(repo, refs[0], quick), "verdict": "fix",
-                                  "how": "history" if proven else "rule", "reason": quick["reason"], "caveat": ""}
+                group["known"] = {"new_value": refheal.new_value(repo, refs[0], quick),
+                                  "verdict": quick.get("verdict", "fix"), "how": "history" if proven else "rule",
+                                  "reason": quick["reason"], "caveat": quick.get("caveat", "")}
             if not group["known"]:
                 self._recall(repo, group)
             elif group["known"]["new_value"] in self._declined(refs[0]):

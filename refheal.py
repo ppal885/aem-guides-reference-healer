@@ -265,7 +265,60 @@ def rule_fix(repo, ref):
             proposal = {"target_path": "", "topic_id": "", "element_id": element_id, "key": close[0]}
             if resolves(repo, ref, proposal):
                 return dict(proposal, reason="The key \"%s\" exists and differs from \"%s\" only in punctuation or case." % (close[0], key))
-    return history_fix(repo, ref)
+    return history_fix(repo, ref) or topic_id_fix(repo, ref)
+
+
+def _says(link_text, target_text):
+    """True when the text of a link is found in the text of what it would point at."""
+    squash = lambda text: re.sub(r"[^a-z0-9]", "", (text or "").lower())
+    link = squash(link_text)
+    return len(link) >= 4 and link in squash(target_text)
+
+
+def topic_id_fix(repo, ref):
+    """The file is there and only the topic id in the reference is out of date: no model needed.
+
+    Seen on 16 Nov 2026 on real customer content: 57 of 121 broken references were of this kind,
+    most of them links inside one file ("#old-topic-id/element"). Finder agents repaired them one by
+    one, with about two and a half model calls per reference.
+
+    With an element id: the element is in the file exactly once, so the topic that holds it is the
+    topic meant. Without one: the file holds exactly one topic. That names the target; it does not
+    prove the id still sits on the element the author linked to (ids like "d180e703" are written by
+    a conversion tool and can move). So the repair is applied ("fix") only when the text of the link
+    is found in the target; otherwise the author checks it.
+    """
+    if ref["reason"] != "topic-missing" or ref["attribute"] not in refcheck.PATH_ATTRS:
+        return None
+    target, topic_id, element_id = repo.split_target(ref)
+    entry = repo.files.get(target)
+    if not entry:
+        return None
+    name = os.path.basename(target)
+    if element_id:
+        holders = [topic for (topic, eid) in entry["elements"] if eid == element_id and topic]
+        if len(holders) != 1 or (holders[0], element_id) in entry["copies"]:
+            return None
+        new_topic = holders[0]
+        sure = _says(ref.get("link_text"), entry["elements"][(new_topic, element_id)]["content"])
+        reason = ("%s has no topic with the id \"%s\". The element \"%s\" is in the file once, in the topic \"%s\": "
+                  "only the topic id in the reference is out of date." % (name, topic_id, element_id, new_topic))
+        caveat = ("The text of the link is not found in the element that has the id \"%s\" now. Check that the link "
+                  "lands on the right element." % element_id)
+    else:
+        if len(entry["topics"]) != 1:
+            return None
+        new_topic = next(iter(entry["topics"]))
+        sure = _says(ref.get("link_text"), entry["title"])
+        reason = ("%s has no topic with the id \"%s\". It holds one topic, \"%s\" (id \"%s\")."
+                  % (name, topic_id, entry["title"][:70], new_topic))
+        caveat = "The link text does not name this topic. Check that this is the topic the link meant."
+    proposal = {"target_path": target, "topic_id": new_topic, "element_id": element_id or "", "key": ""}
+    if not resolves(repo, ref, proposal):
+        return None
+    if sure:
+        reason += " The text of the link is found there."
+    return dict(proposal, reason=reason, verdict="fix" if sure else "review", caveat="" if sure else caveat)
 
 
 def never_defined(repo, ref):
@@ -495,8 +548,10 @@ def heal_one(repo, ref, backend, model, with_history, log):
               "steps": [], "checks": [], "review": None, "candidates": []}
     quick = rule_fix(repo, ref)
     if quick:
-        result.update(stage="rule", verdict="fix", new_value=new_value(repo, ref, quick), confidence="high",
-                      reason=quick["reason"], checks=["only one candidate exists", "rewritten reference resolves"])
+        sure = quick.get("verdict", "fix") == "fix"
+        result.update(stage="rule", verdict="fix" if sure else "review", new_value=new_value(repo, ref, quick),
+                      confidence="high" if sure else "medium", reason=quick["reason"], caveat=quick.get("caveat", ""),
+                      checks=["only one candidate exists", "rewritten reference resolves"])
         result["candidates"] = [{"new_value": result["new_value"], "likelihood": 100, "why": quick["reason"]}]
         return result
 
