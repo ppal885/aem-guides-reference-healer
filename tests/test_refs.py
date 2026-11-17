@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -318,6 +319,79 @@ class TheLinkTextIsCheckedBeforeARepairIsAccepted(unittest.TestCase):
         self.assertEqual(add("", repo, ref, new, "history"), "")
         said = "The text of the link is not found in the element that has the id now."
         self.assertEqual(add(said, repo, ref, new, "rule"), said)
+
+
+class AnAuthorSaysThisIsNotIt(unittest.TestCase):
+    """A declined target is not proposed again: the finder is told and looks further, once."""
+
+    LIB = ('<topic id="lib"><title>Lib</title><body><note id="first">Back up first.</note>'
+           '<note id="second">Keep a copy.</note></body></topic>')
+    FILES = [{"id": "GUID-lib", "path": "/d/lib.dita", "xml": LIB},
+             {"id": "GUID-t1", "path": "/d/t1.dita", "xml": TOPIC % '<p><xref href="GUID-lib.dita#lib/backup">Back up</xref></p>'}]
+
+    def setUp(self):
+        self.saved = (refheal.agentloop.run, refheal.review_proposal)
+        self.tasks = []
+        refheal.review_proposal = lambda *a, **k: {"agree": True, "reason": "fits"}
+
+    def tearDown(self):
+        refheal.agentloop.run, refheal.review_proposal = self.saved
+
+    def finder_answers(self, element_id):
+        def run(system, task, specs, finish, **kwargs):
+            self.tasks.append(task)
+            next(spec for spec in specs if spec["name"] == "outline")["fn"]({"path": "d/lib.dita"})
+            return ({"decision": "replace", "target_path": "d/lib.dita", "topic_id": "lib", "element_id": element_id, "key": "",
+                     "confidence": "high", "reason": "The note says the same.", "caveat": "", "other_candidates": []},
+                    [{"tool": "outline", "args": {"path": "d/lib.dita"}, "result": "topic, 2 ids"}], None)
+        refheal.agentloop.run = run
+
+    def heal(self, declined=()):
+        repo = refcheck.Repo(files=self.FILES)
+        ref = next(r for r in repo.broken())
+        return refheal.heal_one(repo, ref, "cli", None, False, lambda message: None, declined=declined)
+
+    def test_without_a_no_the_finders_answer_stands(self):
+        self.finder_answers("first")
+        out = self.heal()
+        self.assertEqual((out["verdict"], out["new_value"]), ("fix", "GUID-lib.dita#lib/first"))
+        self.assertNotIn("An author already looked", self.tasks[0])
+
+    def test_the_finder_is_told_what_was_declined_and_its_new_answer_goes_to_the_author(self):
+        self.finder_answers("second")
+        out = self.heal(declined=["GUID-lib.dita#lib/first"])
+        self.assertIn("An author already looked at these targets", self.tasks[0])
+        self.assertIn("GUID-lib.dita#lib/first", self.tasks[0])
+        self.assertEqual((out["verdict"], out["new_value"]), ("review", "GUID-lib.dita#lib/second"))
+        self.assertIn("a new search found", out["caveat"])
+
+    def test_a_finder_that_names_the_declined_target_again_is_not_passed_on(self):
+        self.finder_answers("first")
+        out = self.heal(declined=["GUID-lib.dita#lib/first"])
+        self.assertEqual((out["verdict"], out["new_value"]), ("none", None))
+        self.assertIn("declined", out["reason"])
+
+    def test_a_remembered_finding_is_searched_again_once_for_each_new_no(self):
+        memory = {"rejected": {"href|GUID-lib.dita#lib/backup": ["GUID-lib.dita#lib/first"]}}
+        session = refplan.Session(self.FILES, log=lambda message: None, memory=memory, cache={})
+        repo, group = session.current["repo"], next(iter(session.current["groups"].values()))
+        found = {"new_value": "GUID-lib.dita#lib/first", "verdict": "review", "candidates": [], "reason": "r", "caveat": "",
+                 "reviewer": True}
+        key = session._fingerprint(repo, group)
+        session.cache[key] = {"when": time.time(), "known": found}
+        self.assertFalse(session._from_cache(repo, group))            # declined since: look again
+        session.cache[key]["declined_when_searched"] = ["GUID-lib.dita#lib/first"]
+        self.assertTrue(session._from_cache(repo, group))             # that search knew of the no
+        self.assertIsNone(group["known"]["new_value"])                # and the declined target is not shown
+
+    def test_a_rule_or_history_answer_that_was_declined_is_set_aside_for_the_agents(self):
+        old = '<topic id="lib"><title>Lib</title><body><note id="backup">Back up first.</note></body></topic>'
+        files = [{"id": "GUID-lib", "path": "/d/lib.dita", "xml": self.LIB, "previous": [old]}, self.FILES[1]]
+        proven = refplan.Session(files, log=lambda message: None)
+        self.assertEqual(next(iter(proven.current["groups"].values()))["known"]["how"], "history")
+        declined = refplan.Session(files, log=lambda message: None,
+                                   memory={"rejected": {"href|GUID-lib.dita#lib/backup": ["GUID-lib.dita#lib/first"]}})
+        self.assertIsNone(next(iter(declined.current["groups"].values()))["known"])
 
 
 class WhatThePlanSaysMatchesTheList(unittest.TestCase):
