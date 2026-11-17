@@ -320,6 +320,89 @@ class TheLinkTextIsCheckedBeforeARepairIsAccepted(unittest.TestCase):
         self.assertEqual(add(said, repo, ref, new, "rule"), said)
 
 
+class WhatThePlanSaysMatchesTheList(unittest.TestCase):
+
+    def test_a_repair_that_is_held_back_for_a_look_is_named_in_the_plan(self):
+        old = '<topic id="lib"><title>Lib</title><body><section id="old"><title>Escalation</title><p>Call the desk.</p></section></body></topic>'
+        files = [{"id": "GUID-lib", "path": "/d/lib.dita", "xml": old.replace('id="old"', 'id="new"'), "previous": [old]},
+                 {"id": "GUID-t1", "path": "/d/t1.dita", "xml": TOPIC % '<p><xref href="GUID-lib.dita#lib/old">Wrap-up</xref></p>'}]
+        session = refplan.Session(files, log=lambda message: None)
+        group = session.tool_overview({})["groups"][0]
+        found_by_an_agent(session, group["broken_value"])
+        session.tool_decide({"group_ids": [group["id"]], "decision": "repair_references", "reason": "test"})
+        session.tool_apply_and_recheck({})
+        out = session.result()
+        self.assertEqual(out["repairs"][0]["verdict"], "review")
+        self.assertTrue(any("1 reference that I repaired on the copy is shown to you for a look" in line for line in out["plan"]))
+        self.assertEqual(refplan.Session._held_back_line(0), [])
+
+    def test_a_link_to_dita_content_that_is_marked_as_html_is_explained_not_called_a_difference(self):
+        topic = ('<topic id="t"><title>T</title><body><section id="wrap"><title>Wrap-up</title><p>Done.</p></section>'
+                 '<p><xref format="html" href="#t/wrap">Wrap-up</xref> and <xref href="#t/wrap">again</xref></p></body></topic>')
+        files = [{"id": "GUID-t", "path": "/d/t.dita", "xml": topic}]
+        session = refplan.Session(files, log=lambda message: None,
+                                  reported=[{"file": "/d/t.dita", "attribute": "href", "value": "#t/wrap"}])
+        session.look_back(None)
+        only = session._aem_only_repairs()
+        self.assertEqual([(r["verdict"], r["stage"]) for r in only], [("none", "rule")])
+        self.assertIn('marked format="html"', only[0]["reason"])
+        self.assertIn("the href stays as it is", only[0]["reason"])
+
+
+class HowTheFinderSearched(unittest.TestCase):
+    """What a finder agent did is kept with its finding: for the author to judge it, and to count."""
+
+    def test_tool_calls_are_kept_in_a_form_a_person_can_read(self):
+        steps = [{"tool": "find_files", "args": {"query": "close  period"}, "result": "3 files"},
+                 {"tool": "outline", "args": {"path": "tasks/close_pay_period.dita"}, "result": "task, 3 ids"},
+                 {"tool": "find_elements", "args": {"query": "confirm", "tag": "step"}, "result": "2 elements"}]
+        self.assertEqual(refplan._searched(steps), [
+            {"tool": "find_files", "asked": "close period", "got": "3 files"},
+            {"tool": "outline", "asked": "tasks/close_pay_period.dita", "got": "task, 3 ids"},
+            {"tool": "find_elements", "asked": "confirm step", "got": "2 elements"}])
+        self.assertEqual(len(refplan._searched([{"tool": "outline", "args": {}, "result": ""}] * 20)), refheal.MAX_TOOL_CALLS)
+
+    def test_the_comparison_detail_carries_it_and_a_repair_without_an_agent_has_none(self):
+        case = RepairsWithoutAModel
+        session = refplan.Session([
+            {"id": "GUID-lib", "path": "/d/lib.dita", "xml": case.LIB_NEW, "previous": [case.LIB_OLD]},
+            {"id": "GUID-t1", "path": "/d/t1.dita", "xml": TOPIC % '<note conref="GUID-lib.dita#lib/hot"/>'}],
+            log=lambda message: None)
+        group = next(iter(session.current["groups"].values()))
+        self.assertEqual(session._detail(group)["searched"], [])
+        group["known"]["searched"] = [{"tool": "outline", "asked": "lib.dita", "got": "topic, 2 ids"}]
+        self.assertEqual(session._detail(group)["searched"][0]["tool"], "outline")
+
+
+class ReuseIsNotAppliedOnAFindersWordAlone(unittest.TestCase):
+    """Without an earlier version nothing says what a conref showed before. A finder's "repair" for
+    it goes to the author; a link in the same position may still be repaired."""
+
+    LIB = '<topic id="lib"><title>Lib</title><body><note id="take-backup">Back up first.</note></body></topic>'
+
+    def weigh(self, markup, verdict="fix"):
+        files = [{"id": "GUID-lib", "path": "/d/lib.dita", "xml": self.LIB},
+                 {"id": "GUID-t1", "path": "/d/t1.dita", "xml": TOPIC % markup}]
+        session = refplan.Session(files, log=lambda message: None)
+        group = next(iter(session.current["groups"].values()))
+        known = {"new_value": "GUID-lib.dita#lib/take-backup", "verdict": verdict, "caveat": "", "reason": "Found by its text.",
+                 "reviewer": True}
+        session._weigh(session.current["repo"], group["refs"][0], known)
+        return known["verdict"], known["caveat"]
+
+    def test_a_conref_without_an_earlier_version_goes_to_the_author(self):
+        verdict, caveat = self.weigh('<note conref="GUID-lib.dita#lib/backup"/>')
+        self.assertEqual(verdict, "review")
+        self.assertIn("Read the piece before accepting", caveat)
+
+    def test_a_link_without_an_earlier_version_is_left_as_the_finder_and_reviewer_settled_it(self):
+        self.assertEqual(self.weigh('<p><xref href="GUID-lib.dita#lib/backup">Back up first</xref></p>'), ("fix", ""))
+
+    def test_a_conref_the_finder_was_not_sure_of_keeps_its_own_caveat(self):
+        files_verdict, _ = self.weigh('<note conref="GUID-lib.dita#lib/backup"/>', verdict="review")
+        self.assertEqual(files_verdict, "review")
+
+
 class SearchByMeaning(unittest.TestCase):
     """The optional tool that finds a piece by what it says, not by its words (meaning.py). The
     model is replaced here by one that knows three subjects, so the tests need no download."""
