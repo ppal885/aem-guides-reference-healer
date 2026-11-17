@@ -19,10 +19,31 @@ _open = 0
 _overlapped = False
 
 
+_who = threading.local()
+
+
+class as_agent:
+    """Marks the model calls made inside it as one agent's: finder, reviewer, planner or chooser.
+    Finders run in their own threads, so the mark is per thread; it nests and is put back on the way out."""
+
+    def __init__(self, name):
+        self.name = name
+
+    def __enter__(self):
+        self.before = getattr(_who, "name", None)
+        _who.name = self.name
+        return self
+
+    def __exit__(self, *exc):
+        _who.name = self.before
+        return False
+
+
 def note(ok, input_tokens=0, output_tokens=0, cost_usd=None, error=None, cached=0):
     """One model call. cost_usd is None when the backend does not report money."""
     with _lock:
         _calls.append({"ok": bool(ok), "in": int(input_tokens or 0), "out": int(output_tokens or 0), "cached": int(cached or 0),
+                       "who": getattr(_who, "name", None) or "other",
                        "cost": cost_usd, "error": (" ".join(str(error).split())[:160] if error else None)})
 
 
@@ -59,7 +80,13 @@ def finish(mark):
             _overlapped = False
     failed = [call for call in calls if not call["ok"]]
     costs = [call["cost"] for call in calls if call["cost"] is not None]
-    return {"model_calls": len(calls), "failed_calls": len(failed),
+    by_agent = {}
+    for call in calls:
+        mine = by_agent.setdefault(call.get("who") or "other", {"model_calls": 0, "input_tokens": 0, "output_tokens": 0})
+        mine["model_calls"] += 1
+        mine["input_tokens"] += call["in"]
+        mine["output_tokens"] += call["out"]
+    return {"model_calls": len(calls), "failed_calls": len(failed), "by_agent": by_agent,
             "input_tokens": sum(call["in"] for call in calls),
             "of_which_read_from_cache": sum(call["cached"] for call in calls), "output_tokens": sum(call["out"] for call in calls),
             "cost_usd": round(sum(costs), 4) if costs else None,
@@ -73,8 +100,11 @@ def sentence(totals):
         return "AI use in this check: none; rules, version history and earlier answers settled everything."
     money = ", about $%.2f" % totals["cost_usd"] if totals["cost_usd"] is not None else ""
     shared = " Another check ran at the same time; its calls are counted in." if totals["shared_with_another_check"] else ""
-    return "AI use in this check: %d model call%s, %s tokens in and %s out%s.%s" % (
-        totals["model_calls"], "" if totals["model_calls"] == 1 else "s", format(totals["input_tokens"], ","), format(totals["output_tokens"], ","), money, shared)
+    agents = sorted((totals.get("by_agent") or {}).items(), key=lambda item: -item[1]["input_tokens"])
+    split = " By agent: %s." % "; ".join("%s %d call%s, %s tokens in" % (
+        name, use["model_calls"], "" if use["model_calls"] == 1 else "s", format(use["input_tokens"], ",")) for name, use in agents) if len(agents) > 1 else ""
+    return "AI use in this check: %d model call%s, %s tokens in and %s out%s.%s%s" % (
+        totals["model_calls"], "" if totals["model_calls"] == 1 else "s", format(totals["input_tokens"], ","), format(totals["output_tokens"], ","), money, split, shared)
 
 
 def warning(totals):

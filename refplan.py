@@ -635,6 +635,7 @@ class Session:
                 self.tool_uses.update(step["tool"] for step in searched)
             group["known"] = {"new_value": outcome["new_value"], "verdict": outcome["verdict"], "how": "finder",
                               "candidates": outcome["candidates"], "searched": searched,
+                              "closest": outcome.get("closest"),
                               "reason": outcome["reason"], "caveat": outcome["caveat"],
                               "reviewer": (outcome["review"] or {}).get("agree")}
             self._to_cache(repo, group, failed=bool(outcome.get("failed")))
@@ -729,7 +730,8 @@ class Session:
             return   # a search that broke down is not a finding
         known = group["known"]
         self.cache[self._fingerprint(repo, group)] = {"when": time.time(), "known": {
-            k: known.get(k) for k in ("new_value", "verdict", "candidates", "reason", "caveat", "reviewer", "searched")},
+            k: known.get(k) for k in ("new_value", "verdict", "candidates", "reason", "caveat", "reviewer", "searched",
+                                      "closest")},
             "declined_when_searched": sorted(self._declined(group["refs"][0]))}
 
     def _keep_second_opinion(self, repo, group):
@@ -781,8 +783,9 @@ class Session:
         """{reference number: candidate number}, from one model call."""
         import sidecar
         sidecar.BACKEND = self.backend
-        answer = sidecar.call_model(CHOOSE_SYSTEM, json.dumps(
-            {"old_target_showed": was, "candidates": candidates, "references": references}, ensure_ascii=False, indent=1), self.model)
+        with usage.as_agent("chooser"):
+            answer = sidecar.call_model(CHOOSE_SYSTEM, json.dumps(
+                {"old_target_showed": was, "candidates": candidates, "references": references}, ensure_ascii=False, indent=1), self.model)
         return {int(c["reference"]): int(c["candidate"]) for c in answer.get("choices") or []
                 if str(c.get("reference", "")).isdigit() and str(c.get("candidate", "")).isdigit()}
 
@@ -1226,10 +1229,28 @@ class Session:
                 follow[(ref["attribute"], ref["value"])] = value
         options = [dict(o, reference_edits=[{"attribute": a, "old": old, "new": new} for (a, old), new in follow.items()])
                    if o["kind"] == "restore" else o for o in ways["options"]]
+        options = options + self._similar_option(repo, gone, group)
         kind = wayout.KINDS.get(gone.get("decision") or "")
         chosen = next((o for o in options if o["kind"] == kind), None)
         return {"safety": ways["safety"], "options": options,
                 "recommended": {"kind": kind, "label": chosen["label"], "why": gone["reason"]} if chosen else None}
+
+    def _similar_option(self, repo, gone, group):
+        """A way out for content that is gone: point the references at the piece a finder named as
+        the closest that exists (the same procedure for another line of business, say). Never the
+        planner's recommendation and never applied by "Fix all": only the author can take it."""
+        closest = (gone.get("known") or {}).get("closest") or {}
+        first = group["refs"][0]
+        value = closest.get("new_value")
+        if not value or value in self._declined(first) or repo.check(dict(first, value=value)) is not None:
+            return []
+        edits = [{"attribute": attribute, "old": old, "new": value}
+                 for attribute, old in sorted({(ref["attribute"], ref["value"]) for ref in group["refs"]})]
+        target = refheal.target_label(repo, first, value)
+        return [{"kind": "similar", "target": target, "why": _whole_sentences(closest.get("why") or "", 240),
+                 "now": refheal.text_at(repo, first, value)[:300], "reference_edits": edits,
+                 "label": "Point the %s at %s instead: a similar piece, not the same one" % (
+                     _count(len(group["refs"]), "reference"), target)}]
 
     def _detail(self, group):
         """What an author needs to compare before accepting: what the reference showed before, the
@@ -1302,8 +1323,9 @@ def _ask_planner(session, backend, model, log, progress):
         sum(len(g["refs"]) for g in groups.values()), len(groups)))
     task = ("The map has %d broken references in %d groups. Repair what can be repaired safely and tell the author "
             "what is left. Start with overview." % (sum(len(g["refs"]) for g in groups.values()), len(groups)))
-    answer, steps, problem = agentloop.run(PLANNER_SYSTEM, task, session.tools(), FINISH, backend=backend, model=model,
-                                           max_calls=MAX_PLANNER_CALLS, log=log)
+    with usage.as_agent("planner"):
+        answer, steps, problem = agentloop.run(PLANNER_SYSTEM, task, session.tools(), FINISH, backend=backend, model=model,
+                                               max_calls=MAX_PLANNER_CALLS, log=log)
     if problem:
         log("planner stopped: %s" % problem)
         session.plan.append("The planner stopped early (%s). What it had not decided got the safe default: repair when "

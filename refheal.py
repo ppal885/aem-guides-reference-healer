@@ -34,6 +34,7 @@ import time
 import agentloop
 import meaning
 import refcheck
+import usage
 
 MAX_TOOL_CALLS = 8
 
@@ -206,6 +207,11 @@ FINISH = {
         "reason": {"type": "string", "description": "one or two sentences an author can check"},
         "caveat": {"type": "string", "description": "something the author must check before accepting, or empty"},
         "likelihood": {"type": "string", "description": "how likely your answer is the intended target, 0 to 100"},
+        "closest": {"type": "string",
+                    "description": "only with decision none: one piece that is not the target but covers the same subject "
+                                   "for another audience, product or version, as: target :: one sentence saying what is "
+                                   "the same and what differs. target is path#topic_id/element_id for href and conref, or "
+                                   "key or key/element_id for keyref and conkeyref. Empty when nothing is close"},
         "other_candidates": {"type": "array", "items": {"type": "string"},
                              "description": "up to two other plausible targets, most likely first, each as: "
                                             "target :: likelihood 0-100 :: one sentence why. target is path#topic_id/element_id "
@@ -238,6 +244,7 @@ Rules for the answer:
 - Use confidence "high" only when name and subject both match, or history or a previous version shows the rename. Otherwise "medium" or "low".
 - Leave caveat empty when nothing needs a human decision.
 - "none" is the right answer when the content was removed and nothing replaces it.
+- When you answer "none" and another piece covers the same subject for another audience, product or version (the same procedure for another line of business, the same note for another model), name it in closest. It is not a repair: the author is offered it as one way out next to removing the reference, and decides. Name it only when a tool showed it to you and it is truly about the same thing; leave closest empty otherwise.
 - An author will compare your candidates. Before you finish, look at the other elements of the same type in the target file (or the other keys): if the old content could reasonably be meant by a second one, for example because it was split in two or two elements say similar things, list it in other_candidates, ranked, with honest likelihoods that add up to at most 100. Do not pad the list: a second candidate you would never choose is noise.""" + DATA_RULE
 
 REVIEW_SYSTEM = """You review a proposed repair of a broken reference in DITA documentation.
@@ -555,10 +562,44 @@ def review_proposal(repo, ref, proposal, backend, model):
         before = text_at(repo, ref, ref["value"], previous=True)
         if before:
             asked["broken_target_showed_before"] = before
-        review = sidecar.call_model(REVIEW_SYSTEM, json.dumps(asked, ensure_ascii=False, indent=1), reviewer_model(backend, model))
+        with usage.as_agent("reviewer"):
+            review = sidecar.call_model(REVIEW_SYSTEM, json.dumps(asked, ensure_ascii=False, indent=1), reviewer_model(backend, model))
         return {"agree": bool(review.get("agree")), "reason": str(review.get("reason", ""))[:300]}
     except Exception as exc:
         return {"agree": None, "reason": "review failed: %s" % str(exc)[:120]}
+
+
+def closest_piece(repo, ref, answer, tools, declined=()):
+    """What a finder named as the closest thing to content that is gone: {"new_value", "why"}, or
+    None. It passed the checks of a repair (a tool showed it, the rewritten reference resolves, a
+    conref keeps its element type) and no author declined it. It is offered to the author as a way
+    out; it is never a repair."""
+    text = str(answer.get("closest") or "")
+    target, _, why = text.partition("::")
+    target, why = target.strip(), " ".join(why.split())
+    if not target:
+        return None
+    if ref["attribute"] in ("keyref", "conkeyref"):
+        key, _, element_id = target.partition("/")
+        proposal = {"key": key, "target_path": "", "topic_id": "", "element_id": element_id}
+        if key not in tools.seen_keys:
+            return None
+    else:
+        path, _, fragment = target.partition("#")
+        topic_id, _, element_id = fragment.partition("/")
+        path = repo.alias.get(os.path.basename(path), path.lstrip("/"))
+        proposal = {"key": "", "target_path": path, "topic_id": topic_id, "element_id": element_id}
+        if path not in tools.seen_files:
+            return None
+    try:
+        if not resolves(repo, ref, proposal):
+            return None
+        value = new_value(repo, ref, proposal)
+    except Exception:  # a target written in a form that cannot be read is no candidate
+        return None
+    if value in set(declined or ()) or value == ref["value"]:
+        return None
+    return {"new_value": value, "why": why[:300]}
 
 
 DECLINED_CAVEAT = "An author said another target was not what this reference meant; this is what a new search found."
@@ -594,8 +635,9 @@ def heal_one(repo, ref, backend, model, with_history, log, declined=()):
         "An author already looked at these targets and said they are not what this reference meant: %s. "
         "Do not propose any of them. Find another target, or conclude that nothing replaces the old one." % "; ".join(
             "%s [%s]" % (target_label(repo, ref, value), value) for value in sorted(declined))] if declined else []))
-    answer, steps, problem = agentloop.run(FINDER_SYSTEM, task, tool_specs(tools, with_history), FINISH,
-                                           backend=backend, model=model, max_calls=MAX_TOOL_CALLS, log=log)
+    with usage.as_agent("finder"):
+        answer, steps, problem = agentloop.run(FINDER_SYSTEM, task, tool_specs(tools, with_history), FINISH,
+                                               backend=backend, model=model, max_calls=MAX_TOOL_CALLS, log=log)
     result.update(stage="finder", steps=steps)
     if problem:
         result.update(reason=problem, failed=True)   # the search broke down; this is not a finding
@@ -603,6 +645,7 @@ def heal_one(repo, ref, backend, model, with_history, log, declined=()):
     result.update(confidence=answer["confidence"] if answer["confidence"] in ("high", "medium", "low") else "low",
                   reason=answer["reason"][:500], caveat=answer["caveat"][:300])
     if answer["decision"] != "replace":
+        result["closest"] = closest_piece(repo, ref, answer, tools, declined)
         return result
 
     # Stage: checks in code. The finder's answer is a claim until these pass.

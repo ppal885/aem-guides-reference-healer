@@ -394,6 +394,94 @@ class AnAuthorSaysThisIsNotIt(unittest.TestCase):
         self.assertIsNone(next(iter(declined.current["groups"].values()))["known"])
 
 
+class ModelUseIsCountedPerAgent(unittest.TestCase):
+
+    def test_calls_are_split_by_the_agent_that_made_them_and_the_plan_says_so(self):
+        import usage
+        mark = usage.start()
+        with usage.as_agent("planner"):
+            usage.note(True, 1000, 50)
+            with usage.as_agent("finder"):
+                usage.note(True, 7000, 300)
+                with usage.as_agent("reviewer"):
+                    usage.note(True, 900, 40)
+                usage.note(True, 6000, 200)
+            usage.note(True, 2000, 60)
+        usage.note(True, 10, 1)
+        totals = usage.finish(mark)
+        self.assertEqual({name: (use["model_calls"], use["input_tokens"]) for name, use in totals["by_agent"].items()},
+                         {"planner": (2, 3000), "finder": (2, 13000), "reviewer": (1, 900), "other": (1, 10)})
+        line = usage.sentence(totals)
+        self.assertIn("By agent: finder 2 calls, 13,000 tokens in; planner 2 calls, 3,000 tokens in; reviewer 1 call, 900 tokens in", line)
+
+    def test_one_agent_alone_is_not_split(self):
+        import usage
+        mark = usage.start()
+        with usage.as_agent("planner"):
+            usage.note(True, 844, 129)
+        self.assertNotIn("By agent", usage.sentence(usage.finish(mark)))
+
+
+class TheClosestPieceForContentThatIsGone(unittest.TestCase):
+    """A finder may name the closest thing that exists (the same procedure for another line of
+    business). It is a way out the author can take, never a repair."""
+
+    FILES = [
+        {"id": "GUID-cb", "path": "/d/credit_cb.dita", "xml": '<topic id="credit_cb"><title>Line item credit (CB)</title>'
+                                                              '<body><p id="p1">Credit a line item.</p></body></topic>'},
+        {"id": "GUID-t1", "path": "/d/t1.dita", "xml": TOPIC % '<p><xref href="GUID-gone.dita">Line item credit (DCS)</xref></p>'},
+        {"id": "GUID-t2", "path": "/d/t2.dita", "xml": TOPIC % '<p><xref href="GUID-gone.dita">the DCS procedure</xref></p>'}]
+
+    def setUp(self):
+        self.saved = refheal.agentloop.run
+
+    def tearDown(self):
+        refheal.agentloop.run = self.saved
+
+    def finder_says_none(self, closest, look=True):
+        def run(system, task, specs, finish, **kwargs):
+            if look:
+                next(spec for spec in specs if spec["name"] == "outline")["fn"]({"path": "d/credit_cb.dita"})
+            return ({"decision": "none", "target_path": "", "topic_id": "", "element_id": "", "key": "", "confidence": "high",
+                     "reason": "The DCS procedure was removed.", "caveat": "", "closest": closest}, [], None)
+        refheal.agentloop.run = run
+
+    def heal(self, declined=()):
+        repo = refcheck.Repo(files=self.FILES)
+        return repo, refheal.heal_one(repo, next(iter(repo.broken())), "cli", None, False, lambda message: None, declined=declined)
+
+    def test_it_is_kept_beside_the_answer_none_and_is_not_a_repair(self):
+        self.finder_says_none("d/credit_cb.dita#credit_cb :: The same procedure for the CB line of business.")
+        _, out = self.heal()
+        self.assertEqual((out["verdict"], out["new_value"]), ("none", None))
+        self.assertEqual(out["closest"], {"new_value": "GUID-cb.dita#credit_cb", "why": "The same procedure for the CB line of business."})
+
+    def test_a_piece_no_tool_showed_one_that_does_not_exist_and_a_declined_one_are_dropped(self):
+        self.finder_says_none("d/credit_cb.dita#credit_cb :: Same thing.", look=False)
+        self.assertIsNone(self.heal()[1]["closest"])
+        self.finder_says_none("d/credit_cb.dita#no_such_topic :: Same thing.")
+        self.assertIsNone(self.heal()[1]["closest"])
+        self.finder_says_none("d/credit_cb.dita#credit_cb :: Same thing.")
+        self.assertIsNone(self.heal(declined=["GUID-cb.dita#credit_cb"])[1]["closest"])
+        self.finder_says_none("")
+        self.assertIsNone(self.heal()[1]["closest"])
+
+    def test_the_author_is_offered_it_as_a_way_out_for_every_reference_and_the_planner_never_suggests_it(self):
+        session = refplan.Session(self.FILES, log=lambda message: None)
+        repo, group = session.current["repo"], next(iter(session.current["groups"].values()))
+        group["known"] = {"new_value": None, "verdict": "none", "how": "finder", "reason": "Removed.", "caveat": "",
+                          "closest": {"new_value": "GUID-cb.dita#credit_cb", "why": "The same procedure for the CB line of business."}}
+        ways = session._ways_out_detail(group, group, [])
+        self.assertEqual([option["kind"] for option in ways["options"]], ["similar"])
+        option = ways["options"][0]
+        self.assertIn("a similar piece, not the same one", option["label"])
+        self.assertIn("Line item credit (CB)", option["target"])
+        self.assertEqual(option["reference_edits"], [{"attribute": "href", "old": "GUID-gone.dita", "new": "GUID-cb.dita#credit_cb"}])
+        self.assertIsNone(ways["recommended"])
+        group["known"]["closest"] = None
+        self.assertEqual(session._ways_out_detail(group, group, [])["options"], [])
+
+
 class WhatThePlanSaysMatchesTheList(unittest.TestCase):
 
     def test_a_repair_that_is_held_back_for_a_look_is_named_in_the_plan(self):
