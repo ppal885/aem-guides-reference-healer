@@ -12,6 +12,7 @@ import refheal  # noqa: E402
 import audit  # noqa: E402
 import wayouteval  # noqa: E402
 import refplan  # noqa: E402
+import meaning  # noqa: E402
 
 TOPIC = '<topic id="t"><title>Using it</title><body>%s</body></topic>'
 
@@ -317,6 +318,64 @@ class TheLinkTextIsCheckedBeforeARepairIsAccepted(unittest.TestCase):
         self.assertEqual(add("", repo, ref, new, "history"), "")
         said = "The text of the link is not found in the element that has the id now."
         self.assertEqual(add(said, repo, ref, new, "rule"), said)
+
+
+class SearchByMeaning(unittest.TestCase):
+    """The optional tool that finds a piece by what it says, not by its words (meaning.py). The
+    model is replaced here by one that knows three subjects, so the tests need no download."""
+
+    class Model:
+        SUBJECTS = [("sign", "log", "logon"), ("fee", "fees", "cost", "pricing", "price"), ("remove", "uninstall")]
+
+        def encode(self, texts):
+            import numpy
+            rows = []
+            for text in texts:
+                words = set(refheal.tokens(text))
+                rows.append([float(len(words & set(subject))) for subject in self.SUBJECTS] + [0.01])
+            return numpy.array(rows)
+
+    FILES = [
+        {"id": "G1", "path": "/d/entry.dita", "xml": '<topic id="entry"><title>Getting in</title><body>'
+         '<section id="authenticate"><title>Log on to the console</title><p>Enter your address.</p></section>'
+         '<note id="remove-note">Remove the client first.</note></body></topic>'},
+        {"id": "G2", "path": "/d/fees.dita", "xml": '<topic id="fees"><title>Plans and fees</title><body><p id="p1">What it will cost.</p></body></topic>'},
+    ]
+
+    def setUp(self):
+        try:
+            import numpy  # noqa: F401
+        except ImportError:
+            self.skipTest("numpy is not installed")
+        self.saved = (meaning.ENABLED, meaning._model, meaning._why_not)
+        meaning.ENABLED, meaning._model, meaning._why_not = True, self.Model(), None
+        self.repo = refcheck.Repo(files=self.FILES)
+
+    def tearDown(self):
+        meaning.ENABLED, meaning._model, meaning._why_not = self.saved
+
+    def test_it_finds_a_piece_that_shares_no_word_with_the_query(self):
+        first = meaning.search(self.repo, "sign in")[0]
+        self.assertEqual((first["kind"], first["id"]), ("element", "authenticate"))
+        self.assertEqual(meaning.search(self.repo, "pricing")[0]["path"], "d/fees.dita")
+
+    def test_a_tag_keeps_it_to_elements_of_that_type(self):
+        found = meaning.search(self.repo, "uninstall", tag="note")
+        self.assertEqual([(p["tag"], p["id"]) for p in found], [("note", "remove-note")])
+
+    def test_the_finder_gets_the_tool_only_when_it_is_on_and_the_model_is_there(self):
+        names = lambda: [spec["name"] for spec in refheal.tool_specs(refheal.Tools(self.repo), False)]
+        self.assertIn("find_by_meaning", names())
+        meaning.ENABLED = False
+        self.assertNotIn("find_by_meaning", names())
+        meaning.ENABLED, meaning._model, meaning._why_not = True, None, "not installed"
+        self.assertNotIn("find_by_meaning", names())
+
+    def test_the_tool_says_that_closeness_is_not_proof_and_notes_what_was_looked_at(self):
+        tools = refheal.Tools(self.repo)
+        out = tools.find_by_meaning({"query": "sign in", "tag": ""})
+        self.assertIn("not proof", out["note"])
+        self.assertIn("d/entry.dita", tools.seen_files)
 
 
 if __name__ == "__main__":

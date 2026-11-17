@@ -32,6 +32,7 @@ import subprocess
 import time
 
 import agentloop
+import meaning
 import refcheck
 
 MAX_TOOL_CALLS = 8
@@ -101,6 +102,15 @@ class Tools:
         self.seen_files.update(t[1] for t in top)
         return {"summary": "%d elements" % len(top),
                 "elements": [{"path": p, "topic_id": t, "id": e, "tag": v["tag"], "text": v["text"]} for _, p, t, e, v in top]}
+
+    def find_by_meaning(self, args):
+        """Pieces that say the same as the query in other words (meaning.py). Only offered when the
+        embedding model is there; what it returns is a candidate to read, not a proof."""
+        found = meaning.search(self.repo, args["query"], (args.get("tag") or "").strip())
+        self.seen_files.update(piece["path"] for piece in found)
+        return {"summary": "%d pieces by meaning" % len(found),
+                "note": "closest in meaning first; closeness is not proof, read a candidate before you propose it",
+                "pieces": found}
 
     def find_keys(self, args):
         query = tokens(args["query"])
@@ -172,6 +182,9 @@ def tool_specs(tools, with_history):
         {"name": "find_keys", "description": "Search the keys defined in the maps, by name, target and text.",
          "properties": {"query": string}, "required": ["query"], "fn": tools.find_keys},
     ]
+    if meaning.available():
+        specs.append({"name": "find_by_meaning", "description": "Search by meaning: titles of files and text of elements that say the same as your query in other words (\"sign in\" finds \"Log on to the console\"). Describe what the reference was about, in a few words or a sentence. Use it when the word searches find nothing that fits, or when the file the reference named is gone. Give tag to restrict to one element type; empty string for any. Closeness in meaning is not proof: read the candidate (outline) before you propose it.",
+                      "properties": {"query": string, "tag": string}, "required": ["query", "tag"], "fn": tools.find_by_meaning})
     if tools.repo.previous:
         specs.append({"name": "previous_version", "description": "What an element id or a key name was in the earlier versions of a file: its element type and text, or the key's target. Use it on the file the broken reference points at (for a key, on the map) to learn what the author was pointing to before it broke.",
                       "properties": {"path": string, "id_or_key": string}, "required": ["path", "id_or_key"], "fn": tools.previous_version})
