@@ -267,6 +267,9 @@ A wrong repair is worse than none: a conref to the wrong element silently publis
 # still checks every answer. REFHEAL_SECOND_RUN=1 turns it on again.
 SECOND_RUN = os.environ.get("REFHEAL_SECOND_RUN", "0") == "1"
 
+# References that pull content in, where a wrong target changes what is published without a broken link to show for it.
+REUSE_ATTRS = ("conref", "conrefend", "conkeyref")
+
 # The model of the finder agents alone; the planner and the reviewer keep theirs. Empty: the
 # finders run on the model of the session. Set to measure a cheaper finder (planeval.py --finder-model).
 FINDER_MODEL = os.environ.get("REFHEAL_FINDER_MODEL") or None
@@ -331,6 +334,17 @@ def _whole_sentences(text, limit):
     return cut[:end + 1] if end > limit // 3 else cut.rstrip() + "…"
 
 
+def _searched(steps):
+    """A finder's tool calls in a form an author can read and a check can count:
+    [{"tool", "asked", "got"}], at most the eight it may make."""
+    out = []
+    for step in steps[:refheal.MAX_TOOL_CALLS]:
+        args = step.get("args") or {}
+        asked = " ".join(str(args[key]) for key in ("query", "path", "id_or_key", "tag") if args.get(key))
+        out.append({"tool": step.get("tool", ""), "asked": " ".join(asked.split())[:80], "got": str(step.get("result", ""))[:80]})
+    return out
+
+
 def _key_definitions(map_xml):
     """The key definitions of a map as sorted [keys, file] pairs; the element inside the file is left out."""
     found = []
@@ -355,6 +369,8 @@ class Session:
         self.max_groups = MAX_GROUPS if max_groups is None else max_groups
         self.choose = choose or self._ask_which_candidate
         self.reused = 0                         # findings taken from the cache in this check
+        self.tool_uses = collections.Counter()  # which tools the finder agents used in this check
+        self.count_lock = threading.Lock()
         self.decided_keys = set()               # what the decisions of this check rest on (see _decision_key)
         self.replaying = False                  # True while earlier decisions are used again
         self.memory = _memory(memory or {})
@@ -488,6 +504,13 @@ class Session:
                 known.update(verdict="review", caveat=known["caveat"] or
                              "The text is not what this reference showed before; read both before accepting.")
             return
+        if known["verdict"] == "fix" and ref["attribute"] in REUSE_ATTRS:
+            # Reused content has no text of its own to hold against the target, and here no earlier
+            # version says what it showed. A wrong piece would go into the published output without
+            # a sign, so a finder's word alone does not apply it: the author reads the piece first.
+            known.update(verdict="review", caveat=known["caveat"] or
+                         "No earlier version shows what this reference reused. Read the piece before accepting.")
+            return
         if known["verdict"] == "fix" and SECOND_RUN:
             if "second_run_agrees" not in known:
                 second = refheal.heal_one(repo, ref, self.backend, FINDER_MODEL or self.model, False, self.log)
@@ -604,8 +627,11 @@ class Session:
             self.step(group["id"], "active", "Finder agent", "%s: searching files, ids, keys and the previous version"
                       % self._short(group))
             outcome = refheal.heal_one(repo, group["refs"][0], self.backend, FINDER_MODEL or self.model, False, self.log)
+            searched = _searched(outcome.get("steps") or [])
+            with self.count_lock:
+                self.tool_uses.update(step["tool"] for step in searched)
             group["known"] = {"new_value": outcome["new_value"], "verdict": outcome["verdict"], "how": "finder",
-                              "candidates": outcome["candidates"],
+                              "candidates": outcome["candidates"], "searched": searched,
                               "reason": outcome["reason"], "caveat": outcome["caveat"],
                               "reviewer": (outcome["review"] or {}).get("agree")}
             self._to_cache(repo, group, failed=bool(outcome.get("failed")))
@@ -622,6 +648,9 @@ class Session:
         if remembered:
             self.plan.append("%s: nothing changed since an earlier check, so I used what the agents found then." % (
                 _count(len(remembered), "broken target")))
+        if self.tool_uses:
+            self.plan.append("How the finder agents searched in this check: %s." % ", ".join(
+                "%s %d" % (tool, count) for tool, count in self.tool_uses.most_common()))
         if waiting:
             self.plan.append("%s with fewer references wait for the next check (%s): I look at %d per check, the ones "
                              "that break the most references first." % (
@@ -694,7 +723,7 @@ class Session:
             return   # a search that broke down is not a finding
         known = group["known"]
         self.cache[self._fingerprint(repo, group)] = {"when": time.time(), "known": {
-            k: known.get(k) for k in ("new_value", "verdict", "candidates", "reason", "caveat", "reviewer")}}
+            k: known.get(k) for k in ("new_value", "verdict", "candidates", "reason", "caveat", "reviewer", "searched")}}
 
     def _keep_second_opinion(self, repo, group):
         """A second finder run is part of the finding: remembered with it, not paid for again."""
@@ -1023,9 +1052,10 @@ class Session:
         return lines, failed, True
 
     def _aem_only_repairs(self):
-        repo, lines = self.rounds[0]["repo"], {}
+        repo, lines, formats = self.rounds[0]["repo"], {}, {}
         for ref in repo.refs:
             lines.setdefault((ref["file"], ref["attribute"], ref["value"]), ref["line"])
+            formats.setdefault((ref["file"], ref["attribute"], ref["value"]), ref.get("format") or "")
         waiting = "Repaired by the last Fix all. AEM has not indexed the change yet; this leaves the list by itself."
         differs = ("AEM reports this reference as broken, but its target exists in the files of this map. AEM's check "
                    "and the planner's differ here.")
@@ -1034,14 +1064,33 @@ class Session:
         by_key = ("Nothing to edit here: the key is defined in the map and its target exists. AEM still lists this "
                   "reference because it worked out this topic's keys before the map was right; it does so again when "
                   "the topic is saved.")
+
+        def wrong_format(key):
+            """A link to DITA content that says it is something else. Seen on content that was not
+            ours (17 Nov 2026): a link inside one topic marked format="html". The address is right;
+            AEM does not follow it because of the format."""
+            file, attribute, value = key
+            marked = formats.get(key, "").lower()
+            if attribute != "href" or marked in ("", "dita", "ditamap"):
+                return ""
+            path = value.partition("#")[0]
+            if path and not refcheck.is_dita_path(path):
+                return ""
+            return ("The address is right: its target exists. The link is marked format=\"%s\", and AEM does not follow a "
+                    "link to DITA content that is marked as something else. Set format to \"dita\" or remove the "
+                    "attribute; the href stays as it is." % formats[key])
+
+        def settled_by_rule(key):
+            return (key[1] in ("keyref", "conkeyref") or bool(wrong_format(key))) and key not in self.waiting
+
         return [{"file": "/" + file, "line": lines.get((file, attribute, value), 0), "attribute": attribute, "old": value,
                  "new": None, "target": None, "caveat": "", "used_in": ["/" + file],
-                 # A key reference that resolves is settled by a rule: it says what is the case, no search was made.
-                 "stage": "rule" if attribute in ("keyref", "conkeyref") and (file, attribute, value) not in self.waiting
-                 else "planner",
+                 # Settled by a rule: it says what is the case, no search was made.
+                 "stage": "rule" if settled_by_rule((file, attribute, value)) else "planner",
                  "verdict": "pending" if (file, attribute, value) in self.waiting else "none",
                  "reason": waiting if (file, attribute, value) in self.waiting
-                 else by_key if attribute in ("keyref", "conkeyref") else differs}
+                 else by_key if attribute in ("keyref", "conkeyref")
+                 else wrong_format((file, attribute, value)) or differs}
                 for file, attribute, value in self.aem_only]
 
     # ---- the result ------------------------------------------------------------------------
@@ -1065,6 +1114,16 @@ class Session:
             return caveat
         return " ".join(filter(None, [caveat, refheal.link_text_caveat(repo, ref, value)]))
 
+    @staticmethod
+    def _held_back_line(held):
+        """The plan says "decided to repair" and "works on the copy" of every repair it tried. Some of
+        those are not applied by "Fix all" after all; without this line the plan and the list disagree."""
+        if not held:
+            return []
+        return ["%s that I repaired on the copy %s shown to you for a look instead of being applied by \"Fix all\": "
+                "the target's id is on more than one element, or the text of the link is not found in the target. "
+                "They are listed as \"to review\"." % (_count(held, "reference").capitalize(), "is" if held == 1 else "are")]
+
     def result(self):
         first, final = self.rounds[0], self.rounds[-1]
         final_broken = {(r["file"], r["attribute"], r["value"]) for r in final["repo"].broken()}
@@ -1073,7 +1132,7 @@ class Session:
         for edit in self.source_edits:
             for group_id in edit["groups"]:
                 source_label[group_id] = edit["label"]
-        repairs, details = [], {}
+        repairs, details, held = [], {}, 0
         for group in first["groups"].values():
             used_in = sorted({"/" + r["file"] for r in group["refs"]})
             for ref in group["refs"]:
@@ -1100,6 +1159,7 @@ class Session:
                         # with 21 others and nobody read its warning).
                         entry["verdict"] = "review"
                     entry["caveat"] = checked
+                    held += entry["verdict"] == "review"
                 elif not broken_now:
                     entry.update(verdict="covered", stage="planner",
                                  reason="Repaired by one edit at the source. " + source_label.get(group["id"], ""))
@@ -1132,7 +1192,8 @@ class Session:
                           "groups": len(first["groups"]), "rounds": len(self.edits),
                           "reported_broken_only_by_the_repository": len(self.aem_only),
                           "reviewer_model": refheal.reviewer_model(self.backend, self.model)},
-                "repairs": repairs + self._aem_only_repairs(), "source_fixes": self._source_fixes(), "plan": self.plan + ([self.summary] if self.summary else [])}
+                "repairs": repairs + self._aem_only_repairs(), "source_fixes": self._source_fixes(),
+                "plan": self.plan + self._held_back_line(held) + ([self.summary] if self.summary else [])}
 
     def _ways_out_detail(self, gone, group, chains):
         """The ways out for content that is gone, for the author to choose from: every possible one,
@@ -1171,6 +1232,9 @@ class Session:
                 # reviewer saw it (a rule, an earlier answer of an author). For the evaluation of
                 # what an author accepts, and for a panel that wants to show it.
                 "reviewer": known.get("reviewer"),
+                # How a finder agent got there: the tools it used, what it asked and what came back.
+                # Empty for a repair that a rule, the version history or an author settled.
+                "searched": known.get("searched") or [],
                 # For a key that was never defined: what is the case and what to add. The box then
                 # says this instead of "before it broke" and "no candidate", which are not true of it.
                 "missing_definition": known["reason"] if known.get("never_defined") else "",
@@ -1370,6 +1434,7 @@ def _plan_files(payload, backend="cli", model=None, log=print, progress=None, me
     if stored and session.cache is not None:
         merge_cache(CACHE_PATH, started_with, session.cache)
     out = session.result()
+    out["stats"].update(finder_tool_uses=dict(session.tool_uses))
     out["stats"].update(planner_steps=len(steps), planner_decisions_reused=replayed, seconds=round(time.time() - started),
                         findings_reused_from_an_earlier_check=session.reused)
     return out

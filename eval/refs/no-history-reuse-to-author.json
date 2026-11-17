@@ -1,0 +1,221 @@
+{
+ "sample": "samples/large-demo",
+ "mode": "planner",
+ "backend": "cli",
+ "runs": [
+  {
+   "run": 1,
+   "seconds": 224,
+   "references": 1251,
+   "scores": {
+    "applied right": 157,
+    "asked, wrong": 102,
+    "asked, right": 823,
+    "missed": 60,
+    "none, right": 109
+   },
+   "source_edits": 0,
+   "model_calls": 182,
+   "input_tokens": 594152,
+   "output_tokens": 36357,
+   "failed_calls": 0,
+   "cost_usd": 3.84,
+   "planner_steps": 9,
+   "plan": [
+    "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
+    "8 broken targets could mean two different pieces. I read the sentence around each reference and chose per reference (account-limits: 63 and 4; console-name: 43 and 17; storage-limits: 48 and 6; cli-name: 26 and 16; data-loss: 25 and 3; data-loss: 21 and 5; billing-impact: 20 and 5; billing-impact: 20 and 4).",
+    "Sent 34 to finder agents, each answer checked by a reviewer agent: 30 found under a new name or place, 4 removed for good.",
+    "Decided to repair 157 references. Why: The section kept its subject and title under a new id, for example 'Quota exceeded' and 'Permission denied' are still in the same file.",
+    "Decided to ask you about 943 references (28 questions). Why: A likely replacement exists but nothing confirms it, and the wording may not fit, for example a deletion warning in an export topic.",
+    "Decided to ask you about 60 references (1 question). Why: The Free plan name is gone; it may have been renamed to the Starter plan, or dropped so the sentence needs rewriting.",
+    "Decided to leave 63 references broken. Why: The shared notice about the legacy user interface is gone with no replacement; decide whether these topics still need to mention the old interface.",
+    "Decided to ask you about 28 references (1 question). Why: The warning that this operation takes time is gone; the closest note says the service is unavailable, which is a different message.",
+    "Tried the plan on a copy and checked again: 157 references work now, 1,094 left for you.",
+    "Next: Review the proposed replacements one by one, since none was confirmed by version history, and accept only those whose wording fits the topic.",
+    "AI use in this check: 182 model calls, 594,152 tokens in and 36,357 out, about $3.84."
+   ],
+   "wrong": [
+    {
+     "attribute": "keyref",
+     "old": "console-name",
+     "proposed": "product-name",
+     "verdict": "review, reviewer agreed",
+     "references": 17
+    },
+    {
+     "attribute": "keyref",
+     "old": "free-plan",
+     "proposed": "",
+     "verdict": "none, no reviewer",
+     "references": 60
+    },
+    {
+     "attribute": "conkeyref",
+     "old": "warnings/data-loss",
+     "proposed": "shared-warnings/irreversible-key",
+     "verdict": "review, reviewer disagreed",
+     "references": 5
+    },
+    {
+     "attribute": "href",
+     "old": "../reference/limits.dita#limits/account-limits",
+     "proposed": "GUID-eval-0205.dita#limits/rate-limits",
+     "verdict": "review, reviewer disagreed",
+     "references": 4
+    },
+    {
+     "attribute": "keyref",
+     "old": "cli-name",
+     "proposed": "web-console-name",
+     "verdict": "review, reviewer agreed",
+     "references": 16
+    },
+    {
+     "attribute": "href",
+     "old": "../reference/limits.dita#limits/storage-limits",
+     "proposed": "GUID-eval-0205.dita#limits",
+     "verdict": "review, reviewer disagreed",
+     "references": 48
+    },
+    {
+     "attribute": "conref",
+     "old": "../shared/warnings.dita#warnings/data-loss",
+     "proposed": "GUID-eval-0043.dita#warnings/irreversible-key",
+     "verdict": "review, reviewer disagreed",
+     "references": 3
+    },
+    {
+     "attribute": "conkeyref",
+     "old": "warnings/billing-impact",
+     "proposed": "shared-warnings/plan-and-region-limits",
+     "verdict": "review, reviewer disagreed",
+     "references": 5
+    },
+    {
+     "attribute": "conref",
+     "old": "../shared/warnings.dita#warnings/billing-impact",
+     "proposed": "GUID-eval-0043.dita#warnings/plan-and-region-limits",
+     "verdict": "review, reviewer disagreed",
+     "references": 4
+    }
+   ]
+  },
+  {
+   "run": 2,
+   "seconds": 235,
+   "references": 1251,
+   "scores": {
+    "applied right": 217,
+    "asked, right": 752,
+    "asked, wrong": 173,
+    "none, right": 109
+   },
+   "source_edits": 0,
+   "model_calls": 189,
+   "input_tokens": 650105,
+   "output_tokens": 39519,
+   "failed_calls": 0,
+   "cost_usd": 3.49,
+   "planner_steps": 10,
+   "plan": [
+    "Found 1,251 broken references in 227 files. They all come from 34 ids and keys that were renamed, moved or removed.",
+    "8 broken targets could mean two different pieces. I read the sentence around each reference and chose per reference (account-limits: 53 and 10 and 4; storage-limits: 48 and 6; cli-name: 28 and 14; retention-days: 24 and 12; data-loss: 25 and 3; data-loss: 20 and 6; billing-impact: 20 and 5; billing-impact: 20 and 4).",
+    "Sent 34 to finder agents, each answer checked by a reviewer agent: 31 found under a new name or place, 3 removed for good.",
+    "Decided to repair 217 references. Why: The target was only renamed, for example the 'Permission denied' section now has a new id with the same title and content.",
+    "Decided to ask you about 943 references (28 questions). Why: A likely replacement exists but nothing confirms it, for example 'Starter plan' may not be the old free plan; please check the meaning.",
+    "Decided to leave 91 references broken. Why: The shared note is gone with nothing replacing it, such as the old-interface note or the slow-operation warning; decide whether topics still need it.",
+    "Tried the plan on a copy and checked again: 217 references work now, 1,034 left for you.",
+    "Next: Review the proposed replacements left for you, accepting or correcting each, and decide whether the removed old-interface note and slow-operation warning should come back or be dropped from the topics.",
+    "AI use in this check: 189 model calls, 650,105 tokens in and 39,519 out, about $3.49."
+   ],
+   "wrong": [
+    {
+     "attribute": "conkeyref",
+     "old": "warnings/data-loss",
+     "proposed": "shared-warnings/irreversible-key",
+     "verdict": "review, reviewer disagreed",
+     "references": 6
+    },
+    {
+     "attribute": "href",
+     "old": "../reference/limits.dita#limits/account-limits",
+     "proposed": "GUID-eval-0205.dita#limits",
+     "verdict": "review, reviewer disagreed",
+     "references": 53
+    },
+    {
+     "attribute": "href",
+     "old": "../reference/limits.dita#limits/account-limits",
+     "proposed": "GUID-eval-0205.dita#limits/rate-limits",
+     "verdict": "review, reviewer disagreed",
+     "references": 4
+    },
+    {
+     "attribute": "keyref",
+     "old": "cli-name",
+     "proposed": "product-name",
+     "verdict": "review, reviewer agreed",
+     "references": 14
+    },
+    {
+     "attribute": "keyref",
+     "old": "retention-days",
+     "proposed": "identity-product",
+     "verdict": "review, reviewer disagreed",
+     "references": 12
+    },
+    {
+     "attribute": "keyref",
+     "old": "retention-days",
+     "proposed": "product-name",
+     "verdict": "review, reviewer disagreed",
+     "references": 24
+    },
+    {
+     "attribute": "href",
+     "old": "../reference/limits.dita#limits/storage-limits",
+     "proposed": "GUID-eval-0205.dita#limits",
+     "verdict": "review, reviewer disagreed",
+     "references": 48
+    },
+    {
+     "attribute": "conref",
+     "old": "../shared/warnings.dita#warnings/data-loss",
+     "proposed": "GUID-eval-0043.dita#warnings/irreversible-key",
+     "verdict": "review, reviewer disagreed",
+     "references": 3
+    },
+    {
+     "attribute": "conkeyref",
+     "old": "warnings/billing-impact",
+     "proposed": "shared-warnings/plan-and-region-limits",
+     "verdict": "review, reviewer disagreed",
+     "references": 5
+    },
+    {
+     "attribute": "conref",
+     "old": "../shared/warnings.dita#warnings/billing-impact",
+     "proposed": "GUID-eval-0043.dita#warnings/plan-and-region-limits",
+     "verdict": "review, reviewer disagreed",
+     "references": 4
+    }
+   ]
+  }
+ ],
+ "previous_versions": false,
+ "second_run": false,
+ "model": "opus",
+ "finder_model": "as the session",
+ "targets": 34,
+ "targets_decided_the_same_in_every_run": 32,
+ "targets_that_differed": {
+  "keyref console-name": [
+   "review",
+   "fix"
+  ],
+  "keyref free-plan": [
+   "none",
+   "review"
+  ]
+ }
+}

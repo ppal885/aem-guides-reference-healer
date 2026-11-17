@@ -135,6 +135,11 @@ def serve(port, model=None):
                 if BACKEND == "sdk":
                     import claudeapi
                     state["last_stream"] = dict(claudeapi.LAST_STREAM)
+                # Whether the finder has the search by meaning: "on", "off" (not asked for), or
+                # why it was asked for and could not be loaded.
+                import meaning
+                state["search_by_meaning"] = ("off" if not meaning.ENABLED else
+                                              "on" if meaning.available() else "not loaded: %s" % meaning.why_not())
                 self.send_json(200, state)
             else:
                 self.send_json(404, {"error": "not found"})
