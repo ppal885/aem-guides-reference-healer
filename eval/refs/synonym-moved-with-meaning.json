@@ -1,0 +1,241 @@
+{
+ "cases": 12,
+ "set": "moved",
+ "search_by_meaning": true,
+ "backend": "cli",
+ "model": "opus",
+ "runs": [
+  {
+   "run": 1,
+   "seconds": 111,
+   "references": 12,
+   "scores": {
+    "right": 12
+   },
+   "applied_without_asking_and_wrong": 0,
+   "verdicts": {
+    "review": 10,
+    "none": 2
+   },
+   "model_calls": 73,
+   "failed_calls": 0,
+   "input_tokens": 225465,
+   "output_tokens": 9128,
+   "cost_usd": 1.21,
+   "rows": [
+    {
+     "link": "Sign in",
+     "old": "login.dita#login/sign-in",
+     "proposed": "GUID-mov-01.dita#entry/authenticate",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Reset a forgotten password",
+     "old": "login.dita#login/reset-password",
+     "proposed": "GUID-mov-02.dita#lockouts/recover-entry",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Two-factor authentication",
+     "old": "security.dita#security/two-factor",
+     "proposed": "GUID-mov-03.dita#identity_checks/second-step",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Delete your account",
+     "old": "account.dita#account/delete-account",
+     "proposed": "GUID-mov-04.dita#leaving/close-membership",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Billing address",
+     "old": "billing.dita#billing/billing-address",
+     "proposed": "GUID-mov-05.dita#paperwork/invoice-recipient",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Contact support",
+     "old": "support.dita#support/contact-support",
+     "proposed": "GUID-mov-06.dita#people/reach-our-team",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "System requirements",
+     "old": "install.dita#install/system-requirements",
+     "proposed": "GUID-mov-07.dita#machines/supported-machines",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Uninstall the agent",
+     "old": "install.dita#install/uninstall-agent",
+     "proposed": "GUID-mov-08.dita#cleanup/take-off-client",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Troubleshoot slow uploads",
+     "old": "troubleshooting.dita#troubleshooting/slow-uploads",
+     "proposed": "GUID-mov-09.dita#speed/transfer-speed",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Pricing",
+     "old": "pricing.dita",
+     "proposed": "GUID-mov-10.dita#plans_and_fees",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Send us a fax",
+     "old": "support.dita#support/fax-number",
+     "proposed": "",
+     "verdict": "none",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Notes for version 1",
+     "old": "install.dita#install/v1-notes",
+     "proposed": "",
+     "verdict": "none",
+     "score": "right",
+     "found_by": "finder"
+    }
+   ]
+  },
+  {
+   "run": 2,
+   "seconds": 109,
+   "references": 12,
+   "scores": {
+    "right": 12
+   },
+   "applied_without_asking_and_wrong": 0,
+   "verdicts": {
+    "review": 10,
+    "none": 2
+   },
+   "model_calls": 73,
+   "failed_calls": 0,
+   "input_tokens": 223781,
+   "output_tokens": 8518,
+   "cost_usd": 0.93,
+   "rows": [
+    {
+     "link": "Sign in",
+     "old": "login.dita#login/sign-in",
+     "proposed": "GUID-mov-01.dita#entry/authenticate",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Reset a forgotten password",
+     "old": "login.dita#login/reset-password",
+     "proposed": "GUID-mov-02.dita#lockouts/recover-entry",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Two-factor authentication",
+     "old": "security.dita#security/two-factor",
+     "proposed": "GUID-mov-03.dita#identity_checks/second-step",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Delete your account",
+     "old": "account.dita#account/delete-account",
+     "proposed": "GUID-mov-04.dita#leaving/close-membership",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Billing address",
+     "old": "billing.dita#billing/billing-address",
+     "proposed": "GUID-mov-05.dita#paperwork/invoice-recipient",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Contact support",
+     "old": "support.dita#support/contact-support",
+     "proposed": "GUID-mov-06.dita#people/reach-our-team",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "System requirements",
+     "old": "install.dita#install/system-requirements",
+     "proposed": "GUID-mov-07.dita#machines/supported-machines",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Uninstall the agent",
+     "old": "install.dita#install/uninstall-agent",
+     "proposed": "GUID-mov-08.dita#cleanup/take-off-client",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Troubleshoot slow uploads",
+     "old": "troubleshooting.dita#troubleshooting/slow-uploads",
+     "proposed": "GUID-mov-09.dita#speed/transfer-speed",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Pricing",
+     "old": "pricing.dita",
+     "proposed": "GUID-mov-10.dita#plans_and_fees",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Send us a fax",
+     "old": "support.dita#support/fax-number",
+     "proposed": "",
+     "verdict": "none",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Notes for version 1",
+     "old": "install.dita#install/v1-notes",
+     "proposed": "",
+     "verdict": "none",
+     "score": "right",
+     "found_by": "finder"
+    }
+   ]
+  }
+ ]
+}
