@@ -561,11 +561,19 @@ def review_proposal(repo, ref, proposal, backend, model):
         return {"agree": None, "reason": "review failed: %s" % str(exc)[:120]}
 
 
-def heal_one(repo, ref, backend, model, with_history, log):
-    """Stages 2 to 4 for one broken reference."""
+DECLINED_CAVEAT = "An author said another target was not what this reference meant; this is what a new search found."
+
+
+def heal_one(repo, ref, backend, model, with_history, log, declined=()):
+    """Stages 2 to 4 for one broken reference. declined: targets (new values) an author looked at
+    and said are not it. They are not proposed again, the finder is told so, and whatever it finds
+    instead is shown to the author, not applied."""
+    declined = set(declined or ())
     result = {"stage": None, "verdict": "none", "new_value": None, "confidence": "low", "reason": "", "caveat": "",
               "steps": [], "checks": [], "review": None, "candidates": []}
     quick = rule_fix(repo, ref)
+    if quick and new_value(repo, ref, quick) in declined:
+        quick = None   # the rule's one answer is the one that was declined: the finder looks further
     if quick:
         sure = quick.get("verdict", "fix") == "fix"
         result.update(stage="rule", verdict="fix" if sure else "review", new_value=new_value(repo, ref, quick),
@@ -582,7 +590,10 @@ def heal_one(repo, ref, backend, model, with_history, log):
         "File it points at: %s" % (repo.split_target(ref)[0] if ref["attribute"] in refcheck.PATH_ATTRS else "(a key)"),
         "Link text: %s" % (ref["link_text"] or "(none)"),
         "Sentence around it: %s" % (ref["context"] or "(none)"),
-    ])
+    ] + ([
+        "An author already looked at these targets and said they are not what this reference meant: %s. "
+        "Do not propose any of them. Find another target, or conclude that nothing replaces the old one." % "; ".join(
+            "%s [%s]" % (target_label(repo, ref, value), value) for value in sorted(declined))] if declined else []))
     answer, steps, problem = agentloop.run(FINDER_SYSTEM, task, tool_specs(tools, with_history), FINISH,
                                            backend=backend, model=model, max_calls=MAX_TOOL_CALLS, log=log)
     result.update(stage="finder", steps=steps)
@@ -608,14 +619,23 @@ def heal_one(repo, ref, backend, model, with_history, log):
         result["checks"].append("rewritten reference does not resolve; suggestion dropped")
         return result
     result["checks"].append("rewritten reference resolves" + (", element type matches" if ref["attribute"] in refcheck.CONTENT_ATTRS else ""))
-    result["new_value"] = new_value(repo, ref, answer)
-    result["candidates"] = ranked_candidates(repo, ref, answer, tools, result["new_value"])
+    proposed = new_value(repo, ref, answer)
+    if proposed in declined:
+        result["checks"].append("the agent proposed a target an author declined; suggestion dropped")
+        result["reason"] = "A new search found only the target that an author declined."
+        return result
+    result["new_value"] = proposed
+    result["candidates"] = [c for c in ranked_candidates(repo, ref, answer, tools, result["new_value"])
+                            if c["new_value"] not in declined]
 
     # Stage 4: reviewer.
     result["review"] = review_proposal(repo, ref, answer, backend, model)
     agreed = result["review"]["agree"] is True
     result["checks"].append("reviewer agrees" if agreed else "reviewer does not agree" if result["review"]["agree"] is False else "reviewer gave no verdict")
     result["verdict"] = "fix" if (agreed and result["confidence"] == "high" and not result["caveat"]) else "review"
+    if declined:
+        # A second attempt after an author's "no": it is theirs to look at, whatever the agents think of it.
+        result.update(verdict="review", caveat=" ".join(filter(None, [result["caveat"], DECLINED_CAVEAT])))
     return result
 
 

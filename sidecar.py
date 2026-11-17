@@ -160,7 +160,8 @@ def serve(port, model=None):
             if self.path in ("/feedback", "/applied"):
                 # From the editor, as text/plain so the browser needs no preflight request.
                 #   /feedback  an author accepted a repair ("rejected": the candidates passed over),
-                #              or took an earlier answer back ("forget": true)
+                #              or took an earlier answer back ("forget": true),
+                #              or said none of the proposed targets is right ("decline": true, "values")
                 #   /applied   what "Fix all" wrote, so the next check can see what became of it
                 try:
                     import refplan
@@ -170,6 +171,15 @@ def serve(port, model=None):
                         stored = refplan.record_applied(body.get("edits"), body.get("failed"), map_path=body.get("map"))
                         _log("Fix all recorded: %d edits" % stored)
                         self.send_json(200, {"recorded": stored})
+                    elif body.get("decline"):
+                        # An author looked at the proposed targets and said none of them is it.
+                        values = [v for v in body.get("values") or [] if isinstance(v, str) and v]
+                        if not values or not body.get("attribute") or not body.get("old"):
+                            raise ValueError("decline needs attribute, old and at least one value")
+                        for value in values:
+                            refplan.reject(body.get("attribute"), body.get("old"), value)
+                        _log("author declined %d target(s) for %s" % (len(values), body.get("attribute")))
+                        self.send_json(200, {"declined": len(values)})
                     elif body.get("forget"):
                         forgotten = refplan.forget(body.get("attribute"), body.get("old"))
                         _log("author answer forgotten: %s" % forgotten)

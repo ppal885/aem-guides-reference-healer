@@ -440,7 +440,9 @@ class Session:
             if not group["known"]:
                 self._recall(repo, group)
             elif group["known"]["new_value"] in self._declined(refs[0]):
-                group["known"].update(verdict="review", caveat="This repair was declined in an earlier check.")
+                # An author said this is not it. The rule's or the history's answer is set aside and
+                # the finder agents look for another target (see _from_cache and heal_one).
+                group["known"] = None
             missing = "" if group["known"] else refheal.never_defined(repo, refs[0])
             if missing:
                 # Nothing to find and nothing to put back: settled here, without an agent.
@@ -626,7 +628,8 @@ class Session:
         def run(group):
             self.step(group["id"], "active", "Finder agent", "%s: searching files, ids, keys and the previous version"
                       % self._short(group))
-            outcome = refheal.heal_one(repo, group["refs"][0], self.backend, FINDER_MODEL or self.model, False, self.log)
+            outcome = refheal.heal_one(repo, group["refs"][0], self.backend, FINDER_MODEL or self.model, False, self.log,
+                                       declined=self._declined(group["refs"][0]))
             searched = _searched(outcome.get("steps") or [])
             with self.count_lock:
                 self.tool_uses.update(step["tool"] for step in searched)
@@ -648,9 +651,6 @@ class Session:
         if remembered:
             self.plan.append("%s: nothing changed since an earlier check, so I used what the agents found then." % (
                 _count(len(remembered), "broken target")))
-        if self.tool_uses:
-            self.plan.append("How the finder agents searched in this check: %s." % ", ".join(
-                "%s %d" % (tool, count) for tool, count in self.tool_uses.most_common()))
         if waiting:
             self.plan.append("%s with fewer references wait for the next check (%s): I look at %d per check, the ones "
                              "that break the most references first." % (
@@ -709,6 +709,12 @@ class Session:
         entry = (self.cache or {}).get(self._fingerprint(repo, group))
         if not entry or time.time() - entry.get("when", 0) > CACHE_DAYS * 86400:
             return False
+        declined = self._declined(group["refs"][0])
+        left = [c for c in entry["known"].get("candidates") or [] if c.get("new_value") not in declined]
+        if entry["known"].get("new_value") in declined and not left and declined - set(entry.get("declined_when_searched") or []):
+            # An author declined what was found and there is no second candidate: search again, once
+            # for each new "no". A search that already knew of the declined targets is not repeated.
+            return False
         known = dict(entry["known"], how="finder", remembered=True)
         if known["new_value"] and repo.check(dict(group["refs"][0], value=known["new_value"])) is not None:
             return False
@@ -723,7 +729,8 @@ class Session:
             return   # a search that broke down is not a finding
         known = group["known"]
         self.cache[self._fingerprint(repo, group)] = {"when": time.time(), "known": {
-            k: known.get(k) for k in ("new_value", "verdict", "candidates", "reason", "caveat", "reviewer", "searched")}}
+            k: known.get(k) for k in ("new_value", "verdict", "candidates", "reason", "caveat", "reviewer", "searched")},
+            "declined_when_searched": sorted(self._declined(group["refs"][0]))}
 
     def _keep_second_opinion(self, repo, group):
         """A second finder run is part of the finding: remembered with it, not paid for again."""
@@ -1114,6 +1121,13 @@ class Session:
             return caveat
         return " ".join(filter(None, [caveat, refheal.link_text_caveat(repo, ref, value)]))
 
+    def _tool_use_line(self):
+        """Said once, at the end: the finders may be asked in more than one round of a check."""
+        if not self.tool_uses:
+            return []
+        return ["How the finder agents searched in this check: %s." % ", ".join(
+            "%s %d" % (tool, count) for tool, count in self.tool_uses.most_common())]
+
     @staticmethod
     def _held_back_line(held):
         """The plan says "decided to repair" and "works on the copy" of every repair it tried. Some of
@@ -1193,7 +1207,7 @@ class Session:
                           "reported_broken_only_by_the_repository": len(self.aem_only),
                           "reviewer_model": refheal.reviewer_model(self.backend, self.model)},
                 "repairs": repairs + self._aem_only_repairs(), "source_fixes": self._source_fixes(),
-                "plan": self.plan + self._held_back_line(held) + ([self.summary] if self.summary else [])}
+                "plan": self.plan + self._tool_use_line() + self._held_back_line(held) + ([self.summary] if self.summary else [])}
 
     def _ways_out_detail(self, gone, group, chains):
         """The ways out for content that is gone, for the author to choose from: every possible one,
