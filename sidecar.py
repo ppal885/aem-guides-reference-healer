@@ -11,6 +11,8 @@
     POST /audit       the references an author changed, and who accepted them
     GET  /audit       the audit record; ?map=<path>, &format=csv for a download
     GET  /memory      what the planner remembers of authors' answers
+    GET  /copies      ?map=<path>: the text copied across the map's topics, and what the reuse
+                      agent says about each group (asked on request, kept until the files change)
     GET  /health
 
 It listens on 127.0.0.1 only. The model is called through the local `claude` CLI by default, or
@@ -83,6 +85,42 @@ PROGRESS = {}
 IDLE = {"running": False, "lines": [], "timeline": []}
 
 
+# The files of the last check of each map, for the reuse agent to read when the author opens
+# "Copied content" (GET /copies), and what it decided, kept until the files change.
+LAST_FILES = {}
+COPIES = {}
+
+
+def copies_of(map_path, model=None):
+    """The reuse agent's decisions for the copied text of a map's last check."""
+    import hashlib
+    import reuse
+    files = LAST_FILES.get(map_path or "")
+    if not files:
+        return {"groups": [], "note": "Run the health check first: the agents have not seen this map's files."}
+    fingerprint = hashlib.sha1("".join(f.get("path", "") + (f.get("xml") or "") for f in files).encode("utf-8")).hexdigest()
+    cached = COPIES.get(map_path)
+    if cached and cached[0] == fingerprint:
+        return cached[1]
+    groups = reuse.decide(files, lambda system, user: call_model(system, user, model), _log)
+    titles = reuse._titles(files)
+    answer = {"groups": [dict(_compact(g), topics=[{"file": "/" + f.lstrip("/"), "title": titles.get(f.lstrip("/"), "")}
+                                                   for f in g["files"]]) for g in groups]}
+    COPIES[map_path] = (fingerprint, answer)
+    return answer
+
+
+def _compact(group):
+    slash = lambda path: "/" + path.lstrip("/")
+    return {"id": group["id"], "kind": group["kind"], "tag": group["tag"], "decision": group["decision"],
+            "text": group.get("variant_text") or group["text"], "differs": group.get("differs", ""),
+            "reason": group.get("reason", ""), "decided_by": group.get("decided_by", ""),
+            "existing": dict(group["existing"], path=slash(group["existing"]["path"])) if group.get("existing") else None,
+            "files": [slash(f) for f in group["files"]],
+            "copies": [{"file": slash(c["file"]), "location": c["location"], "text": c["text"]} for c in group["copies"]],
+            "variants": [{"text": v["text"][:400], "count": v["count"]} for v in group["variants"][:6]]}
+
+
 def progress_of(map_path):
     return PROGRESS.setdefault(map_path or "", {"running": False, "lines": [], "timeline": []})
 
@@ -105,6 +143,13 @@ def serve(port, model=None):
             if self.path.split("?")[0] == "/progress":
                 query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
                 self.send_json(200, PROGRESS.get((query.get("map") or [""])[0], IDLE))
+            elif self.path.split("?")[0] == "/copies":
+                query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+                try:
+                    self.send_json(200, copies_of((query.get("map") or [""])[0], model))
+                except Exception as exc:
+                    _log("copies failed: %s" % exc)
+                    self.send_json(500, {"error": str(exc)})
             elif self.path == "/memory":
                 import refplan
                 self.send_json(200, refplan.load_memory())
@@ -204,6 +249,7 @@ def serve(port, model=None):
                     self.send_json(200, refheal.heal_files(payload, BACKEND, model, _log))
                     return
                 import refplan
+                LAST_FILES[payload.get("map") or ""] = payload.get("files") or []
                 state = progress_of(payload.get("map"))
                 state.update(running=True, lines=[], timeline=[])
                 try:

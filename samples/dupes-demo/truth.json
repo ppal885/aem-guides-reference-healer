@@ -1,0 +1,50 @@
+{
+ "groups": [
+  {
+   "text_starts": "Back up the ledger database",
+   "kind": "same",
+   "files": 5,
+   "decision": "share",
+   "why": "a caution in 5 tasks, word for word"
+  },
+  {
+   "text_starts": "The ledger keeps closed periods",
+   "kind": "numbers",
+   "files": 3,
+   "decision": "ask",
+   "why": "90 days in two topics, 60 in one: a contradiction, never merged without the author"
+  },
+  {
+   "text_starts": "Ledgerline 4.",
+   "kind": "numbers",
+   "files": 3,
+   "decision": "variable",
+   "why": "the release number is meant to differ: one shared sentence with the number as a variable"
+  },
+  {
+   "text_starts": "Select OK to close the dialog box",
+   "kind": "same",
+   "files": 4,
+   "decision": "skip",
+   "why": "a generic interface line: sharing it adds a conref for nothing"
+  },
+  {
+   "text_starts": "Record the change in the audit log",
+   "kind": "wording",
+   "files": 3,
+   "decision": "share",
+   "why": "the same instruction, one copy added words: share the common one and keep the addition"
+  },
+  {
+   "text_starts": "Only a ledger administrator",
+   "kind": "same",
+   "files": 2,
+   "decision": "use existing",
+   "why": "already shared as reuse/library.dita#library/n_reopen: conref the copy to it"
+  }
+ ],
+ "not_a_group": [
+  "Delete the export files after the period",
+  "Keep the export files after the period i"
+ ]
+}

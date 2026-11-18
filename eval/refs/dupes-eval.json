@@ -1,0 +1,116 @@
+{
+ "backend": "cli",
+ "model": "the CLI's default",
+ "runs": [
+  {
+   "run": 1,
+   "seconds": 8,
+   "right": 6,
+   "of": 6,
+   "kinds_right": 6,
+   "decoys_grouped": 0,
+   "merged_wrong": 0,
+   "model_calls": 1,
+   "input_tokens": 2149,
+   "rows": [
+    {
+     "group": "Back up the ledger database",
+     "want": "share",
+     "got": "share",
+     "kind_right": true,
+     "reason": "An identical backup caution appears in five topics and must stay word-for-word in step."
+    },
+    {
+     "group": "The ledger keeps closed periods",
+     "want": "ask",
+     "got": "ask",
+     "kind_right": true,
+     "reason": "The variants disagree on how long closed periods are kept, so merging would publish the wrong limit in some topics."
+    },
+    {
+     "group": "Ledgerline 4.",
+     "want": "variable",
+     "got": "variable",
+     "kind_right": true,
+     "reason": "The release-note sentence is the same in each topic except for the version number, which is meant to differ by topic."
+    },
+    {
+     "group": "Select OK to close the dialog box",
+     "want": "skip",
+     "got": "skip",
+     "kind_right": true,
+     "reason": "This is a generic interface line about closing a dialog box and is not worth a shared piece."
+    },
+    {
+     "group": "Record the change in the audit log",
+     "want": "share",
+     "got": "share",
+     "kind_right": true,
+     "reason": "The audit-log instruction is the same procedure step in each topic, and the one copy only adds a short clause about attaching the reversal."
+    },
+    {
+     "group": "Only a ledger administrator",
+     "want": "use existing",
+     "got": "use existing",
+     "kind_right": true,
+     "reason": "The same text is already shared as reuse/library.dita#library/n_reopen."
+    }
+   ]
+  },
+  {
+   "run": 2,
+   "seconds": 9,
+   "right": 6,
+   "of": 6,
+   "kinds_right": 6,
+   "decoys_grouped": 0,
+   "merged_wrong": 0,
+   "model_calls": 1,
+   "input_tokens": 2143,
+   "rows": [
+    {
+     "group": "Back up the ledger database",
+     "want": "share",
+     "got": "share",
+     "kind_right": true,
+     "reason": "All five topics carry the same backup warning word for word, and a data-safety note like this must stay in step everywhere."
+    },
+    {
+     "group": "The ledger keeps closed periods",
+     "want": "ask",
+     "got": "ask",
+     "kind_right": true,
+     "reason": "The variants give different retention periods for closed periods, so merging would publish the wrong number of days in some topics."
+    },
+    {
+     "group": "Ledgerline 4.",
+     "want": "variable",
+     "got": "variable",
+     "kind_right": true,
+     "reason": "The sentence is identical except for the release number, which matches each topic's own release."
+    },
+    {
+     "group": "Select OK to close the dialog box",
+     "want": "skip",
+     "got": "skip",
+     "kind_right": true,
+     "reason": "This is a generic interface line about closing a dialog box and is not worth a shared piece."
+    },
+    {
+     "group": "Record the change in the audit log",
+     "want": "share",
+     "got": "share",
+     "kind_right": true,
+     "reason": "This is the same audit-log instruction in every topic; the extra 'attach the reversal' clause is a small addition that fits the reversal topic, so the common wording should be shared."
+    },
+    {
+     "group": "Only a ledger administrator",
+     "want": "use existing",
+     "got": "use existing",
+     "kind_right": true,
+     "reason": "The same text is already shared as reuse/library.dita#library/n_reopen."
+    }
+   ]
+  }
+ ]
+}

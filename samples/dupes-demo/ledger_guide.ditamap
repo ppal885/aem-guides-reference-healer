@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">
+<map><title>Ledgerline guide</title><topicref href="release/release_4_1.dita"/><topicref href="release/release_4_2.dita"/><topicref href="release/release_4_3.dita"/><topicref href="reuse/library.dita"/><topicref href="tasks/archive_exports.dita"/><topicref href="tasks/close_period.dita"/><topicref href="tasks/export_period.dita"/><topicref href="tasks/import_rates.dita"/><topicref href="tasks/post_entry.dita"/><topicref href="tasks/reopen_period.dita"/><topicref href="tasks/reverse_entry.dita"/></map>
