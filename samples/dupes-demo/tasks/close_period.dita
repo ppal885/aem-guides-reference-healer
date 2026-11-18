@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="close_period"><title>Close a period</title><taskbody><context><note type="caution">Back up the ledger database before you close a period, so that you can go back if a posting is wrong.</note><note type="note">The ledger keeps closed periods for 90 days, after which they can no longer be reopened by anyone.</note></context><steps><step><cmd>Open Periods.</cmd></step><step><cmd>Select Close.</cmd></step></steps></taskbody></task>

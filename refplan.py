@@ -28,6 +28,7 @@ import threading
 import time
 
 import agentloop
+import duplicates
 import refcheck
 import refheal
 import subjectscheme
@@ -1411,6 +1412,16 @@ def plan_files(payload, backend="cli", model=None, log=print, progress=None, mem
         usage.finish(mark)
         raise
     totals = usage.finish(mark)
+    # Text copied across topics: counted by code on every check; the reuse agent is asked only
+    # when the author opens "Copied content" (sidecar GET /copies).
+    copied = duplicates.find(payload.get("files") or [])
+    if copied:
+        copies = sum(len(g["copies"]) for g in copied)
+        out["plan"] = list(out.get("plan") or []) + ["Copied text: %s %s copied into several topics (%s copies, %s of them could "
+                                                     "become conrefs). Open \"Copied content\" to see which could be one shared piece." % (
+                                                         format(len(copied), ","), "piece is" if len(copied) == 1 else "pieces are",
+                                                         format(copies, ","), format(copies - len(copied), ","))]
+        out.setdefault("stats", {})["copied_groups"] = len(copied)
     # Attribute values a subject scheme no longer allows: found and, where the scheme's previous
     # version proves a rename, repaired by code. They are not references, so AEM's report does not
     # list them and the planner's groups do not hold them.

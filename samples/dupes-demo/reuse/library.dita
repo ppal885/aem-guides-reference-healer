@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="library"><title>Shared notes</title><conbody><note id="n_reopen" type="important">Only a ledger administrator can reopen a closed period, and every reopening is written to the audit log.</note></conbody></concept>
