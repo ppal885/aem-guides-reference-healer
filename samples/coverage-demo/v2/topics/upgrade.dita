@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="upgrade"><title>Upgrade the service</title><taskbody><steps><step><cmd>Follow the shared steps.</cmd><info><ol><li conref="../reuse/warnings.dita#warnings/li_stop" conrefend="../reuse/warnings.dita#warnings/li_start"/></ol></info></step><step><cmd>See the <xref keyref="admin.settings">settings</xref>.</cmd></step></steps></taskbody></task>

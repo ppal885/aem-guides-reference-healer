@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="install"><title>Install the service</title><taskbody><steps><step><cmd>Read the <xref href="overview.dita">overview</xref> first.</cmd></step><step><cmd>Check the <xref keyref="sys-req">system requirements</xref>.</cmd></step><step><cmd>Back up first.</cmd><info><note conref="../reuse/warnings.dita#warnings/note_backup"/></info></step></steps></taskbody><related-links><link href="upgrade.dita#upgrade"><linktext>Upgrade the service</linktext></link></related-links></task>

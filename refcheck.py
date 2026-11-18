@@ -119,6 +119,7 @@ class Repo:
         # knows which path the stored name stood for, and that path is what a repair is found by.
         self.assets = None if assets is None else set()
         self.alias = {}      # stored file name -> path
+        self.submap_links = []  # (submap path, key scopes it is brought in under), see _scope_submap_keys
         self.previous = {}   # path -> earlier versions of the file, newest first, indexed like self.files
         self.stored_name = {}  # path -> stored file name
         for asset in assets or ():
@@ -168,6 +169,7 @@ class Repo:
             self._index(rel, tree)
         for rel, (raw, tree) in parsed.items():
             self._collect_keys(rel, tree)
+        self._scope_submap_keys()
         for rel, (raw, tree) in parsed.items():
             self._collect_refs(rel, raw, tree)
 
@@ -180,14 +182,14 @@ class Repo:
                 tree = ET.fromstring(re.sub(r"<!DOCTYPE[^>\[]*(\[[^\]]*\])?[^>]*>", "", old, count=1))
             except ET.ParseError:
                 continue
-            current_files, current_keys = self.files, self.keys
-            self.files, self.keys = {}, {}
+            current_files, current_keys, current_links = self.files, self.keys, self.submap_links
+            self.files, self.keys, self.submap_links = {}, {}, []
             try:
                 self._index(path, tree)
                 self._collect_keys(path, tree)
                 self.previous.setdefault(path, []).append(dict(self.files[path], keys=self.keys))
             finally:
-                self.files, self.keys = current_files, current_keys
+                self.files, self.keys, self.submap_links = current_files, current_keys, current_links
 
     def resolve_path(self, from_file, href_path):
         """The repository path an href's file part points at."""
@@ -213,6 +215,7 @@ class Repo:
             self._index(rel, tree)
         for rel, (raw, tree) in parsed.items():
             self._collect_keys(rel, tree)
+        self._scope_submap_keys()
         for rel, (raw, tree) in parsed.items():
             self._collect_refs(rel, raw, tree)
 
@@ -249,6 +252,11 @@ class Repo:
             own = (el.get("keyscope") or "").split()
             if own:
                 scopes = scopes + [own[0]]
+            link = el.get("href") or ""
+            if (el is not tree and link and not HAS_SCHEME.match(link) and el.get("scope") != "external"
+                    and (el.get("format") == "ditamap" or link.split("#")[0].lower().endswith(".ditamap"))):
+                # A submap: its keys also live in the scopes of the element that brings it in.
+                self.submap_links.append((self.resolve_path(rel, link.split("#")[0]), list(scopes)))
             names = el.get("keys")
             if names:
                 href = el.get("href")
@@ -271,6 +279,18 @@ class Repo:
                 walk(child, scopes)
 
         walk(tree, [])
+
+    def _scope_submap_keys(self):
+        """Gives the keys of a submap the names they have where it is brought in: a mapref with
+        keyscope="admin" makes the submap's key "settings" also "admin.settings". DITA's first
+        definition still wins, so a key the parent map defines itself keeps its definition."""
+        for target, scopes in self.submap_links:
+            if not scopes:
+                continue
+            own = [(name, d) for name, d in list(self.keys.items()) if d.get("defined_in") == target]
+            for name, definition in own:
+                for depth in range(len(scopes) - 1, -1, -1):
+                    self.keys.setdefault(".".join(scopes[depth:] + [name]), definition)
 
     def _collect_refs(self, rel, raw, tree):
         lines = raw.splitlines()

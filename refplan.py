@@ -30,6 +30,7 @@ import time
 import agentloop
 import refcheck
 import refheal
+import subjectscheme
 import usage
 import wayout
 
@@ -216,6 +217,11 @@ CACHE_DAYS = 7
 # minutes for 15 targets and was 47 minutes for 388; past this number the targets with the most
 # references go first and the rest wait for the next check.
 MAX_GROUPS = int(os.environ.get("REFHEAL_MAX_GROUPS", "40"))
+# Tokens (input and output, all agents) one check may spend. When it is reached, the finder agents
+# that have not started yet do not start; their targets wait for the next check, the biggest first.
+# 0: no limit. A first check took about 7,000 tokens per broken target, so the default lets
+# about 40 targets through, as MAX_GROUPS does.
+TOKEN_BUDGET = int(os.environ.get("REFHEAL_TOKEN_BUDGET", "300000"))
 
 CHOOSE_SYSTEM = """A shared piece of DITA content was changed and references to it broke. Two or three candidate targets could replace it. Different topics may have meant different candidates.
 
@@ -334,6 +340,40 @@ def _whole_sentences(text, limit):
     return cut[:end + 1] if end > limit // 3 else cut.rstrip() + "…"
 
 
+def _keep_key_scope(repo, ref, known):
+    """A key reference names its scope ("admin.settings"); a new key found inside that scope is named
+    the same way ("admin.site-settings"), not by its bare name, which resolves only inside the submap.
+    The scan counts every scope's names as defined, so a bare name would pass the re-check and still
+    be wrong in the output. Candidates are corrected the same way."""
+    if ref["attribute"] not in ("keyref", "conkeyref"):
+        return
+    old_key = ref["value"].partition("/")[0]
+    scope = old_key.rpartition(".")[0]
+    if not scope:
+        return
+
+    def scoped(value):
+        if not value:
+            return value
+        key, slash, rest = value.partition("/")
+        if key.startswith(scope + "."):
+            return value
+        definition = repo.keys.get(key) or {}
+        # Scoped when that name exists, or when the key's map is linked from nowhere while a mapref
+        # with this keyscope points at a map that is gone: the submap was renamed and its mapref
+        # broke with it, so once the mapref is repaired the key is reached under the scope again.
+        home = definition.get("defined_in")
+        orphan = bool(home) and not any(t == home for t, _ in repo.submap_links)
+        scope_lost = any(scopes and scopes[-1] == scope and target not in repo.files for target, scopes in repo.submap_links)
+        if (scope + "." + key) in repo.keys or (orphan and scope_lost):
+            return scope + "." + key + slash + rest
+        return value
+
+    known["new_value"] = scoped(known.get("new_value"))
+    for candidate in known.get("candidates") or []:
+        candidate["new_value"] = scoped(candidate.get("new_value"))
+
+
 def _searched(steps):
     """A finder's tool calls in a form an author can read and a check can count:
     [{"tool", "asked", "got"}], at most the eight it may make."""
@@ -360,8 +400,11 @@ class Session:
 
     def __init__(self, files, backend="cli", model=None, log=print, progress=None, memory=None, reported=None,
                  outside=None, timeline=None, cache=None, max_groups=None,
-                 choose=None, assets=None, missing=None):
+                 choose=None, assets=None, missing=None, token_budget=None):
         self.backend, self.model, self.log = backend, model, log
+        self.token_budget = TOKEN_BUDGET if token_budget is None else token_budget
+        self.token_mark = usage.position()      # the tokens of this check are counted from here
+        self.over_budget = []                   # groups whose finder did not start: the limit was reached
         # Who is doing what, as rows for a live view: [{"id", "state", "who", "text"}], state is
         # "done", "active" or "waiting". on_timeline gets the whole list after every change.
         self.steps, self.on_timeline = [], timeline or (lambda steps: None)
@@ -626,6 +669,14 @@ class Session:
             self.step(group["id"], "waiting", "Finder agent", "%s: waiting" % self._short(group))
 
         def run(group):
+            if self.token_budget and usage.tokens_since(self.token_mark) >= self.token_budget:
+                group["known"] = {"new_value": None, "verdict": "none", "how": "planner", "caveat": "", "reason":
+                                  "Not looked at in this check: it reached its limit of %s tokens. Run the check "
+                                  "again to continue." % format(self.token_budget, ",")}
+                with self.count_lock:
+                    self.over_budget.append(group)
+                self.step(group["id"], "done", "Planner agent", "%s: waits for the next check (token limit)" % self._short(group))
+                return group
             self.step(group["id"], "active", "Finder agent", "%s: searching files, ids, keys and the previous version"
                       % self._short(group))
             outcome = refheal.heal_one(repo, group["refs"][0], self.backend, FINDER_MODEL or self.model, False, self.log,
@@ -652,6 +703,13 @@ class Session:
         if remembered:
             self.plan.append("%s: nothing changed since an earlier check, so I used what the agents found then." % (
                 _count(len(remembered), "broken target")))
+        if self.over_budget:
+            stopped = [g for g in fresh if g in self.over_budget]
+            self.plan.append("%s wait for the next check (%s): this check reached its limit of %s tokens, so I "
+                             "started no more finder agents." % (
+                                 _count(len(stopped), "broken target"), _count(sum(len(g["refs"]) for g in stopped), "reference"),
+                                 format(self.token_budget, ",")))
+            fresh = [g for g in fresh if g not in self.over_budget]
         if waiting:
             self.plan.append("%s with fewer references wait for the next check (%s): I look at %d per check, the ones "
                              "that break the most references first." % (
@@ -681,6 +739,7 @@ class Session:
         """What code does with a finder's answer, fresh or remembered: drops what an author declined,
         weighs it against the text, splits it per reference where two pieces could be meant."""
         first, known = group["refs"][0], group["known"]
+        _keep_key_scope(repo, first, known)
         self._drop_declined(first, known)
         self._weigh(repo, first, known)
         self._choose_per_reference(repo, group)
@@ -1352,6 +1411,15 @@ def plan_files(payload, backend="cli", model=None, log=print, progress=None, mem
         usage.finish(mark)
         raise
     totals = usage.finish(mark)
+    # Attribute values a subject scheme no longer allows: found and, where the scheme's previous
+    # version proves a rename, repaired by code. They are not references, so AEM's report does not
+    # list them and the planner's groups do not hold them.
+    scheme = subjectscheme.check(payload.get("files") or [])
+    if scheme["repairs"]:
+        out["repairs"] = list(out.get("repairs") or []) + scheme["repairs"]
+        out["plan"] = scheme["plan"] + list(out.get("plan") or [])
+        stats = out.setdefault("stats", {})
+        stats["subject_scheme_values"] = scheme["values"]
     warning = usage.warning(totals)
     out["plan"] = ([warning] if warning else []) + list(out.get("plan") or []) + [usage.sentence(totals)]
     out["usage"] = totals

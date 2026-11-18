@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">
+<map><title>Agent guide</title><topicref href="console_values.ditamap" format="ditamap" type="subjectScheme" processing-role="resource-only"/><topicref href="install_agent.dita"/><topicref href="remove_agent.dita"/><topicref href="rotate_keys.dita"/></map>

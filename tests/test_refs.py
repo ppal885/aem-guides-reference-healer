@@ -13,6 +13,9 @@ import refheal  # noqa: E402
 import audit  # noqa: E402
 import wayouteval  # noqa: E402
 import refplan  # noqa: E402
+import subjectscheme  # noqa: E402
+import usage  # noqa: E402
+from unittest import mock  # noqa: E402
 import meaning  # noqa: E402
 
 TOPIC = '<topic id="t"><title>Using it</title><body>%s</body></topic>'
@@ -994,6 +997,28 @@ class RememberedFindings(unittest.TestCase):
         self.assertIn("wait for the next check (3 references)", session.plan[-1])
         self.assertEqual(cache, {})
 
+    def test_past_the_token_limit_no_finder_starts_and_the_targets_wait(self):
+        files = self.files() + [{"id": "GUID-t3", "path": "/d/t3.dita", "previous": [],
+                                 "xml": TOPIC % '<note conref="GUID-lib.dita#lib/other-gone"/>'}]
+        cache = {}
+        session = self.session(files, cache=cache, token_budget=1000)
+        usage.note(True, 900, 200)  # the planner's own call already spent the limit
+        started = []
+        with mock.patch.object(refplan.refheal, "heal_one", side_effect=lambda *a, **k: started.append(a) or {}):
+            session.tool_investigate({"group_ids": list(session.current["groups"])})
+        self.assertEqual(started, [])
+        self.assertTrue(all("limit of 1,000 tokens" in g["known"]["reason"] for g in session.current["groups"].values()))
+        self.assertIn("2 broken targets wait for the next check (3 references): this check reached its limit of 1,000 tokens",
+                      " ".join(session.plan))
+        self.assertEqual(cache, {})
+
+    def test_without_a_token_limit_the_finders_start(self):
+        session = self.session(token_budget=0)
+        usage.note(True, 10 ** 9, 0)
+        with mock.patch.object(refplan.refheal, "heal_one", side_effect=RuntimeError("started")):
+            with self.assertRaisesRegex(RuntimeError, "started"):
+                session.tool_investigate({"group_ids": list(session.current["groups"])})
+
 
 class KeyFindingsAfterFixAll(unittest.TestCase):
     """A finding about a key rests on the maps' key definitions, not on every character of the maps."""
@@ -1801,3 +1826,109 @@ class AProvenRenameIsNotUndone(unittest.TestCase):
         self.assertEqual(result["source_fixes"], [])
         # The single edit is still known for the group, for an author who wants it.
         self.assertEqual(group["source"]["new"], "backup")
+
+
+class SubjectSchemeValues(unittest.TestCase):
+    """Attribute values that a subject scheme no longer allows, and the rename its previous version proves."""
+
+    OLD = ('<subjectScheme><subjectdef keys="os"><subjectdef keys="linux" navtitle="Linux"/>'
+           '<subjectdef keys="win"><topicmeta><navtitle>Windows</navtitle></topicmeta></subjectdef>'
+           '<subjectdef keys="mac"/><subjectdef keys="bsd" navtitle="BSD"/></subjectdef>'
+           '<enumerationdef><attributedef name="platform"/><subjectdef keyref="os"/></enumerationdef></subjectScheme>')
+    NOW = ('<subjectScheme><subjectdef keys="os"><subjectdef keys="gnu-linux" navtitle="Linux"/>'
+           '<subjectdef keys="win"><topicmeta><navtitle>Windows</navtitle></topicmeta></subjectdef>'
+           '<subjectdef keys="macos"/></subjectdef>'
+           '<enumerationdef><attributedef name="platform"/><subjectdef keyref="os"/></enumerationdef></subjectScheme>')
+
+    def files(self, scheme_previous=True):
+        topic = ('<topic id="t"><title>T</title><body><p platform="linux win">a</p><p platform="linux win">b</p>'
+                 '<p platform="mac">c</p><p platform="bsd">d</p><p platform="wni">e</p><p platform="win">f</p></body></topic>')
+        return [{"id": "GUID-s", "path": "/d/scheme.ditamap", "xml": self.NOW, "previous": [self.OLD] if scheme_previous else []},
+                {"id": "GUID-t", "path": "/d/t.dita", "xml": topic, "previous": []}]
+
+    def by_old(self, result):
+        return {r["old"]: r for r in result["repairs"]}
+
+    def test_a_renamed_key_with_the_same_label_is_proven_and_every_token_is_kept(self):
+        rows = self.by_old(subjectscheme.check(self.files()))
+        self.assertEqual((rows["linux win"]["new"], rows["linux win"]["verdict"]), ("gnu-linux win", "fix"))
+        self.assertEqual(rows["linux win"]["attribute"], "platform")
+        self.assertNotIn("win", rows)                       # an allowed value is not a finding
+
+    def test_one_edit_per_file_and_value_since_fix_all_changes_every_occurrence(self):
+        found = subjectscheme.check(self.files())["repairs"]
+        self.assertEqual(sum(1 for r in found if r["old"] == "linux win"), 1)
+
+    def test_a_key_in_the_same_place_without_a_label_is_only_likely(self):
+        row = self.by_old(subjectscheme.check(self.files()))["mac"]
+        self.assertEqual((row["new"], row["verdict"]), ("macos", "review"))
+        self.assertIn("check it", row["reason"])
+
+    def test_a_removed_key_gets_no_repair(self):
+        row = self.by_old(subjectscheme.check(self.files()))["bsd"]
+        self.assertEqual((row["new"], row["verdict"]), (None, "none"))
+
+    def test_a_value_never_in_the_scheme_gets_the_closest_spelling_for_the_author(self):
+        row = self.by_old(subjectscheme.check(self.files()))["wni"]
+        self.assertEqual(row["verdict"], "review")
+        self.assertEqual(row["new"], "win")
+        self.assertIn("now or in an earlier version", row["reason"])
+
+    def test_without_the_previous_version_nothing_is_proven(self):
+        rows = self.by_old(subjectscheme.check(self.files(scheme_previous=False)))
+        self.assertNotEqual(rows["linux win"]["verdict"], "fix")
+
+    def test_the_plan_says_how_many_values_the_rename_touches(self):
+        plan = " ".join(subjectscheme.check(self.files())["plan"])
+        self.assertIn('"linux" ("Linux") was renamed "gnu-linux"', plan)
+        self.assertIn("no AI needed", plan)
+
+    def test_no_scheme_no_findings(self):
+        self.assertEqual(subjectscheme.check(self.files()[1:])["repairs"], [])
+
+    def test_an_element_restriction_is_respected(self):
+        scheme = self.NOW.replace('<attributedef name="platform"/>', '<elementdef name="note"/><attributedef name="platform"/>')
+        files = self.files()
+        files[0]["xml"] = scheme
+        self.assertEqual(subjectscheme.check(files)["repairs"], [])
+
+    def test_a_check_with_nothing_else_broken_still_reports_the_values_and_says_so_first(self):
+        out = refplan.plan_files({"files": self.files()}, log=lambda message: None, memory={})
+        rows = {r["old"]: r for r in out["repairs"]}
+        self.assertEqual(rows["linux win"]["verdict"], "fix")
+        self.assertTrue(out["plan"][0].startswith("Subject scheme:"))
+        self.assertEqual(out["stats"]["subject_scheme_values"], 4)
+
+
+class SubmapKeyScopes(unittest.TestCase):
+    """A keyscope on the mapref that brings a submap in names the submap's keys inside that scope."""
+
+    def repo(self, keyscope=' keyscope="admin"', key="settings"):
+        return refcheck.Repo(files=[
+            {"path": "/book.ditamap", "previous": [], "xml": '<bookmap><chapter navtitle="Admin"><mapref href="maps/admin.ditamap"%s/>'
+                                                                 '</chapter></bookmap>' % keyscope},
+            {"path": "/maps/admin.ditamap", "previous": [], "xml": '<map><keydef keys="%s" href="../t/s.dita"/></map>' % key},
+            {"path": "/t/s.dita", "previous": [], "xml": '<topic id="s"><title>S</title><body><p>x</p></body></topic>'},
+            {"path": "/t/u.dita", "previous": [], "xml": '<topic id="u"><title>U</title><body><p><xref keyref="admin.settings"/></p></body></topic>'}])
+
+    def test_a_scoped_key_of_a_submap_resolves(self):
+        self.assertEqual(self.repo().broken(), [])
+
+    def test_without_the_scope_or_after_a_rename_it_is_broken(self):
+        self.assertEqual([b["reason"] for b in self.repo(keyscope="").broken()], ["key-undefined"])
+        self.assertEqual([b["reason"] for b in self.repo(key="site-settings").broken()], ["key-undefined"])
+
+    def test_a_key_found_for_a_scoped_reference_keeps_the_scope(self):
+        repo = self.repo(key="site-settings")
+        ref = repo.broken()[0]
+        known = {"new_value": "site-settings", "candidates": [{"new_value": "site-settings"}]}
+        refplan._keep_key_scope(repo, ref, known)
+        self.assertEqual(known["new_value"], "admin.site-settings")
+        self.assertEqual(known["candidates"][0]["new_value"], "admin.site-settings")
+
+    def test_when_the_submap_was_renamed_too_the_scope_is_still_kept(self):
+        repo = refcheck.Repo(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "samples", "coverage-demo", "v2"))
+        ref = next(b for b in repo.broken() if b["attribute"] == "keyref")
+        known = {"new_value": "site-settings", "candidates": []}
+        refplan._keep_key_scope(repo, ref, known)
+        self.assertEqual(known["new_value"], "admin.site-settings")

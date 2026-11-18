@@ -1,0 +1,65 @@
+[
+ {
+  "file": "topics/install.dita",
+  "kind": "xref to a topic whose file was renamed",
+  "attribute": "href",
+  "old": "overview.dita",
+  "now": "product_overview.dita"
+ },
+ {
+  "file": "book.ditamap",
+  "kind": "chapter in a bookmap, file renamed",
+  "attribute": "href",
+  "old": "topics/overview.dita",
+  "now": "topics/product_overview.dita"
+ },
+ {
+  "file": "book.ditamap",
+  "kind": "mapref to a submap that was renamed",
+  "attribute": "href",
+  "old": "maps/admin.ditamap",
+  "now": "maps/administration.ditamap"
+ },
+ {
+  "file": "book.ditamap",
+  "kind": "keydef whose topic id was renamed",
+  "attribute": "href",
+  "old": "topics/requirements.dita#requirements",
+  "now": "topics/requirements.dita#system_requirements"
+ },
+ {
+  "file": "topics/install.dita",
+  "kind": "conref to a renamed element",
+  "attribute": "conref",
+  "old": "../reuse/warnings.dita#warnings/note_backup",
+  "now": "../reuse/warnings.dita#warnings/note_take_backup"
+ },
+ {
+  "file": "topics/upgrade.dita",
+  "kind": "conref range: start renamed",
+  "attribute": "conref",
+  "old": "../reuse/warnings.dita#warnings/li_stop",
+  "now": "../reuse/warnings.dita#warnings/li_halt"
+ },
+ {
+  "file": "topics/upgrade.dita",
+  "kind": "conref range: end renamed",
+  "attribute": "conrefend",
+  "old": "../reuse/warnings.dita#warnings/li_start",
+  "now": "../reuse/warnings.dita#warnings/li_resume"
+ },
+ {
+  "file": "topics/upgrade.dita",
+  "kind": "scoped keyref into a submap whose key was renamed",
+  "attribute": "keyref",
+  "old": "admin.settings",
+  "now": "admin.site-settings"
+ },
+ {
+  "file": "topics/settings.dita",
+  "kind": "conkeyref whose key was renamed",
+  "attribute": "conkeyref",
+  "old": "warn-lib/note_backup",
+  "now": "warnings-lib/note_take_backup"
+ }
+]
