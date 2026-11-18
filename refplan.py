@@ -1201,9 +1201,14 @@ class Session:
                     if "ways_out" not in entry["detail"]:
                         entry["detail"]["ways_out"] = self._ways_out_detail(gone, group, chains)
                     suggested = entry["detail"]["ways_out"].get("recommended")
+                    similar = next((o for o in entry["detail"]["ways_out"]["options"] if o["kind"] == "similar"), None)
                     if suggested:
                         entry["reason"] = "Suggested: %s. %s %s" % (
                             suggested["label"], _one_sentence(suggested["why"]), entry["reason"])
+                    elif similar:
+                        # Said first, so the row can show it: without it this row looks like every
+                        # other "no repair found", and the author would not know to open it.
+                        entry["reason"] = "A similar piece exists: %s. %s" % (similar["target"], entry["reason"])
                 repairs.append(entry)
         return {"stats": {"files": len(first["repo"].files), "references": len(first["repo"].refs), "broken": len(repairs),
                           "groups": len(first["groups"]), "rounds": len(self.edits),
