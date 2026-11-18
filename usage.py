@@ -69,6 +69,19 @@ def start():
         return len(_calls)
 
 
+def position():
+    """Where the record of calls stands now, to count from (unlike start(), it opens no check)."""
+    with _lock:
+        return len(_calls)
+
+
+def tokens_since(mark):
+    """Input and output tokens of the calls since position() or start() returned mark. A check that
+    runs at the same time adds its calls too, so a limit on this stops early rather than late."""
+    with _lock:
+        return sum(call["in"] + call["out"] for call in _calls[mark:])
+
+
 def finish(mark):
     """Totals of the calls since start()."""
     global _open, _overlapped

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE subjectScheme PUBLIC "-//OASIS//DTD DITA Subject Scheme Map//EN" "subjectScheme.dtd">
+<subjectScheme id="console_values">
+ <title>Console values</title>
+ <subjectdef keys="os"><topicmeta><navtitle>Operating systems</navtitle></topicmeta>
+  <subjectdef keys="linux"><topicmeta><navtitle>Linux</navtitle></topicmeta></subjectdef>
+  <subjectdef keys="win"><topicmeta><navtitle>Windows</navtitle></topicmeta></subjectdef>
+  <subjectdef keys="mac"/>
+  <subjectdef keys="bsd"><topicmeta><navtitle>BSD</navtitle></topicmeta></subjectdef>
+ </subjectdef>
+ <subjectdef keys="aud"><topicmeta><navtitle>Audiences</navtitle></topicmeta>
+  <subjectdef keys="admin"><topicmeta><navtitle>Administrator</navtitle></topicmeta></subjectdef>
+  <subjectdef keys="enduser"><topicmeta><navtitle>End user</navtitle></topicmeta></subjectdef>
+ </subjectdef>
+ <enumerationdef><attributedef name="platform"/><subjectdef keyref="os"/></enumerationdef>
+ <enumerationdef><attributedef name="audience"/><subjectdef keyref="aud"/></enumerationdef>
+</subjectScheme>

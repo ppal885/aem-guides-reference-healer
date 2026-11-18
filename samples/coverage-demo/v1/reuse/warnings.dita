@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="warnings"><title>Shared warnings</title><conbody><note id="note_backup" type="warning">Back up the database before you upgrade.</note><ol id="upgrade_steps"><li id="li_stop">Stop the service.</li><li id="li_copy">Copy the new files.</li><li id="li_start">Start the service.</li></ol></conbody></concept>
