@@ -1,0 +1,87 @@
+{
+ "signin.png": {
+  "listed": true,
+  "uses": 2,
+  "words": [
+   [
+    "sign in",
+    "sign-in",
+    "login",
+    "log in"
+   ],
+   [
+    "email",
+    "password"
+   ]
+  ]
+ },
+ "close_dialog.png": {
+  "listed": true,
+  "uses": 1,
+  "words": [
+   [
+    "close period"
+   ],
+   [
+    "march",
+    "confirm",
+    "dialog",
+    "lock"
+   ]
+  ]
+ },
+ "postings_chart.png": {
+  "listed": true,
+  "uses": 1,
+  "words": [
+   [
+    "posting"
+   ],
+   [
+    "month",
+    "grow",
+    "increas",
+    "rising",
+    "jan",
+    "may"
+   ]
+  ]
+ },
+ "entry_flow.png": {
+  "listed": true,
+  "uses": 1,
+  "words": [
+   [
+    "draft"
+   ],
+   [
+    "review"
+   ],
+   [
+    "post"
+   ]
+  ]
+ },
+ "logo.png": {
+  "listed": false
+ },
+ "divider.png": {
+  "listed": true,
+  "uses": 1,
+  "decorative": true
+ },
+ "settings.png": {
+  "listed": true,
+  "uses": 1,
+  "words": [
+   [
+    "time zone",
+    "timezone"
+   ],
+   [
+    "setting",
+    "company"
+   ]
+  ]
+ }
+}

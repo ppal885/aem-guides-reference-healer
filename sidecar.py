@@ -14,6 +14,8 @@
     GET  /copies      ?map=<path>[&judge=<n>][&ids=g1,g7]: the text copied across the map's topics (most
                       removable copies first; n more groups judged, none when not given), and what the reuse
                       agent says about each group (asked on request, kept until the files change)
+    GET  /alt         ?map=<path>: the images of the map's last check whose alt text says nothing (no model)
+    POST /alt-suggest {map, id, image_base64, media_type}: one alt text from a model that sees the image
     GET  /health
 
 It listens on 127.0.0.1 only. The model is called through the local `claude` CLI by default, or
@@ -21,6 +23,7 @@ through the Claude API with --backend sdk (claudeapi.py).
 """
 import argparse
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -37,23 +40,34 @@ def _log(message):
 BACKEND = "cli"
 
 
-def call_model(system, user, model=None):
+IMAGE_TYPES = {"image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif", "image/webp": ".webp"}
+
+
+def call_model(system, user, model=None, image=None):
     """One model call that must answer with a JSON object. Every call, good or failed, is noted
-    in usage.py, so a check can say what it cost and whether the model answered."""
+    in usage.py, so a check can say what it cost and whether the model answered. `image`: (bytes,
+    media type) for a call that must see a picture (alttext.py)."""
     import usage
     if BACKEND == "sdk":
         import claudeapi
-        return claudeapi.call_model(system, user, model)
+        return claudeapi.call_model(system, user, model, image=image)
     # --strict-mcp-config: the agents get no MCP servers. Without it the CLI adds the tool lists of
     # every MCP server of the person who started the sidecar whenever they connect in time: measured
     # on 15 Nov 2026, the same one-line call was 930 or 34,700 input tokens, by chance.
+    # With an image the CLI may read that one file and nothing else: the folder holds only it.
+    tools = ["--tools", "Read", "--allowedTools", "Read"] if image else ["--tools", ""]
     cmd = ["claude", "-p", "--output-format", "json", "--system-prompt", system,
-           "--tools", "", "--no-session-persistence", "--strict-mcp-config"]
+           *tools, "--no-session-persistence", "--strict-mcp-config"]
     if model:
         cmd += ["--model", model]
     envelope = {}
     try:
         with tempfile.TemporaryDirectory() as cwd:
+            if image:
+                name = "image" + IMAGE_TYPES.get(image[1], ".png")
+                with open(os.path.join(cwd, name), "wb") as f:
+                    f.write(image[0])
+                user = "The image is the file %s in the current folder: read it first.\n\n%s" % (name, user)
             proc = subprocess.run(cmd, input=user, capture_output=True, text=True, timeout=600, cwd=cwd)
         if proc.returncode != 0:
             raise RuntimeError("claude CLI failed: %s" % (proc.stderr or proc.stdout)[:400])
@@ -89,6 +103,7 @@ IDLE = {"running": False, "lines": [], "timeline": []}
 # The files of the last check of each map, for the reuse agent to read when the author opens
 # "Copied content" (GET /copies), and what it decided, kept until the files change.
 LAST_FILES = {}
+LAST_ASSETS = {}     # map path: (the assets that are not DITA, the paths dangling names stood for)
 COPIES = {}          # map path: (fingerprint of its files, the groups found in them)
 DECISIONS = {}       # reuse.decision_key: the reuse agent's decision, kept for the next page and check
 
@@ -122,6 +137,44 @@ def copies_of(map_path, model=None, judge=None, ids=None):
     return {"groups": [g if small or g["id"] in wanted else _summary(g) for g in full], "total": len(full),
             "unjudged": sum(1 for g in full if g["decision"] == "unjudged"),
             "copies": sum(len(g["copies"]) for g in full), "removable": sum(max(0, len(g["copies"]) - 1) for g in full)}
+
+
+def alt_of(map_path):
+    """The images of a map's last check whose alt text says nothing (alttext.py). No model."""
+    import alttext
+    files = LAST_FILES.get(map_path or "")
+    if not files:
+        return {"images": [], "note": "Run the health check first: the agents have not seen this map's files."}
+    assets, missing = LAST_ASSETS.get(map_path or "", (None, None))
+    found = alttext.images(files, assets, missing)
+    return {"images": found, "uses": sum(len(g["uses"]) for g in found), "weak_uses": sum(g["weak_uses"] for g in found)}
+
+
+def suggest_alt(body, model=None):
+    """One alt text for one image of the map's last check, from a model that sees the image. The
+    editor sends the picture it read from AEM (base64) and the id from alt_of. Asked only when the
+    author asks; nothing is written."""
+    import base64
+    import alttext
+    import usage
+    group = next((g for g in alt_of(body.get("map")).get("images", []) if g["id"] == body.get("id")), None)
+    if group is None:
+        raise ValueError("no such image in the map's last check: %s" % body.get("id"))
+    media = body.get("media_type") or "image/png"
+    if media not in IMAGE_TYPES:
+        raise ValueError("not an image type the model reads: %s" % media)
+    data = base64.b64decode(body.get("image_base64") or "", validate=True)
+    if not data or len(data) > 5 * 1024 * 1024:
+        raise ValueError("the image is empty or larger than 5 MB")
+    mark = usage.start()
+    try:
+        with usage.as_agent("alt"):
+            answer = call_model(alttext.SYSTEM, alttext.prompt_for(group), model, image=(data, media))
+    finally:
+        cost = usage.finish(mark)
+    return dict(alttext.clean(answer, group["image"]), id=group["id"], image=group["image"],
+                model_calls=cost["model_calls"], input_tokens=cost["input_tokens"],
+                output_tokens=cost["output_tokens"], cost_usd=cost["cost_usd"])
 
 
 def _summary(group):
@@ -188,6 +241,13 @@ def serve(port, model=None):
                 except Exception as exc:
                     _log("copies failed: %s" % exc)
                     self.send_json(500, {"error": str(exc)})
+            elif self.path.split("?")[0] == "/alt":
+                query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+                try:
+                    self.send_json(200, alt_of((query.get("map") or [""])[0]))
+                except Exception as exc:
+                    _log("alt failed: %s" % exc)
+                    self.send_json(500, {"error": str(exc)})
             elif self.path == "/memory":
                 import refplan
                 self.send_json(200, refplan.load_memory())
@@ -240,6 +300,18 @@ def serve(port, model=None):
                 except (ValueError, AttributeError, TypeError) as exc:
                     self.send_json(400, {"error": str(exc)})
                 return
+            if self.path == "/alt-suggest":
+                # From the editor, as text/plain so the browser needs no preflight request.
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(length).decode("utf-8"))
+                    self.send_json(200, suggest_alt(body, model))
+                except (ValueError, AttributeError, TypeError) as exc:
+                    self.send_json(400, {"error": str(exc)})
+                except Exception as exc:
+                    _log("alt suggestion failed: %s" % exc)
+                    self.send_json(502, {"error": "The model did not answer: %s" % " ".join(str(exc).split())[:200]})
+                return
             if self.path in ("/feedback", "/applied"):
                 # From the editor, as text/plain so the browser needs no preflight request.
                 #   /feedback  an author accepted a repair ("rejected": the candidates passed over),
@@ -288,6 +360,7 @@ def serve(port, model=None):
                     return
                 import refplan
                 LAST_FILES[payload.get("map") or ""] = payload.get("files") or []
+                LAST_ASSETS[payload.get("map") or ""] = (payload.get("assets"), payload.get("missing_paths"))
                 state = progress_of(payload.get("map"))
                 state.update(running=True, lines=[], timeline=[])
                 try:
