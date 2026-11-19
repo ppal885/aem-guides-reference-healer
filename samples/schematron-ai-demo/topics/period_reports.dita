@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="period_reports"><title>Period reports</title><shortdesc>The period reports show every journal entry that was posted in the period, grouped by account and by day, together with the totals for each account and the opening and closing balances of the period.</shortdesc><body><p>The trial balance report is ready as soon as the period is closed!</p><p>The trial balance report lists every account of the ledger with its debit and credit totals for the period and it shows the difference between them so that you can see at once whether the ledger balances before you close the period.</p></body></topic>

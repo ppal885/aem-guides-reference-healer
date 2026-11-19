@@ -1,0 +1,17 @@
+{
+  "about": "One finding per rule. A fix is right when this Schematron no longer reports it, the topic stays valid, and the meaning is kept: keep lists words the fixed element must still contain.",
+  "findings": [
+    {"rule": "c-note-type", "file": "close_period.dita", "kind": "code", "keep": ["Back up the ledger"]},
+    {"rule": "c-no-bold", "file": "close_period.dita", "kind": "code", "keep": ["Close period", "toolbar"], "expect": "uicontrol"},
+    {"rule": "c-section-id", "file": "close_period.dita", "kind": "code", "keep": ["After the close", "trial balance"]},
+    {"rule": "c-image-alt", "file": "ledger_screens.dita", "kind": "code", "keep": ["periods.png"]},
+    {"rule": "c-fig-title", "file": "ledger_screens.dita", "kind": "code", "keep": ["periods.png"]},
+    {"rule": "c-table-title", "file": "ledger_screens.dita", "kind": "code", "keep": ["Open and close periods"]},
+    {"rule": "t-title-length", "file": "reopen_period.dita", "kind": "text", "keep": ["Reopen"]},
+    {"rule": "t-no-click", "file": "reopen_period.dita", "kind": "text", "keep": ["Reopen", "toolbar"], "expect": "Select"},
+    {"rule": "t-no-please", "file": "reopen_period.dita", "kind": "text", "keep": ["ledger administrator", "reopen"]},
+    {"rule": "t-shortdesc-words", "file": "period_reports.dita", "kind": "text", "keep": ["journal entr", "account"]},
+    {"rule": "t-no-exclamation", "file": "period_reports.dita", "kind": "text", "keep": ["trial balance", "closed"]},
+    {"rule": "t-sentence-length", "file": "period_reports.dita", "kind": "text", "keep": ["debit", "credit", "balances"]}
+  ]
+}
