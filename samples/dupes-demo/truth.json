@@ -46,5 +46,21 @@
  "not_a_group": [
   "Delete the export files after the period",
   "Keep the export files after the period i"
+ ],
+ "map_groups": [
+  {
+   "tag": "topichead",
+   "navtitle": "Closing periods",
+   "maps": 2,
+   "refs": 3,
+   "why": "the same three topics under the same heading in both guides"
+  },
+  {
+   "tag": "reltable",
+   "navtitle": "",
+   "maps": 2,
+   "refs": 2,
+   "why": "the same relationship table in both guides"
+  }
  ]
 }

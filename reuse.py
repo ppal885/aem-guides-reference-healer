@@ -104,4 +104,19 @@ def decide(files, call_model, log=lambda message: None, max_groups=MAX_GROUPS):
             out.append(dict(group, decision=decision, variant_text=variant if decision in ("share", "variable") else "",
                             differs=str(a.get("differs") or "")[:200], reason=str(a.get("reason") or "No answer.")[:300],
                             existing=None, decided_by="agent" if a else "default"))
-    return sorted(out, key=lambda g: (-len(g["files"]), g["id"]))
+    out = sorted(out, key=lambda g: (-len(g["files"]), g["id"]))
+    return out + map_groups(files, start=len(groups))
+
+
+def map_groups(files, start=0):
+    """Groups of references copied into several maps: decided by code, no model. The same
+    references in several places say the same thing by construction; keeping them in step is the
+    point of sharing them."""
+    out = []
+    for number, group in enumerate(duplicates.find_maps(files)):
+        where = len(group["files"])
+        out.append(dict(group, id="m%d" % (start + number + 1), decision="share", decided_by="rule", existing=None,
+                        variant_text=group["text"], differs="",
+                        reason="The same %d references in %d %s: one shared piece keeps them in step." % (
+                            group["refs"], where, "map" if where == 1 else "maps")))
+    return out

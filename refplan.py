@@ -1412,16 +1412,20 @@ def plan_files(payload, backend="cli", model=None, log=print, progress=None, mem
         usage.finish(mark)
         raise
     totals = usage.finish(mark)
-    # Text copied across topics: counted by code on every check; the reuse agent is asked only
-    # when the author opens "Copied content" (sidecar GET /copies).
+    # Text copied across topics, and groups of references copied across maps: counted by code on
+    # every check; the reuse agent is asked only when the author opens "Copied content" (GET /copies).
     copied = duplicates.find(payload.get("files") or [])
-    if copied:
-        copies = sum(len(g["copies"]) for g in copied)
-        out["plan"] = list(out.get("plan") or []) + ["Copied text: %s %s copied into several topics (%s copies, %s of them could "
-                                                     "become conrefs). Open \"Copied content\" to see which could be one shared piece." % (
-                                                         format(len(copied), ","), "piece is" if len(copied) == 1 else "pieces are",
-                                                         format(copies, ","), format(copies - len(copied), ","))]
-        out.setdefault("stats", {})["copied_groups"] = len(copied)
+    copied_maps = duplicates.find_maps(payload.get("files") or [])
+    if copied or copied_maps:
+        everything = copied + copied_maps
+        copies = sum(len(g["copies"]) for g in everything)
+        maps = " (%s of them groups of references in maps)" % format(len(copied_maps), ",") if copied_maps else ""
+        out["plan"] = list(out.get("plan") or []) + ["Copied text: %s %s copied into several topics or maps%s: %s copies, "
+                                                     "%s of them could become conrefs. Open \"Copied content\" to see which "
+                                                     "could be one shared piece." % (
+                                                         format(len(everything), ","), "piece is" if len(everything) == 1 else "pieces are",
+                                                         maps, format(copies, ","), format(copies - len(everything), ","))]
+        out.setdefault("stats", {}).update(copied_groups=len(copied), copied_map_groups=len(copied_maps))
     # Attribute values a subject scheme no longer allows: found and, where the scheme's previous
     # version proves a rename, repaired by code. They are not references, so AEM's report does not
     # list them and the planner's groups do not hold them.
