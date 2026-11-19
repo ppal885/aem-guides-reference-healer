@@ -1,0 +1,690 @@
+{
+ "about": "Every case of every feature, simple or edge, and how it is checked. casecheck.py runs the agents' tests named here (no model), the editor's tests with --editor, and reads the measured runs of the model and of AEM from where they are written. not built: nothing checks it yet (a note may say where it is); gap: a case tried and found not handled, to be fixed; known miss: not handled on purpose.",
+ "cases": [
+  {
+   "id": "links-01",
+   "feature": "Broken links",
+   "level": "simple",
+   "case": "An element id renamed; the previous version has the same text",
+   "check": {
+    "py": "test_refs.RepairsWithoutAModel.test_renamed_id_is_settled_from_the_previous_version_when_the_text_is_unchanged"
+   }
+  },
+  {
+   "id": "links-02",
+   "feature": "Broken links",
+   "level": "simple",
+   "case": "A key renamed in the map; the previous map proves it",
+   "check": {
+    "py": "test_refs.RepairsWithoutAModel.test_renamed_key_is_settled_from_the_previous_version_of_the_map"
+   }
+  },
+  {
+   "id": "links-03",
+   "feature": "Broken links",
+   "level": "simple",
+   "case": "Only the topic id in the link is out of date; the link text is in the target",
+   "check": {
+    "py": "test_refs.OnlyTheTopicIdIsOutOfDate.test_it_is_repaired_when_the_link_text_is_found_in_the_target"
+   }
+  },
+  {
+   "id": "links-04",
+   "feature": "Broken links",
+   "level": "simple",
+   "case": "Content that moved as a whole to another file",
+   "check": {
+    "py": "test_refs.ContentThatMovedAsAWhole.test_no_reference_is_given_the_second_candidate_and_the_chooser_is_not_asked"
+   }
+  },
+  {
+   "id": "links-05",
+   "feature": "Broken links",
+   "level": "simple",
+   "case": "1,251 broken references of every kind in a 227-file map, planner, 3 runs",
+   "check": {
+    "measured": "eval/refs/planner-eval.json",
+    "says": "0 wrong repairs, 0 missed; 710 applied, 432 asked, 109 gone in every run"
+   }
+  },
+  {
+   "id": "links-06",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "Two elements with the same text: not guessed between",
+   "check": {
+    "py": "test_refs.RepairsWithoutAModel.test_two_elements_with_the_same_text_are_not_guessed_between"
+   }
+  },
+  {
+   "id": "links-07",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "A key renamed and an id renamed in one reference",
+   "check": {
+    "py": "test_refs.RepairsWithoutAModel.test_renamed_key_and_renamed_id_together"
+   }
+  },
+  {
+   "id": "links-08",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "The end of a conref range must exist too",
+   "check": {
+    "py": "test_refs.Scanner.test_the_end_of_a_conref_range_must_exist_too"
+   }
+  },
+  {
+   "id": "links-09",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "A key in a key scope, and a submap brought in under a scope",
+   "check": {
+    "py": "test_refs.SubmapKeyScopes.test_a_scoped_key_of_a_submap_resolves"
+   }
+  },
+  {
+   "id": "links-10",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "An undefined key with a working fallback href is not broken",
+   "check": {
+    "py": "test_refs.Scanner.test_an_undefined_key_with_a_working_fallback_is_not_broken"
+   }
+  },
+  {
+   "id": "links-11",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "A repair that lands on a duplicated id waits for a look",
+   "check": {
+    "py": "test_refs.RepairsThatLandOnADuplicatedId.test_the_same_repair_waits_for_a_look_when_two_elements_carry_the_new_id"
+   }
+  },
+  {
+   "id": "links-12",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "A decoy closer in name than the right target, 8 cases, 3 runs",
+   "check": {
+    "measured": "eval/refs/hard-eval.json",
+    "says": "right target first 8 of 8 in every run; reviewer rejected 24 of 24 decoys"
+   }
+  },
+  {
+   "id": "links-13",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "Text addressed to the model inside a wrong target",
+   "check": {
+    "measured": "eval/refs/inject-eval.json",
+    "says": "steered 0 of 8"
+   }
+  },
+  {
+   "id": "links-14",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "A percent-encoded file name and an upper-case extension on disk",
+   "check": {
+    "py": "test_refs.Scanner.test_on_disk_a_percent_encoded_file_name_and_an_upper_case_extension_are_read"
+   }
+  },
+  {
+   "id": "links-15",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "A link whose text is not in the new target gets a warning and waits",
+   "check": {
+    "py": "test_refs.TheLinkTextIsCheckedBeforeARepairIsAccepted.test_a_finders_repair_with_this_warning_is_not_applied_by_fix_all"
+   }
+  },
+  {
+   "id": "links-16",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "An author says no proposed target is right; the finder searches again without it",
+   "check": {
+    "py": "test_refs.AnAuthorSaysThisIsNotIt.test_a_finder_that_names_the_declined_target_again_is_not_passed_on"
+   }
+  },
+  {
+   "id": "links-17",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "Content that is gone: put it back, keep the text, or remove the references",
+   "check": {
+    "py": "test_refs.WaysOut.test_a_removed_note_can_be_put_back_kept_as_text_or_removed"
+   }
+  },
+  {
+   "id": "links-18",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "The repairs people applied on customer content, read against the targets",
+   "check": {
+    "measured": "README.md",
+    "says": "rule 32 of 32 right; finder 21 right, 7 likely, 5 unsure, 2 wrong (both put back)"
+   }
+  },
+  {
+   "id": "links-19",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "A file renamed in case only (File.dita to file.dita)",
+   "check": {
+    "py": "test_edgecases.EdgeCases.test_a_file_renamed_in_case_only_is_repaired_by_a_rule"
+   }
+  },
+  {
+   "id": "links-20",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "A file renamed and moved to another folder at once",
+   "check": {
+    "measured": "eval/refs/synonym-moved-words-only.json",
+    "says": "pieces moved to another file under another name, no history: right 12 of 12 in every run (finder agent)"
+   }
+  },
+  {
+   "id": "links-21",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "A link to a target outside the map is named, not repaired",
+   "check": {
+    "py": "test_refs.Learning.test_files_outside_the_map_that_use_the_target_are_named"
+   }
+  },
+  {
+   "id": "links-22",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "A conref push (conaction) whose target is gone",
+   "check": {
+    "py": "test_edgecases.EdgeCases.test_a_pushed_conref_whose_target_is_gone_is_broken"
+   }
+  },
+  {
+   "id": "links-23",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "A link to DITA content marked format=html is explained, not called a difference",
+   "check": {
+    "py": "test_refs.WhatThePlanSaysMatchesTheList.test_a_link_to_dita_content_that_is_marked_as_html_is_explained_not_called_a_difference"
+   }
+  },
+  {
+   "id": "images-01",
+   "feature": "Images (repair)",
+   "level": "simple",
+   "case": "An image moved; its name exists once",
+   "check": {
+    "py": "test_refs.ImagesAndOtherAssets.test_with_the_asset_list_a_moved_image_is_found_behind_the_key_and_behind_the_path"
+   }
+  },
+  {
+   "id": "images-02",
+   "feature": "Images (repair)",
+   "level": "simple",
+   "case": "An image behind a key whose name was renamed",
+   "check": {
+    "py": "test_refs.ImagesAndOtherAssets.test_a_renamed_key_of_an_image_is_repaired_from_the_maps_previous_version"
+   }
+  },
+  {
+   "id": "images-03",
+   "feature": "Images (repair)",
+   "level": "edge",
+   "case": "Two images of the same name are not guessed between",
+   "check": {
+    "py": "test_refs.ImagesAndOtherAssets.test_two_images_of_the_same_name_are_not_guessed"
+   }
+  },
+  {
+   "id": "images-04",
+   "feature": "Images (repair)",
+   "level": "edge",
+   "case": "A finder's image that another topic shows is named and held for a look",
+   "check": {
+    "py": "test_refs.AnImageAnotherTopicShows.test_a_finders_image_that_another_topic_shows_is_named_and_held_for_a_look"
+   }
+  },
+  {
+   "id": "images-05",
+   "feature": "Images (repair)",
+   "level": "edge",
+   "case": "A repair written as the GUID name AEM stores",
+   "check": {
+    "py": "test_refs.ImagesStoredByGuid.test_the_repair_is_written_as_the_guid_name_of_the_image_found"
+   }
+  },
+  {
+   "id": "images-06",
+   "feature": "Images (repair)",
+   "level": "edge",
+   "case": "An image renamed in case only",
+   "check": {
+    "py": "test_edgecases.EdgeCases.test_an_image_renamed_in_case_only_is_repaired_by_a_rule"
+   }
+  },
+  {
+   "id": "copies-01",
+   "feature": "Copies (conref)",
+   "level": "simple",
+   "case": "The same paragraph in several topics is one group",
+   "check": {
+    "py": "test_refs.CopiedText.test_the_same_text_in_several_topics_is_one_group"
+   }
+  },
+  {
+   "id": "copies-02",
+   "feature": "Copies (conref)",
+   "level": "simple",
+   "case": "A shared piece keeps the bold and the link of the copies",
+   "check": {
+    "editor": "src/controllers/widgets/content_health_report/copy_pieces.test.ts",
+    "name": "makes the piece from the copy"
+   }
+  },
+  {
+   "id": "copies-03",
+   "feature": "Copies (conref)",
+   "level": "simple",
+   "case": "A whole list or step copied word for word is one piece",
+   "check": {
+    "py": "test_refs.CopiedWholeBlocks.test_a_whole_list_is_one_group_and_its_items_are_not_grouped_again"
+   }
+  },
+  {
+   "id": "copies-04",
+   "feature": "Copies (conref)",
+   "level": "simple",
+   "case": "A Fix changes nothing a reader sees (HTML5 before and after, customer copy in local AEM)",
+   "check": {
+    "measured": "README.md",
+    "says": "1,540 of 1,547 pages the same, 7 gained one space, 101 of 101 files valid"
+   }
+  },
+  {
+   "id": "copies-05",
+   "feature": "Copies (conref)",
+   "level": "edge",
+   "case": "Copies for other readers (audience, product) are not one piece",
+   "check": {
+    "py": "test_refs.CopiedText.test_copies_for_other_readers_are_not_one_piece"
+   }
+  },
+  {
+   "id": "copies-06",
+   "feature": "Copies (conref)",
+   "level": "edge",
+   "case": "A Fix keeps the conditions and other attributes of a copy",
+   "check": {
+    "editor": "src/controllers/widgets/content_health_report/copy_pieces.test.ts",
+    "name": "keeps the conditions and other attributes"
+   }
+  },
+  {
+   "id": "copies-07",
+   "feature": "Copies (conref)",
+   "level": "edge",
+   "case": "A list with an item something links to is left to its items",
+   "check": {
+    "py": "test_refs.CopiedWholeBlocks.test_a_list_with_an_item_something_links_to_is_left_to_its_items"
+   }
+  },
+  {
+   "id": "copies-08",
+   "feature": "Copies (conref)",
+   "level": "edge",
+   "case": "Numbers that differ are never shared, whatever the model says",
+   "check": {
+    "py": "test_refs.ReuseAgent.test_numbers_that_differ_are_never_shared_whatever_the_model_says"
+   }
+  },
+  {
+   "id": "copies-09",
+   "feature": "Copies (conref)",
+   "level": "edge",
+   "case": "Groups of references copied into several maps",
+   "check": {
+    "py": "test_refs.CopiedMapContent.test_the_same_group_in_two_maps_in_different_folders_is_one_group"
+   }
+  },
+  {
+   "id": "copies-10",
+   "feature": "Copies (conref)",
+   "level": "edge",
+   "case": "Opening Copied content sends nothing to the model",
+   "check": {
+    "py": "test_refs.ReuseAgent.test_the_sidecar_asks_once_per_wording_and_says_when_it_has_none"
+   }
+  },
+  {
+   "id": "copies-11",
+   "feature": "Copies (conref)",
+   "level": "edge",
+   "case": "A copy in a table cell",
+   "check": {
+    "py": "test_edgecases.EdgeCases.test_copies_in_table_cells_are_one_group"
+   }
+  },
+  {
+   "id": "copies-14",
+   "feature": "Copies (conref)",
+   "level": "edge",
+   "case": "A table cell shared in AEM: one cell in a table of its own in the shared topic, a conref in each cell, valid, the same text in HTML5",
+   "check": {
+    "measured": "README.md",
+    "says": "3 of 3 cells conrefs with their column kept, 4 of 4 files valid, the text in all 3 HTML5 pages"
+   }
+  },
+  {
+   "id": "copies-12",
+   "feature": "Copies (conref)",
+   "level": "edge",
+   "case": "A copy that holds a variable (ph keyref)",
+   "check": {
+    "py": "test_edgecases.EdgeCases.test_a_copy_that_holds_a_variable_keeps_its_keyref"
+   }
+  },
+  {
+   "id": "copies-13",
+   "feature": "Copies (conref)",
+   "level": "edge",
+   "case": "The same text in topics of two languages (xml:lang)",
+   "check": {
+    "py": "test_edgecases.EdgeCases.test_topics_of_two_languages_are_never_one_group"
+   }
+  },
+  {
+   "id": "keep-01",
+   "feature": "Keep copies",
+   "level": "simple",
+   "case": "A number that differs is listed",
+   "check": {
+    "py": "test_keepcopies.CopiesThatDrifted.test_the_sample_finds_what_truth_says"
+   }
+  },
+  {
+   "id": "keep-02",
+   "feature": "Keep copies",
+   "level": "simple",
+   "case": "A short copy with a word or three changed is found",
+   "check": {
+    "py": "test_keepcopies.CopiesThatDrifted.test_a_short_copy_with_a_word_or_three_changed_is_found"
+   }
+  },
+  {
+   "id": "keep-03",
+   "feature": "Keep copies",
+   "level": "simple",
+   "case": "Every copy made to say one wording, in its own place, no conref",
+   "check": {
+    "editor": "src/controllers/widgets/content_health_report/copy_same.test.ts",
+    "name": "writes every copy that has another wording"
+   }
+  },
+  {
+   "id": "keep-04",
+   "feature": "Keep copies",
+   "level": "edge",
+   "case": "The link of the chosen wording is moved to each topic's folder",
+   "check": {
+    "editor": "src/controllers/widgets/content_health_report/copy_same.test.ts",
+    "name": "moves the links of the chosen wording"
+   }
+  },
+  {
+   "id": "keep-05",
+   "feature": "Keep copies",
+   "level": "edge",
+   "case": "The condition of a copy stays in its group and on the copy",
+   "check": {
+    "py": "test_keepcopies.CopiesThatDrifted.test_the_condition_of_a_copy_stays_in_its_group"
+   }
+  },
+  {
+   "id": "keep-06",
+   "feature": "Keep copies",
+   "level": "edge",
+   "case": "Two words or more put for others are another sentence",
+   "check": {
+    "py": "test_keepcopies.CopiesThatDrifted.test_two_words_or_more_put_for_others_are_another_sentence"
+   }
+  },
+  {
+   "id": "keep-07",
+   "feature": "Keep copies",
+   "level": "edge",
+   "case": "A not, or a name for other words, makes another sentence",
+   "check": {
+    "py": "test_refs.CopiedText.test_a_not_or_another_name_makes_it_a_different_sentence"
+   }
+  },
+  {
+   "id": "keep-08",
+   "feature": "Keep copies",
+   "level": "edge",
+   "case": "A copy changed since the check is left as it is",
+   "check": {
+    "editor": "src/controllers/widgets/content_health_report/copy_same.test.ts",
+    "name": "leaves a topic whose copy changed"
+   }
+  },
+  {
+   "id": "keep-09",
+   "feature": "Keep copies",
+   "level": "edge",
+   "case": "The mode and a kept group are remembered per map",
+   "check": {
+    "py": "test_keepcopies.KeepCopiesInTheSidecar.test_the_mode_and_a_kept_group_are_remembered_per_map"
+   }
+  },
+  {
+   "id": "keep-10",
+   "feature": "Keep copies",
+   "level": "edge",
+   "case": "One sentence written twice in one topic, once drifted",
+   "check": {
+    "py": "test_edgecases.EdgeCases.test_one_sentence_twice_in_one_topic_both_copies_are_in_the_group"
+   }
+  },
+  {
+   "id": "keep-11",
+   "feature": "Keep copies",
+   "level": "edge",
+   "case": "Two-word synonyms (service desk, support team)",
+   "check": {
+    "known_miss": "the word-by-word pass takes two words put for two others as another sentence"
+   }
+  },
+  {
+   "id": "scheme-01",
+   "feature": "Subject scheme",
+   "level": "simple",
+   "case": "A key renamed with the same label is proven",
+   "check": {
+    "py": "test_refs.SubjectSchemeValues.test_a_renamed_key_with_the_same_label_is_proven_and_every_token_is_kept"
+   }
+  },
+  {
+   "id": "scheme-02",
+   "feature": "Subject scheme",
+   "level": "edge",
+   "case": "A key in the same place without a label is only likely",
+   "check": {
+    "py": "test_refs.SubjectSchemeValues.test_a_key_in_the_same_place_without_a_label_is_only_likely"
+   }
+  },
+  {
+   "id": "scheme-03",
+   "feature": "Subject scheme",
+   "level": "edge",
+   "case": "A removed key gets no repair",
+   "check": {
+    "py": "test_refs.SubjectSchemeValues.test_a_removed_key_gets_no_repair"
+   }
+  },
+  {
+   "id": "alt-01",
+   "feature": "Alt text",
+   "level": "simple",
+   "case": "Images with no alt, a generic alt or the file name are listed; a good alt is not",
+   "check": {
+    "py": "test_alttext.FindingImagesWithoutAlt.test_the_sample_lists_what_truth_says_and_not_the_logo"
+   }
+  },
+  {
+   "id": "alt-02",
+   "feature": "Alt text",
+   "level": "simple",
+   "case": "The model's alt for seven made-up images, 2 runs",
+   "check": {
+    "measured": "eval/refs/alt-eval.json",
+    "says": "6 of 6 right in both runs"
+   }
+  },
+  {
+   "id": "alt-03",
+   "feature": "Alt text",
+   "level": "simple",
+   "case": "The alt goes into every place of the image",
+   "check": {
+    "editor": "src/controllers/widgets/content_health_report/alt_apply.test.ts",
+    "name": "writes every place of an image"
+   }
+  },
+  {
+   "id": "alt-04",
+   "feature": "Alt text",
+   "level": "edge",
+   "case": "An empty alt is decorative on purpose and not listed",
+   "check": {
+    "py": "test_alttext.FindingImagesWithoutAlt.test_why_an_alt_says_nothing"
+   }
+  },
+  {
+   "id": "alt-05",
+   "feature": "Alt text",
+   "level": "edge",
+   "case": "The sentence around the image leaves the image's own alt out",
+   "check": {
+    "py": "test_alttext.FindingImagesWithoutAlt.test_the_sentence_around_leaves_the_images_own_alt_out_and_reads_the_block_before"
+   }
+  },
+  {
+   "id": "alt-06",
+   "feature": "Alt text",
+   "level": "edge",
+   "case": "An external image is left out",
+   "check": {
+    "py": "test_alttext.FindingImagesWithoutAlt.test_an_external_image_is_left_out"
+   }
+  },
+  {
+   "id": "alt-07",
+   "feature": "Alt text",
+   "level": "edge",
+   "case": "A type the model does not read (text/html) is refused",
+   "check": {
+    "py": "test_alttext.SuggestingAnAlt.test_the_sidecar_lists_without_a_model_and_suggests_with_the_image"
+   }
+  },
+  {
+   "id": "alt-08",
+   "feature": "Alt text",
+   "level": "edge",
+   "case": "An image named only by a key",
+   "check": {
+    "py": "test_edgecases.EdgeCases.test_an_image_named_by_a_key_is_listed_by_the_path_of_the_key"
+   }
+  },
+  {
+   "id": "alt-09",
+   "feature": "Alt text",
+   "level": "edge",
+   "case": "An SVG image, or one without a web rendition",
+   "check": {
+    "editor": "src/controllers/widgets/content_health_report/alt_apply.test.ts",
+    "name": "is drawn by the browser"
+   }
+  },
+  {
+   "id": "alt-10",
+   "feature": "Alt text",
+   "level": "edge",
+   "case": "An image over 5 MB",
+   "check": {
+    "py": "test_edgecases.EdgeCases.test_an_image_over_5_mb_is_not_sent_to_the_model"
+   }
+  },
+  {
+   "id": "schematron-01",
+   "feature": "Schematron",
+   "level": "simple",
+   "case": "A finding with the Schematron's own fix (sqf:fix)",
+   "check": {
+    "measured": "README.md",
+    "says": "6 of 6 findings, 4 of 4 fixes applied in AEM"
+   }
+  },
+  {
+   "id": "schematron-02",
+   "feature": "Schematron",
+   "level": "edge",
+   "case": "A fix that asks the author for a value (sqf:user-entry)",
+   "check": {
+    "note": "not built in the Schematron work (it says so in its README row)"
+   }
+  },
+  {
+   "id": "schematron-03",
+   "feature": "Schematron",
+   "level": "edge",
+   "case": "A fix that reaches outside the element it fired on",
+   "check": {
+    "note": "not built in the Schematron work (it says so in its README row)"
+   }
+  },
+  {
+   "id": "index-01",
+   "feature": "Index refresh",
+   "level": "simple",
+   "case": "A link or conref saved in a topic shows in AEM's report at once",
+   "check": {
+    "measured": "README.md",
+    "says": "at the first ask, 3 of 3"
+   }
+  },
+  {
+   "id": "index-02",
+   "feature": "Index refresh",
+   "level": "edge",
+   "case": "A key renamed in a map",
+   "check": {
+    "measured": "README.md",
+    "says": "about 600 s, once not within 15 min (AEM caches a map's keys)"
+   }
+  },
+  {
+   "id": "index-03",
+   "feature": "Index refresh",
+   "level": "edge",
+   "case": "The search service asked right after Fix all",
+   "check": {
+    "note": "covered on a separate local branch only"
+   }
+  },
+  {
+   "id": "alt-11",
+   "feature": "Alt text",
+   "level": "edge",
+   "case": "An SVG in AEM: previewed from the original, drawn to a PNG for the model",
+   "check": {
+    "measured": "README.md",
+    "says": "suggestion named the three stages of the diagram; one model call"
+   }
+  }
+ ]
+}

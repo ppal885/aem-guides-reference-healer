@@ -277,6 +277,15 @@ def rule_fix(repo, ref):
             proposal = {"target_path": same_name[0], "topic_id": topic_id or "", "element_id": element_id or "", "key": ""}
             if resolves(repo, ref, proposal):
                 return dict(proposal, reason="The only file named %s in the repository is %s." % (os.path.basename(target), same_name[0]))
+        # A name that differs in case only (Setup.dita for setup.dita): the repository is case
+        # sensitive, a person reads it as the same name. Only when one file has it.
+        if not same_name:
+            same_case = [p for p in places if os.path.basename(p).lower() == os.path.basename(target).lower()]
+            if len(same_case) == 1:
+                proposal = {"target_path": same_case[0], "topic_id": topic_id or "", "element_id": element_id or "", "key": ""}
+                if resolves(repo, ref, proposal):
+                    return dict(proposal, reason="The only file named %s, in any case, in the repository is %s." % (
+                        os.path.basename(target), same_case[0]))
     if ref["reason"] == "key-undefined":
         key, _, element_id = ref["value"].partition("/")
         squash = lambda name: re.sub(r"[^a-z0-9]", "", name.lower())
