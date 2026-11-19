@@ -51,8 +51,32 @@ def _parse(raw):
         return None
 
 
+def _resolved_href(path, href):
+    """A relative href resolved against the file's folder, so the same target compares equal from
+    any folder; a GUID, a URL or an absolute path as it is."""
+    if re.match(r"^(GUID-|[a-z]+:|/|#)", href):
+        return href
+    target, _, fragment = href.partition("#")
+    return os.path.normpath(os.path.join(os.path.dirname(path), target)) + ("#" + fragment if fragment else "")
+
+
+def markup_of(path, el):
+    """The markup inside a block, without its text: '<b><xref href=content/a.dita>'. Ids are left out,
+    so are namespaced attributes; an href is resolved. Two copies with the same text and different
+    markup (bold here, not there; a link to another topic) are not the same piece. The editor
+    computes the same string from the file (markup.ts)."""
+    parts = []
+    for d in el.iter():
+        if d is el:
+            continue
+        attrs = sorted((k, _resolved_href(path, v) if k == "href" else v) for k, v in d.attrib.items()
+                       if k != "id" and not k.startswith("{") and ":" not in k)
+        parts.append("<%s%s>" % (_local(d.tag), "".join(" %s=%s" % kv for kv in attrs)))
+    return "".join(parts)
+
+
 def blocks_of(path, raw):
-    """[{file, location, tag, text}] for the blocks of one file."""
+    """[{file, location, tag, text, id, markup}] for the blocks of one file."""
     tree = _parse(raw)
     if tree is None:
         return []
@@ -72,7 +96,8 @@ def blocks_of(path, raw):
             if name in BLOCK_TAGS and not holds_block:
                 text = _text(child)
                 if len(text) >= MIN_CHARS:
-                    found.append({"file": path, "location": here, "tag": name, "text": text, "id": child.get("id") or ""})
+                    found.append({"file": path, "location": here, "tag": name, "text": text, "id": child.get("id") or "",
+                                  "markup": markup_of(path, child)})
             else:
                 walk(child, here)
 

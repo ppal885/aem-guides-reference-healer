@@ -139,6 +139,8 @@ def _compact(group):
     copies = []
     for c in group["copies"]:
         copy = {"file": slash(c["file"]), "location": c["location"]}
+        if c.get("markup"):
+            copy["mk"] = c["markup"]          # the markup inside it, when there is any (duplicates.markup_of)
         if c["text"] in variants:
             copy["v"] = variants.index(c["text"])
         else:

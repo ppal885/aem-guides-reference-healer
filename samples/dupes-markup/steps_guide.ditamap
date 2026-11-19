@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">
+<map><title>Ledgerline closing steps</title><topicref href="concepts/audits.dita"/><topicref href="concepts/periods.dita"/><topicref href="concepts/postings.dita"/><topicref href="reference/limits.dita"/><topicref href="tasks/adjustments.dita"/><topicref href="tasks/month_end.dita"/><topicref href="tasks/quarter_end.dita"/><topicref href="tasks/year_end.dita"/></map>
