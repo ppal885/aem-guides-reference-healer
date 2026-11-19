@@ -1,0 +1,13 @@
+{
+  "fixes_offered": [
+    {"file": "topics/close_period.dita", "rule": "note-type", "after": "<note type=\"caution\">Back up the ledger before you close the period.</note>"},
+    {"file": "topics/close_period.dita", "rule": "p-bold", "after": "<p>Select <uicontrol>Close period</uicontrol> in the toolbar.</p>"},
+    {"file": "topics/close_period.dita", "rule": "sd-click", "after": "<shortdesc>Select Close to end the period.</shortdesc>"},
+    {"file": "topics/reopen_period.dita", "rule": "section-draft", "after": "<section><p>Only a ledger administrator can reopen a period.</p></section>"}
+  ],
+  "reported_without_fix": [
+    {"file": "topics/period_reports.dita", "rule": "title-length"},
+    {"file": "topics/period_reports.dita", "rule": "topic-shortdesc"}
+  ],
+  "not_reported": ["topics/reopen_period.dita note (has a type)"]
+}
