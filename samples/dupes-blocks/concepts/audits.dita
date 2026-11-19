@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="audits"><title>About audits</title><conbody><p>Before you close a period:</p><ul><li>Post every open journal entry for the period before you start.</li><li>Run the <b>trial balance</b> report and check that it balances.</li><li>Ask the controller to approve the close in the approvals queue.</li></ul></conbody></concept>
