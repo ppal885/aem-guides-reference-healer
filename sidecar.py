@@ -5,6 +5,8 @@
     python3 -u sidecar.py --serve 8766 [--backend cli|sdk] [--model NAME]
 
     POST /heal-refs   the files of a map -> repairs, source fixes and the planner's plan
+    POST /schematron-fix {findings: [{id, rule, message, test, element, allowed, title, context, feedback}]}
+                      -> a model's fixed element for each Schematron finding without a quick fix
     POST /feedback    an author accepted a repair, or took an earlier answer back
     POST /applied     what "Fix all" wrote
     GET  /progress    what the agents are doing right now; ?map=<path> for one map's check
@@ -208,6 +210,20 @@ def alt_of(map_path):
     return {"images": found, "uses": sum(len(g["uses"]) for g in found), "weak_uses": sum(g["weak_uses"] for g in found)}
 
 
+def schematron_fix(body, model=None):
+    """A model's fix for each Schematron finding AEM sends (schematronfix.py): asked only when the
+    author asks, checked by AEM before the author sees it; nothing is written here."""
+    import schematronfix
+    import usage
+    mark = usage.start()
+    try:
+        with usage.as_agent("schematron"):
+            answer = schematronfix.suggest(body, lambda system, user: call_model(system, user, model))
+    finally:
+        cost = usage.finish(mark)
+    return dict(answer, input_tokens=cost["input_tokens"], output_tokens=cost["output_tokens"], cost_usd=cost["cost_usd"])
+
+
 def suggest_alt(body, model=None):
     """One alt text for one image of the map's last check, from a model that sees the image. The
     editor sends the picture it read from AEM (base64) and the id from alt_of. Asked only when the
@@ -359,6 +375,17 @@ def serve(port, model=None):
                     self.send_json(200, {"recorded": stored})
                 except (ValueError, AttributeError, TypeError) as exc:
                     self.send_json(400, {"error": str(exc)})
+                return
+            if self.path == "/schematron-fix":
+                # From AEM (Content Health): Schematron findings without a quick fix, when the author asks.
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                    self.send_json(200, schematron_fix(json.loads(self.rfile.read(length).decode("utf-8")), model))
+                except (ValueError, AttributeError, TypeError) as exc:
+                    self.send_json(400, {"error": str(exc)})
+                except Exception as exc:
+                    _log("schematron fix failed: %s" % exc)
+                    self.send_json(502, {"error": "The model did not answer: %s" % " ".join(str(exc).split())[:200]})
                 return
             if self.path == "/alt-suggest":
                 # From the editor, as text/plain so the browser needs no preflight request.
