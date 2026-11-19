@@ -36,6 +36,30 @@
    "label": "not the same text",
    "right": null,
    "why": "one copy adds a whole step: another sentence, not a copy that drifted"
+  },
+  {
+   "text_starts": "Do not share the closing",
+   "label": "drifted",
+   "right": null,
+   "why": "a short form (Don't) is the same words: found by code"
+  },
+  {
+   "text_starts": "Ask the controller to take care of",
+   "label": "maybe, same",
+   "right": null,
+   "why": "\"take care of\" and \"look into\" say the same: a maybe group the reuse agent should share"
+  },
+  {
+   "text_starts": "Call the ledger help line",
+   "label": "facts differ",
+   "right": null,
+   "why": "two phone numbers: which is right is the author's to say"
+  },
+  {
+   "text_starts": "Attach the signed receipts",
+   "label": "maybe, other",
+   "right": null,
+   "why": "signed receipts and payment slips are different papers: a maybe group the reuse agent should skip"
   }
  ],
  "not_listed": [

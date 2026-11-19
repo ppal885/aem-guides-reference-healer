@@ -33,6 +33,10 @@ UNLOCK = "Ask the IT %s to unlock the ledger before you reopen a period that was
 EXPORT = "Export the trial balance to the reporting folder before you close the period%s."
 EXPORT_MORE = (", then email the controller, attach the signed approval form and wait for the controller to answer "
                "before you continue")
+SHORT = "%s share the closing workbook with anyone outside the finance team, even for a quick review."
+CARE = "Ask the controller to %s any posting that the period close report marks as late or unbalanced."
+PHONE = "Call the ledger help line on %s if the close fails twice for the same period and the same company."
+FILES = "Attach the %s to the closing case so that the auditor can check them before the period is locked."
 SAME = "Every posting in a closed period keeps the name of the person who approved it and the time of approval."
 
 
@@ -61,11 +65,18 @@ def files():
         "topics/unlock_admins.dita": concept("unlock_admins", "Unlock for administrators (internal)", [
             p(UNLOCK % "help desk", "internal")]),
         "topics/checklist.dita": concept("checklist", "Closing checklist", [p("The items to check before a close.")]),
+        "topics/share_rules.dita": concept("share_rules", "Sharing the workbook", [
+            p(SHORT % "Do not"), p(CARE % "take care of"), p(PHONE % "800-555-0100"), p(FILES % "signed receipts")]),
+        "topics/close_rules.dita": concept("close_rules", "Closing rules", [
+            p(SHORT % "Do not"), p(CARE % "take care of"), p(PHONE % "800-555-0100"), p(FILES % "signed receipts")]),
+        "topics/close_help.dita": concept("close_help", "Help with a close", [
+            p(SHORT % "Don't"), p(CARE % "look into"), p(PHONE % "800-555-0199"), p(FILES % "payment slips")]),
         "drift_guide.ditamap": ('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" '
                                 '"map.dtd">\n<map><title>Ledgerline closing (copies that drifted)</title>%s</map>\n' % "".join(
                                     '<topicref href="topics/%s.dita"/>' % n for n in (
                                         "close_month", "close_quarter", "close_year", "payroll_close", "reopen_internal",
-                                        "unlock_internal", "unlock_admins", "checklist"))),
+                                        "unlock_internal", "unlock_admins", "checklist", "share_rules", "close_rules",
+                                        "close_help"))),
     }
 
 
@@ -83,6 +94,14 @@ TRUTH = [
      "why": "copies for internal readers; one says help desk; the condition must stay"},
     {"text_starts": "Export the trial balance", "label": "not the same text", "right": None,
      "why": "one copy adds a whole step: another sentence, not a copy that drifted"},
+    {"text_starts": "Do not share the closing", "label": "drifted", "right": None,
+     "why": "a short form (Don't) is the same words: found by code"},
+    {"text_starts": "Ask the controller to take care of", "label": "maybe, same", "right": None,
+     "why": "\"take care of\" and \"look into\" say the same: a maybe group the reuse agent should share"},
+    {"text_starts": "Call the ledger help line", "label": "facts differ", "right": None,
+     "why": "two phone numbers: which is right is the author's to say"},
+    {"text_starts": "Attach the signed receipts", "label": "maybe, other", "right": None,
+     "why": "signed receipts and payment slips are different papers: a maybe group the reuse agent should skip"},
 ]
 NOT_LISTED = [SAME[:40]]
 

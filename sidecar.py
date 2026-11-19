@@ -191,7 +191,10 @@ def copies_of(map_path, model=None, judge=None, ids=None):
     small = len(full) <= FULL_UP_TO
     keep = keep_of(map_path)
     kept = set(keep["kept"])
-    drifted = [g for g in full if g["kind"] in ("numbers", "wording")]
+    # Copies that no longer agree, and maybe groups unless the reuse agent said their wordings say
+    # different things.
+    drifted = [g for g in full if g["kind"] in ("numbers", "wording")
+               or (g["kind"] == "maybe" and g["decision"] not in ("skip", "variable"))]
     return {"groups": [dict(g if small or g["id"] in wanted else _summary(g), kept=g["key"] in kept) for g in full],
             "total": len(full), "mode": keep["mode"],
             "drifted": sum(1 for g in drifted if g["key"] not in kept), "kept": sum(1 for g in drifted if g["key"] in kept),
