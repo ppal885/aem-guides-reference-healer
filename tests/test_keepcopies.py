@@ -26,12 +26,17 @@ class CopiesThatDrifted(unittest.TestCase):
     def test_the_sample_finds_what_truth_says(self):
         with open(os.path.join(SAMPLE, "truth.json")) as f:
             truth = json.load(f)
-        drifted = [g["text"] for g in duplicates.find(duplicates.files_of(SAMPLE)) if g["kind"] in ("numbers", "wording")]
-        listed = lambda start: any(text.startswith(start) for text in drifted)
+        groups = duplicates.find(duplicates.files_of(SAMPLE))
+        kinds = lambda start: {g["kind"] for g in groups if any(v["text"].startswith(start) for v in g["variants"])}
         for case in truth["groups"]:
-            # meant to differ, or another sentence: not a group of copies that drifted
-            self.assertEqual(listed(case["text_starts"]), case["label"] in ("drifted", "facts differ"), case["why"])
-        self.assertFalse(listed(truth["not_listed"][0]))
+            found = kinds(case["text_starts"]) & {"numbers", "wording", "maybe"}
+            want = {"drifted": {"numbers", "wording"}, "facts differ": {"numbers", "wording"},
+                    "maybe, same": {"maybe"}, "maybe, other": {"maybe"}}.get(case["label"], set())
+            # meant to differ, or another sentence: not listed at all
+            self.assertEqual(bool(found), bool(want), case["why"])
+            if want:
+                self.assertTrue(found <= want, (case["why"], found))
+        self.assertFalse(kinds(truth["not_listed"][0]) & {"numbers", "wording", "maybe"})
 
     def test_a_short_copy_with_a_word_or_three_changed_is_found(self):
         base = "Back up the ledger database before you close the period, every time, even for a short period."
@@ -42,7 +47,18 @@ class CopiesThatDrifted(unittest.TestCase):
     def test_two_words_or_more_put_for_others_are_another_sentence(self):
         a = "Assist a client with checking their eligibility for the new cash flow tool today."
         files = [topic("a", "<p>%s</p>" % a), topic("b", "<p>%s</p>" % a.replace("checking their eligibility", "scheduling a demo"))]
-        self.assertEqual(duplicates.find(files), [])
+        # Never a group of copies: a "maybe" group, which nothing shares until someone settles it.
+        self.assertEqual([g["kind"] for g in duplicates.find(files)], ["maybe"])
+
+    def test_a_short_form_is_the_same_words_and_a_synonym_is_a_maybe(self):
+        said = "Do not share the ledger file with anyone outside the closing team, even for a review."
+        files = [topic("a", "<p>%s</p>" % said), topic("b", "<p>%s</p>" % said.replace("Do not", "Don't"))]
+        self.assertEqual([g["kind"] for g in duplicates.find(files)], ["wording"])
+        unlock = "Ask the IT service desk to unlock the ledger before you reopen a period that was closed by mistake."
+        files = [topic("a", "<p>%s</p>" % unlock), topic("b", "<p>%s</p>" % unlock),
+                 topic("c", "<p>%s</p>" % unlock.replace("service desk", "support team"))]
+        kinds = sorted((g["kind"], len(g["copies"])) for g in duplicates.find(files))
+        self.assertEqual(kinds, [("maybe", 3), ("same", 2)])
 
     def test_the_condition_of_a_copy_stays_in_its_group(self):
         group = self.groups()["Ask the IT service d"]
@@ -66,12 +82,12 @@ class KeepCopiesInTheSidecar(unittest.TestCase):
 
     def test_the_mode_and_a_kept_group_are_remembered_per_map(self):
         first = self.sidecar.copies_of("/drift.ditamap")
-        self.assertEqual((first["mode"], first["drifted"], first["kept"]), ("share", 4, 0))
+        self.assertEqual((first["mode"], first["drifted"], first["kept"]), ("share", 8, 0))   # 6 drifted, 2 maybe
         self.assertEqual(self.sidecar.set_keep({"map": "/drift.ditamap", "mode": "keep"})["mode"], "keep")
         drifted = next(g for g in first["groups"] if g["kind"] == "numbers")
         self.sidecar.set_keep({"map": "/drift.ditamap", "keep": drifted["key"]})
         again = self.sidecar.copies_of("/drift.ditamap")
-        self.assertEqual((again["mode"], again["drifted"], again["kept"]), ("keep", 3, 1))
+        self.assertEqual((again["mode"], again["drifted"], again["kept"]), ("keep", 7, 1))
         self.assertTrue(next(g for g in again["groups"] if g["key"] == drifted["key"])["kept"])
         self.assertEqual(self.sidecar.keep_of("/other.ditamap"), {"mode": "share", "kept": []})
         self.sidecar.set_keep({"map": "/drift.ditamap", "unkeep": drifted["key"]})

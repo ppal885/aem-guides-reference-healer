@@ -494,9 +494,38 @@
    "id": "keep-11",
    "feature": "Keep copies",
    "level": "edge",
-   "case": "Two-word synonyms (service desk, support team)",
+   "case": "Two-word synonyms (service desk, support team): a maybe group, settled by the reuse agent",
    "check": {
-    "known_miss": "the word-by-word pass takes two words put for two others as another sentence"
+    "py": "test_keepcopies.CopiesThatDrifted.test_a_short_form_is_the_same_words_and_a_synonym_is_a_maybe"
+   }
+  },
+  {
+   "id": "keep-12",
+   "feature": "Keep copies",
+   "level": "edge",
+   "case": "A short form (Don't, Do not) is the same words",
+   "check": {
+    "py": "test_keepcopies.CopiesThatDrifted.test_a_short_form_is_the_same_words_and_a_synonym_is_a_maybe"
+   }
+  },
+  {
+   "id": "keep-13",
+   "feature": "Keep copies",
+   "level": "edge",
+   "case": "The reuse agent settles maybe groups: same words said otherwise shared, other things skipped",
+   "check": {
+    "measured": "README.md",
+    "says": "2 runs: 2 of 2 maybe groups right both times; a maybe that says another thing called the same: 0"
+   }
+  },
+  {
+   "id": "keep-14",
+   "feature": "Keep copies",
+   "level": "edge",
+   "case": "A maybe group is never listed to share in one place",
+   "check": {
+    "editor": "test/controllers/dialogs/content_health_copies_dialog_controller.test.ts",
+    "name": "lists a maybe group only in Keep copies"
    }
   },
   {

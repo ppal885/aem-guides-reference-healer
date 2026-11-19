@@ -194,12 +194,34 @@ def _contained(a, b):
     return len(small & large) / float(len(small)) if small else 0.0
 
 
+# Short forms that say the same as their long form ("Don't" and "Do not"): one copy that uses the
+# short form has not changed a word. Keys are lower case words, so "don't" is "don t".
+CONTRACTIONS = [("don t", "do not"), ("doesn t", "does not"), ("didn t", "did not"), ("can t", "cannot"),
+                ("can not", "cannot"), ("won t", "will not"), ("isn t", "is not"), ("aren t", "are not"),
+                ("wasn t", "was not"), ("weren t", "were not"), ("shouldn t", "should not"), ("couldn t", "could not"),
+                ("wouldn t", "would not"), ("haven t", "have not"), ("hasn t", "has not"), ("it s", "it is"),
+                ("you re", "you are"), ("we re", "we are"), ("they re", "they are"), ("you ll", "you will"),
+                ("we ll", "we will"), ("that s", "that is"), ("there s", "there is"), ("let s", "let us")]
+
+
+def long_forms(key):
+    """A key with every short form written out."""
+    out = " %s " % key
+    for short, full in CONTRACTIONS:
+        out = out.replace(" %s " % short, " %s " % full)
+    return out.strip()
+
+
 def _changed_words(a, b):
-    """How many words differ between two texts (their keys): added, removed or replaced."""
-    x, y = a.split(), b.split()
+    """How many words differ between two texts (their keys): added, removed or replaced. A short form
+    and its long form are the same words."""
+    x, y = long_forms(a).split(), long_forms(b).split()
     return sum(max(i2 - i1, j2 - j1) for op, i1, i2, j1, j2 in
                difflib.SequenceMatcher(None, x, y, autojunk=False).get_opcodes() if op != "equal")
 
+
+# The same short forms, as a person writes them ("don't"), for the text of a copy.
+CONTRACTION_WORDS = {short.replace(" ", "'"): full for short, full in CONTRACTIONS if " " in short and short.endswith((" t", " s", " re", " ll"))}
 
 NEGATIONS = {"not", "no", "never", "cannot", "none", "nor", "without", "neither", "nothing", "t"}  # "t": don't, isn't
 
@@ -209,7 +231,10 @@ def _says_otherwise(a, b):
     don't...) where the other does not, or a name is put in place of other words (Payroll for Billing,
     Acme Payroll for the customer).
     Words only added or left out are not a different name; the changed-words limit covers those."""
-    words_a, words_b = re.findall(r"[A-Za-z0-9]+", a), re.findall(r"[A-Za-z0-9]+", b)
+    # Short forms written out first, so "Don't" and "Do not" are the same words (and the same "not").
+    expand = lambda text: re.findall(r"[A-Za-z0-9]+", " " + " ".join(
+        w if not CONTRACTION_WORDS.get(w.lower()) else CONTRACTION_WORDS[w.lower()] for w in re.findall(r"[A-Za-z0-9']+", text)))
+    words_a, words_b = expand(a), expand(b)
     negations = lambda words: sorted("not" if w.lower() == "t" else w.lower() for w in words if w.lower() in NEGATIONS)
     if negations(words_a) != negations(words_b):
         return "negation"
@@ -279,12 +304,22 @@ def find(files):
         signature = _minhash(shingles[index])
         for band in range(BANDS):
             buckets[(tag, own, band, tuple(signature[band * ROWS:(band + 1) * ROWS]))].append(index)
+    # Pairs that would be copies but for two words or more put for two others: maybe the same thing
+    # in other words ("service desk", "support team"), maybe another statement ("receipts", "payments").
+    # Code cannot tell; they become "maybe" groups for the author or the reuse agent to settle.
+    maybe = []
+
+    def join_or_maybe(a, b):
+        why = _says_otherwise(units[a][1][0]["text"], units[b][1][0]["text"])
+        if why is None:
+            join(a, b)
+        elif why == "other words":
+            maybe.append((a, b))
     for members in buckets.values():
         for a, b in zip(members, members[1:]):
             if (_jaccard(shingles[a], shingles[b]) >= WORDING_SIMILARITY or _contained(shingles[a], shingles[b]) >= CONTAINED) \
-                    and _changed_words(units[a][0][2], units[b][0][2]) <= MAX_CHANGED_WORDS \
-                    and not _says_otherwise(units[a][1][0]["text"], units[b][1][0]["text"]):
-                join(a, b)
+                    and _changed_words(units[a][0][2], units[b][0][2]) <= MAX_CHANGED_WORDS:
+                join_or_maybe(a, b)
     # Short copies: one changed word changes three word triples, so in a sentence of fifteen words
     # the triples of two copies never meet (seen on samples/dupes-drift: "and the attachments" added,
     # "service desk" for "support team"). Copies that keep their first or last three words are
@@ -300,9 +335,8 @@ def find(files):
             continue
         for i, a in enumerate(members):
             for b in members[i + 1:]:
-                if root(a) != root(b) and _changed_words(units[a][0][2], units[b][0][2]) <= MAX_CHANGED_WORDS \
-                        and not _says_otherwise(units[a][1][0]["text"], units[b][1][0]["text"]):
-                    join(a, b)
+                if root(a) != root(b) and _changed_words(units[a][0][2], units[b][0][2]) <= MAX_CHANGED_WORDS:
+                    join_or_maybe(a, b)
     clusters = collections.defaultdict(list)
     for index in range(len(units)):
         clusters[root(index)].append(index)
@@ -314,8 +348,37 @@ def find(files):
         templates = {re.sub(r"\d+", "#", units[i][0][2]) for i in indexes}
         kind = "same" if len(indexes) == 1 else "numbers" if len(templates) == 1 else "wording"
         groups.append(_group(kind, units[indexes[0]][0][0], members))
+    groups.extend(_maybe_groups(maybe, root, clusters, units))
     groups.extend(whole_groups)
     return sorted(groups, key=lambda g: (-len(g["files"]), -len(g["copies"]), g["text"]))
+
+
+def _maybe_groups(pairs, root, clusters, units):
+    """One "maybe" group for each set of copy groups (or single wordings) that pairs join: their copies
+    together, in two topics or more. A group of copies stays as it is; the maybe group is listed
+    beside it until someone says whether the wordings say the same."""
+    parent = {}
+
+    def top(r):
+        while parent.get(r, r) != r:
+            r = parent[r]
+        return r
+    for a, b in pairs:
+        ra, rb = top(root(a)), top(root(b))
+        if ra != rb:
+            parent[max(ra, rb)] = min(ra, rb)
+    sets = collections.defaultdict(set)
+    for a, b in pairs:
+        for r in (root(a), root(b)):
+            sets[top(r)].add(r)
+    out = []
+    for roots in sets.values():
+        if len(roots) < 2:
+            continue
+        members = [blk for r in sorted(roots) for i in clusters[r] for blk in units[i][1]]
+        if len({blk["file"] for blk in members}) >= MIN_FILES:
+            out.append(_group("maybe", units[min(roots)][0][0], members))
+    return out
 
 
 def _linked_ids(files):
