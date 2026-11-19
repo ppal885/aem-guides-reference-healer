@@ -1986,6 +1986,65 @@ class CopiedText(unittest.TestCase):
         self.assertEqual(duplicates.find(files), [])
 
 
+class CopiedWholeBlocks(unittest.TestCase):
+    """A whole list or step copied word for word is one group; its items are not grouped again."""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "samples"))
+        import gen_dupes_blocks
+        cls.files = [{"path": "content/dam/b/" + path, "xml": xml} for path, xml in gen_dupes_blocks.files().items()]
+        cls.groups = duplicates.find(cls.files)
+
+    def of(self, tag):
+        return [g for g in self.groups if g["tag"] == tag]
+
+    def names(self, group):
+        return sorted(os.path.basename(f) for f in group["files"])
+
+    def test_a_whole_list_is_one_group_and_its_items_are_not_grouped_again(self):
+        lists = self.of("ul")
+        self.assertEqual([self.names(g) for g in lists], [["audits.dita", "periods.dita", "postings.dita"]])
+        self.assertEqual(lists[0]["kind"], "same")
+        self.assertIn("<li><li><b><li>", lists[0]["copies"][0]["markup"])
+        items = [g for g in self.of("li") if "trial balance" in g["text"]]
+        self.assertEqual(items, [])          # reports.dita alone has its items now: nothing to group
+
+    def test_a_list_with_an_item_something_links_to_is_left_to_its_items(self):
+        kept = [self.names(g) for g in self.of("li") if "ninety days" in g["text"]]
+        self.assertEqual(kept, [["archive.dita", "retention.dita"]] * 2)
+
+    def test_a_whole_step_is_one_group_and_a_step_with_other_info_shares_its_command(self):
+        self.assertEqual([self.names(g) for g in self.of("step")], [["month_end.dita", "quarter_end.dita", "year_end.dita"]])
+        self.assertEqual([self.names(g) for g in self.of("cmd") if "Periods" in g["text"]], [["adjustments.dita", "corrections.dita"]])
+        self.assertEqual([g for g in self.of("info") if "no open journal" in g["text"]], [])
+
+    def test_whole_blocks_are_shared_by_rule_without_the_model(self):
+        asked = []
+        decided = reuse.decide(self.files, lambda system, user: asked.append(user) or {"groups": []})
+        whole = [g for g in decided if g["tag"] in ("ul", "step")]
+        self.assertEqual([(g["decision"], g["decided_by"]) for g in whole], [("share", "rule")] * 2)
+        self.assertFalse(any('"element": "ul"' in a or '"element": "step"' in a for a in asked))
+
+    def test_after_a_fix_the_items_of_a_shared_list_are_not_copies(self):
+        items = "<li>Post every open journal entry for the period before you start.</li><li>Run the <b>trial balance</b> report.</li>"
+        shared = '<topic id="shared_content"><title>S</title><body><ul id="ul_post">%s</ul></body></topic>' % items
+        user = '<concept id="%s"><title>T</title><conbody><ul conref="GUID-S.dita#shared_content/ul_post"><li/></ul></conbody></concept>'
+        other = '<concept id="r"><title>R</title><conbody><ul>%s<li>Ask the auditor to approve it.</li></ul></conbody></concept>' % items
+        files = [{"path": "d/reuse/shared-content.dita", "xml": shared}, {"path": "d/a.dita", "xml": user % "a"},
+                 {"path": "d/b.dita", "xml": user % "b"}, {"path": "d/r.dita", "xml": other}]
+        self.assertEqual(duplicates.find(files), [])
+        # A new topic with the whole list again joins the shared one: "use existing".
+        files.append({"path": "d/c.dita", "xml": '<concept id="c"><title>C</title><conbody><ul>%s</ul></conbody></concept>' % items})
+        decided = reuse.decide(files, lambda system, user: {"groups": []})
+        self.assertEqual([(g["tag"], g["decision"], [c["file"] for c in g["copies"]]) for g in decided],
+                         [("ul", "use existing", ["d/c.dita"])])
+
+    def test_a_list_with_one_item_is_left_to_its_item(self):
+        one = '<topic id="t"><title>T</title><body><ul><li>%s</li></ul></body></topic>' % ("x " * 30)
+        self.assertEqual([b["tag"] for b in duplicates.blocks_of("d/a.dita", one)], ["li"])
+
+
 
 class CopiedMapContent(unittest.TestCase):
     """Groups of references copied into several maps."""

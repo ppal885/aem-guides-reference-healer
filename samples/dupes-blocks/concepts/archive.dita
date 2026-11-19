@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="archive"><title>About archive</title><conbody><ul><li>The ledger keeps every posting for ninety days after the close.</li><li>Postings older than ninety days move to the archive every night.</li></ul></conbody></concept>

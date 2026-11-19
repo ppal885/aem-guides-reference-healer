@@ -31,6 +31,11 @@ BLOCK_TAGS = {"p", "note", "step", "cmd", "li", "shortdesc", "section", "info", 
               "example", "lq", "postreq", "prereq", "result", "abstract"}
 MIN_CHARS = 40
 MIN_FILES = 2
+# A whole list or step copied word for word (its items, its markup) is one piece: one conref takes
+# its place instead of one for each item, and the items stay in step. Only an exact copy: a list
+# with one item different is left to its items.
+WHOLE_TAGS = {"ul", "ol", "step"}
+MIN_PARTS = 2
 WORDING_SIMILARITY = 0.85
 CONTAINED = 0.9            # or: nearly all of the shorter copy's word triples are in the longer one
 BANDS, ROWS = 20, 5          # MinHash LSH: 100 hashes; pairs near 0.85 meet in a band almost always
@@ -92,6 +97,12 @@ def blocks_of(path, raw):
             here = "%s/%s[%d]" % (location, name, counts[name])
             if child.get("conref") or child.get("conkeyref"):
                 continue                              # already reused, and so is what is inside it
+            if name in WHOLE_TAGS and sum(1 for c in child if _local(c.tag) in BLOCK_TAGS) >= MIN_PARTS:
+                text = _text(child)
+                if len(text) >= MIN_CHARS:
+                    found.append({"file": path, "location": here, "tag": name, "text": text, "id": child.get("id") or "",
+                                  "markup": markup_of(path, child), "whole": True,
+                                  "inner_ids": sorted({d.get("id") for d in child.iter() if d is not child and d.get("id")})})
             holds_block = any(_local(d.tag) in BLOCK_TAGS for d in child.iter() if d is not child)
             if name in BLOCK_TAGS and not holds_block:
                 text = _text(child)
@@ -150,6 +161,7 @@ def find(files):
         path = (entry.get("path") or "").lstrip("/")
         if path.endswith(".dita"):
             blocks.extend(blocks_of(path, entry.get("xml") or ""))
+    whole_groups, blocks = _whole(files, blocks)
     # Units: the blocks with the same text (case, spaces and punctuation aside) of one element type.
     by_text = collections.defaultdict(list)
     for block in blocks:
@@ -197,7 +209,59 @@ def find(files):
         templates = {re.sub(r"\d+", "#", units[i][0][1]) for i in indexes}
         kind = "same" if len(indexes) == 1 else "numbers" if len(templates) == 1 else "wording"
         groups.append(_group(kind, units[indexes[0]][0][0], members))
+    groups.extend(whole_groups)
     return sorted(groups, key=lambda g: (-len(g["files"]), -len(g["copies"]), g["text"]))
+
+
+def _linked_ids(files):
+    """The element ids something links to: {(file, id)}, and {id} for a link by GUID, whose file
+    is not known here (any element with that id counts as linked)."""
+    by_file, anywhere = set(), set()
+    for entry in files:
+        path = (entry.get("path") or "").lstrip("/")
+        for target, fragment in re.findall(r'\s(?:href|conref)\s*=\s*"([^"#]*)#([^"]+)"', entry.get("xml") or ""):
+            element = fragment.split("/")[-1]
+            if target.startswith("GUID-") or re.match(r"^[a-z]+:", target):
+                anywhere.add(element)
+            else:
+                by_file.add((_resolved_href(path, target) if target else path, element))
+    return by_file, anywhere
+
+
+def _inside(location, taken):
+    parts = location.split("/")
+    return any("/".join(parts[:n]) in taken for n in range(2, len(parts)))
+
+
+def _whole(files, blocks):
+    """Groups of whole lists and steps copied word for word, markup and all, into MIN_FILES files or
+    more; and the other blocks, without the items inside those copies (the whole list is shared,
+    not its items). A copy with an item something links to is left to its items: a conref would
+    take that id away."""
+    whole = [b for b in blocks if b.get("whole")]
+    rest = [b for b in blocks if not b.get("whole")]
+    by_file, anywhere = _linked_ids(files)
+
+    def linked(file, element_id):
+        return (file, element_id) in by_file or element_id in anywhere
+    # A whole list or step that is itself a shared piece (something pulls it in by conref): its
+    # items are the piece's, not copies of their own.
+    pieces = [b for b in whole if b["id"] and linked(b["file"], b["id"])]
+    keep = [b for b in whole if not any(linked(b["file"], i) for i in b["inner_ids"])]
+    for _ in range(2):                                # a copied list inside a copied step goes with the step
+        by_text = collections.defaultdict(list)
+        for block in keep:
+            by_text[(block["tag"], _key(block["text"]), block["markup"])].append(block)
+        chosen = [m for m in by_text.values() if len({b["file"] for b in m}) >= MIN_FILES]
+        taken = collections.defaultdict(set)
+        for block in pieces:
+            taken[block["file"]].add(block["location"])
+        for members in chosen:
+            for block in members:
+                taken[block["file"]].add(block["location"])
+        keep = [b for b in keep if not _inside(b["location"], taken[b["file"]])]
+    groups = [_group("same", m[0]["tag"], m) for m in chosen if not any(_inside(b["location"], taken[b["file"]]) for b in m)]
+    return groups, [b for b in rest if not _inside(b["location"], taken[b["file"]])]
 
 
 def _group(kind, tag, members):

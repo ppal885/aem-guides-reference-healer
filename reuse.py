@@ -128,6 +128,11 @@ def decide(files, call_model, log=lambda message: None, judge=PAGE, cache=None, 
                             decided_by="rule", reason="The same text is already shared as %s#%s/%s." % (
                                 piece["path"], piece["topic"], piece["id"])))
             continue
+        if group["tag"] in duplicates.WHOLE_TAGS:   # word for word, markup and all: nothing to judge
+            out.append(dict(group, decision="share", variant_text=group["text"], differs="", decided_by="rule",
+                            reason="The same %s, every item and its markup, is in %d topics." % (
+                                "step" if group["tag"] == "step" else "list", len(group["files"]))))
+            continue
         out.append(group)
         if decision_key(group) not in cache and len(to_ask) < judge:
             to_ask.append(group)
