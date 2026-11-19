@@ -1979,6 +1979,43 @@ class CopiedText(unittest.TestCase):
 
 
 
+class CopiedMapContent(unittest.TestCase):
+    """Groups of references copied into several maps."""
+
+    GROUP = '<topichead navtitle="Setup"><topicref href="%sa.dita"/><topicref href="%sb.dita"/></topichead>'
+
+    def mapfile(self, path, body):
+        return {"path": path, "xml": "<map><title>M</title>%s</map>" % body}
+
+    def test_the_same_group_in_two_maps_in_different_folders_is_one_group(self):
+        files = [self.mapfile("/d/one.ditamap", self.GROUP % ("t/", "t/")),
+                 self.mapfile("/d/sub/two.ditamap", self.GROUP % ("../t/", "../t/"))]
+        groups = duplicates.find_maps(files)
+        self.assertEqual([(g["tag"], g["navtitle"], g["refs"], g["files"]) for g in groups],
+                         [("topichead", "Setup", 2, ["d/one.ditamap", "d/sub/two.ditamap"])])
+        # Each copy keeps its own map's spelling: the editor compares that before it replaces it.
+        self.assertIn("href=../t/a.dita", next(c for c in groups[0]["copies"] if c["file"] == "d/sub/two.ditamap")["text"])
+
+    def test_only_the_largest_copied_group_and_not_a_group_that_points_elsewhere(self):
+        inner = '<topicgroup><topicref href="a.dita"/><topicref href="b.dita"/></topicgroup>'
+        files = [self.mapfile("/d/one.ditamap", '<topichead navtitle="Setup">%s</topichead>' % inner),
+                 self.mapfile("/d/two.ditamap", '<topichead navtitle="Setup">%s</topichead>' % inner),
+                 self.mapfile("/d/three.ditamap", self.GROUP % ("x/", "x/"))]
+        self.assertEqual([g["tag"] for g in duplicates.find_maps(files)], ["topichead"])
+
+    def test_a_reused_group_and_a_lone_reference_are_left_out(self):
+        files = [self.mapfile("/d/one.ditamap", '<topichead conref="GUID-1.ditamap#s"/><topicref href="a.dita"/>'),
+                 self.mapfile("/d/two.ditamap", '<topichead conref="GUID-1.ditamap#s"/><topicref href="a.dita"/>')]
+        self.assertEqual(duplicates.find_maps(files), [])
+
+    def test_the_demo_guides_share_a_heading_and_a_relationship_table_decided_without_a_model(self):
+        here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "samples", "dupes-demo")
+        groups = reuse.map_groups(duplicates.files_of(here, maps=True))
+        self.assertEqual([(g["tag"], g["decision"], g["decided_by"], len(g["files"])) for g in groups],
+                         [("topichead", "share", "rule", 2), ("reltable", "share", "rule", 2)])
+
+
+
 class ReuseAgent(unittest.TestCase):
     """What the reuse agent decides, and what code decides without it (the model is stood in for)."""
 

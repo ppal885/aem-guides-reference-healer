@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">
+<map><title>Ledgerline daily use</title><topichead navtitle="Closing periods"><topicref href="../tasks/close_period.dita"/><topicref href="../tasks/reopen_period.dita"/><topicref href="../tasks/export_period.dita"/></topichead><topicref href="../tasks/post_entry.dita"/><topicref href="../tasks/reverse_entry.dita"/><reltable><relrow><relcell><topicref href="../tasks/close_period.dita"/></relcell><relcell><topicref href="../tasks/reopen_period.dita"/></relcell></relrow></reltable></map>

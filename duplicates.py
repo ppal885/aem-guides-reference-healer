@@ -182,11 +182,120 @@ def _group(kind, tag, members):
             "variants": [{"text": text, "count": count} for text, count in counts.most_common()]}
 
 
-def files_of(folder):
+# ---- maps -----------------------------------------------------------------------------------
+# A group of topic references (a topichead with its topics, a chapter, a relationship table) copied
+# into several maps of one check is the same thing to keep in step: add a topic to one copy and the
+# others miss it. Maps hold almost no text, so a copy is compared by its references: for each
+# element in it, its name and its href, keyref, keys, navtitle, format, scope and type.
+
+MAP_REFS = {"topicref", "topichead", "topicgroup", "chapter", "part", "appendix", "appendices", "keydef",
+            "mapref", "glossref", "anchorref", "topicset", "topicsetref", "frontmatter", "backmatter", "notices"}
+MAP_GROUP_TAGS = MAP_REFS | {"reltable"}
+MAP_ATTRIBUTES = ("href", "keyref", "keys", "navtitle", "format", "scope", "type")
+MIN_REFS = 2          # a group holds at least this many references below it
+
+
+def _refs_below(el):
+    return sum(1 for d in el.iter() if d is not el and _local(d.tag) in MAP_REFS)
+
+
+def map_signature(el):
+    """The references of an element as the file says them: 'topichead|navtitle=Setup;topicref|href=a.dita'.
+    The editor computes the same string from the file before it replaces a copy."""
+    parts = []
+    for d in el.iter():
+        name = _local(d.tag)
+        if name in MAP_GROUP_TAGS or name in ("relrow", "relcell", "relheader", "relcolspec"):
+            parts.append("|".join([name] + ["%s=%s" % (a, d.get(a)) for a in MAP_ATTRIBUTES if d.get(a)]))
+    return ";".join(parts)
+
+
+def _resolved(signature, path):
+    """The signature with each relative href resolved against the map's folder, so two maps in
+    different folders that point at the same topics compare equal."""
+    folder = os.path.dirname(path)
+
+    def resolve(match):
+        href = match.group(1)
+        if re.match(r"^(GUID-|[a-z]+:|/)", href):
+            return "href=" + href
+        target, _, fragment = href.partition("#")
+        return "href=" + os.path.normpath(os.path.join(folder, target)) + ("#" + fragment if fragment else "")
+    return re.sub(r"href=([^|;]+)", resolve, signature)
+
+
+def map_blocks_of(path, raw):
+    """[{file, location, tag, text, id, refs}] for the groups of a map: the largest elements of
+    MAP_GROUP_TAGS with at least MIN_REFS references below them (a relationship table: at least one
+    row). Elements already reused (conref) are left out."""
+    tree = _parse(raw)
+    if tree is None:
+        return []
+    found = []
+
+    def walk(el, location):
+        counts = {}
+        for child in el:
+            name = _local(child.tag)
+            if not name:
+                continue
+            counts[name] = counts.get(name, 0) + 1
+            here = "%s/%s[%d]" % (location, name, counts[name])
+            if child.get("conref") or child.get("conkeyref"):
+                continue
+            refs = _refs_below(child)
+            rows = sum(1 for d in child.iter() if _local(d.tag) == "relrow")
+            if name in MAP_GROUP_TAGS and (refs >= MIN_REFS or (name == "reltable" and rows >= 1)):
+                found.append({"file": path, "location": here, "tag": name, "text": map_signature(child),
+                              "id": child.get("id") or "", "refs": refs, "navtitle": _navtitle(child)})
+            walk(child, here)
+
+    walk(tree, "/%s[1]" % _local(tree.tag))
+    return found
+
+
+def _navtitle(el):
+    if el.get("navtitle"):
+        return el.get("navtitle")
+    for d in el:
+        if _local(d.tag) == "topicmeta":
+            for t in d:
+                if _local(t.tag) == "navtitle":
+                    return _text(t)
+    return ""
+
+
+def find_maps(files):
+    """Groups of map elements copied into several maps (or twice into one), the largest only: a
+    group inside a copied group is not reported again. Most references first:
+    [{kind: "map", tag, text, navtitle, files, copies, variants, refs}]."""
+    blocks = []
+    for entry in files:
+        path = (entry.get("path") or "").lstrip("/")
+        if path.endswith(".ditamap"):
+            blocks.extend(map_blocks_of(path, entry.get("xml") or ""))
+    by_key = collections.defaultdict(list)
+    for block in blocks:
+        by_key[(block["tag"], _resolved(block["text"], block["file"]))].append(block)
+    copied = [members for members in by_key.values() if len(members) > 1]
+    places = {(b["file"], b["location"]) for members in copied for b in members}
+    groups = []
+    for members in copied:
+        # Inside another copied group: that group is the one to share.
+        if all(any((b["file"], b["location"].rsplit("/", n)[0]) in places
+                   for n in range(1, b["location"].count("/"))) for b in members):
+            continue
+        group = _group("map", members[0]["tag"], members)
+        group.update(navtitle=next((b["navtitle"] for b in members if b["navtitle"]), ""), refs=members[0]["refs"])
+        groups.append(group)
+    return sorted(groups, key=lambda g: (-g["refs"], -len(g["copies"]), g["text"]))
+
+
+def files_of(folder, maps=False):
     out = []
     for directory, _, names in os.walk(folder):
         for name in sorted(names):
-            if name.endswith(".dita"):
+            if name.endswith(".dita") or (maps and name.endswith(".ditamap")):
                 full = os.path.join(directory, name)
                 with open(full, encoding="utf-8", errors="replace") as handle:
                     out.append({"path": os.path.relpath(full, folder), "xml": handle.read()})
