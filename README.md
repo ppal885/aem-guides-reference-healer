@@ -286,6 +286,30 @@ Read the limits before quoting these:
 - The 1,251-reference sample is generated from templates. It has renamed, reworded, moved, merged, split and removed content, but real content is messier.
 - Key scopes are read in a simple way: a key in a scope counts as defined under its plain and its qualified names everywhere, so a reference from outside the scope to the plain name is not flagged. A submap's keys also get the scope of the `mapref` that brings it in. The end of a conref range (`conrefend`) is checked like a conref; whether AEM's report lists it has not been tried.
 
+## Case matrix
+
+Every case of every feature, simple or edge, and how it is checked, is in `eval/cases.json`.
+`python3 casecheck.py` runs the agents' tests it names (no model, under a second) and reads where the
+model and AEM runs are written; `--editor ~/xmleditor` runs the editor's tests too (about 20 s);
+`--markdown` prints the whole table. A case is pass or fail when a test checks it, measured when a
+model or AEM run did (the file is named), gap when it was tried and is not handled yet, known miss
+when it is not handled on purpose, and not built when nothing checks it yet. `tests/test_cases.py` keeps the matrix true to the tests.
+
+On 20 Nov 2026, with the editor: 74 cases, **58 pass**, 12 measured, none failing, no gap left. The
+five gaps the matrix found when it was first run are closed: a file or image renamed in case only is
+repaired by a rule (one file in any case; two are not guessed between); copies in table cells are
+found and shared (on a customer export 161 groups, 417 copies, were in cells); topics of two
+languages (their xml:lang, or a language folder) are never one group; an SVG is drawn to a PNG by the
+editor for the alt text model. 1 known miss (two-word synonyms in "Keep copies"), 3 not built (two
+Schematron fixes that ask the author for a value or reach outside the element, and the search
+service right after "Fix all", covered on a separate local branch only).
+
+In AEM on `samples/edge-demo` (20 Nov 2026): a cell copied into three tables (one drifted) became a
+conref in each, with its column kept, and one cell in a one-cell table of its own in the shared
+topic; the four files valid; the cell's text in all three HTML5 pages. The SVG was previewed from its
+original (AEM makes no web rendition of an SVG) and the model, given the PNG the editor drew, named
+the three stages of the diagram.
+
 ## Files
 
 | File | What it is |
@@ -295,6 +319,7 @@ Read the limits before quoting these:
 | `audit.py` | The audit record: appends what an author applied, reads it back, writes the CSV. No model. |
 | `wayout.py` | What can be done about a reference whose content is gone: put it back, keep the text, remove the references. No model. |
 | `alttext.py` | Images whose alt text says nothing (no model), and the prompt and checks for a model that sees the image and suggests one. |
+| `casecheck.py` | The case matrix: runs the checks `eval/cases.json` names and prints where each case stands. No model. |
 | `alteval.py` | Scores the suggested alt texts on `samples/alt-demo` against its `truth.json`. |
 | `subjectscheme.py` | Attribute values that a subject scheme no longer allows, and the new name where the scheme's previous version proves it. No model. |
 | `planeval.py` | Runs the planner (or with `--mode pipeline` the fixed pipeline) several times on the large sample and scores every answer against the known right one. |

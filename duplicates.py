@@ -29,7 +29,9 @@ import sys
 import xml.etree.ElementTree as ET
 
 BLOCK_TAGS = {"p", "note", "step", "cmd", "li", "shortdesc", "section", "info", "stepresult", "context", "dd",
-              "example", "lq", "postreq", "prereq", "result", "abstract"}
+              "example", "lq", "postreq", "prereq", "result", "abstract",
+              # A table cell: on a customer export (20 Nov 2026) 161 groups, 417 copies, were in cells.
+              "entry"}
 MIN_CHARS = 40
 MIN_FILES = 2
 # A whole list or step copied word for word (its items, its markup) is one piece: one conref takes
@@ -93,6 +95,24 @@ def markup_of(path, el):
 CONDITIONS = ("audience", "platform", "product", "props", "otherprops", "deliveryTarget", "rev")
 
 
+# Folders that name a language (AEM keeps a language copy of the content per folder: /en, /fr-FR).
+LANGUAGES = {"ar", "cs", "da", "de", "el", "en", "es", "fi", "fr", "he", "hi", "hu", "id", "it", "ja", "ko", "nb", "nl",
+             "no", "pl", "pt", "ro", "ru", "sv", "th", "tr", "uk", "vi", "zh"}
+
+
+def language_of(path, root):
+    """The topic's language, its main code only ("fr" for fr-FR): its xml:lang, or a language folder
+    on its path; '' when neither says."""
+    lang = root.get("{http://www.w3.org/XML/1998/namespace}lang") if root is not None else None
+    if lang:
+        return lang.lower().replace("_", "-").split("-")[0]
+    for part in path.lower().split("/"):
+        code = part.replace("_", "-")
+        if code.split("-")[0] in LANGUAGES and re.match(r"^[a-z]{2}(-[a-z]{2,4})?$", code):
+            return code.split("-")[0]
+    return ""
+
+
 def own_attributes(el):
     """The block's own condition attributes: 'audience=internal;product=ledger'. Other attributes
     (a note's type, outputclass) do not split a group; the Fix keeps them on each copy."""
@@ -132,6 +152,12 @@ def blocks_of(path, raw):
                 walk(child, here)
 
     walk(tree, "/%s[1]" % _local(tree.tag))
+    # Topics of two languages are never one piece: a conref would join the languages (gap found on
+    # 20 Nov 2026 by eval/cases.json, copies-13). The language goes with the conditions into the key.
+    lang = language_of(path, tree)
+    if lang:
+        for block in found:
+            block["own"] = ";".join(filter(None, [block["own"], "lang=" + lang]))
     return found
 
 

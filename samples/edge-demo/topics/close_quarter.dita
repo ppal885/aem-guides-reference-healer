@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="close_quarter"><title>Close the quarter</title><body><p>Who does what.</p><table><tgroup cols="2"><colspec colname="c1"/><colspec colname="c2"/><thead><row><entry>Step</entry><entry>Who</entry></row></thead><tbody><row><entry colname="c1">Approve</entry><entry colname="c2">Ask the controller to approve the close before the end of the business day.</entry></row></tbody></tgroup></table></body></topic>
