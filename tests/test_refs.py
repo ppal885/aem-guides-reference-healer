@@ -1972,6 +1972,14 @@ class CopiedText(unittest.TestCase):
         self.assertEqual(group["tag"], "p")
         self.assertEqual(len(group["copies"]), 2)
 
+    def test_each_copy_carries_its_markup_with_links_resolved(self):
+        body = '<p>Select <b>Save</b> and then read the steps in <xref href="../b/close.dita" format="dita">Closing</xref> first.</p>'
+        block = duplicates.blocks_of("content/dam/a/one.dita", '<topic id="t"><title>T</title><body>%s</body></topic>' % body)[0]
+        # The editor's markupOf gives the same string for the same element (markup.test.ts).
+        self.assertEqual(block["markup"], "<b><xref format=dita href=content/dam/b/close.dita>")
+        plain = duplicates.blocks_of("d/a.dita", "<topic id='t'><title>T</title><body><p>%s</p></body></topic>" % self.WARN)[0]
+        self.assertEqual(plain["markup"], "")
+
     def test_short_text_and_copies_in_one_topic_are_left_out(self):
         files = [self.topic("a", "<p>Click Save.</p><p>%s</p><p>%s</p>" % (self.WARN, self.WARN)),
                  self.topic("b", "<p>Click Save.</p>")]
