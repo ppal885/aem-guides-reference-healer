@@ -12,7 +12,7 @@
     GET  /audit       the audit record; ?map=<path>, &format=csv for a download
     GET  /memory      what the planner remembers of authors' answers
     GET  /copies      ?map=<path>[&judge=<n>][&ids=g1,g7]: the text copied across the map's topics (most
-                      removable copies first; n more groups judged, 100 when not given), and what the reuse
+                      removable copies first; n more groups judged, none when not given), and what the reuse
                       agent says about each group (asked on request, kept until the files change)
     GET  /health
 
@@ -98,8 +98,9 @@ FULL_UP_TO = 200      # groups sent with their copies at once; above that, a sum
 
 def copies_of(map_path, model=None, judge=None, ids=None):
     """The copied text of a map's last check, most removable copies first, and the reuse agent's
-    word on each group judged so far: `judge` more groups are asked this time (reuse.PAGE when not
-    given, 0 for none). A map with more than FULL_UP_TO groups gets a summary of each (17.6 MB in
+    word on each group judged so far: `judge` more groups are asked this time, none when not given.
+    Opening "Copied content" sends nothing to the model; the author asks for it ("Judge next 100"):
+    on 19 Nov 2026 a default of 100 sent 800 groups of customer content to the model unasked. A map with more than FULL_UP_TO groups gets a summary of each (17.6 MB in
     full on the customer sample); `ids` ("g1,g7") names the groups to send with their copies."""
     import hashlib
     import reuse
@@ -107,7 +108,7 @@ def copies_of(map_path, model=None, judge=None, ids=None):
     if not files:
         return {"groups": [], "note": "Run the health check first: the agents have not seen this map's files."}
     fingerprint = hashlib.sha1("".join(f.get("path", "") + (f.get("xml") or "") for f in files).encode("utf-8")).hexdigest()
-    judge = reuse.PAGE if judge is None else max(0, int(judge))
+    judge = 0 if judge is None else max(0, int(judge))
     cached = COPIES.get(map_path)
     if not (cached and cached[0] == fingerprint and judge == 0):
         groups = reuse.decide(files, lambda system, user: call_model(system, user, model), _log, judge=judge, cache=DECISIONS)

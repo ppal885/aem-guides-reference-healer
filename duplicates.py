@@ -80,6 +80,17 @@ def markup_of(path, el):
     return "".join(parts)
 
 
+# The attributes that decide who reads a block (filtering) or how it is flagged. Two copies with the
+# same text and other values here publish to other readers, so they are not the same piece.
+CONDITIONS = ("audience", "platform", "product", "props", "otherprops", "deliveryTarget", "rev")
+
+
+def own_attributes(el):
+    """The block's own condition attributes: 'audience=internal;product=ledger'. Other attributes
+    (a note's type, outputclass) do not split a group; the Fix keeps them on each copy."""
+    return ";".join("%s=%s" % (a, " ".join(sorted(el.get(a).split()))) for a in CONDITIONS if el.get(a))
+
+
 def blocks_of(path, raw):
     """[{file, location, tag, text, id, markup}] for the blocks of one file."""
     tree = _parse(raw)
@@ -101,14 +112,14 @@ def blocks_of(path, raw):
                 text = _text(child)
                 if len(text) >= MIN_CHARS:
                     found.append({"file": path, "location": here, "tag": name, "text": text, "id": child.get("id") or "",
-                                  "markup": markup_of(path, child), "whole": True,
+                                  "markup": markup_of(path, child), "own": own_attributes(child), "whole": True,
                                   "inner_ids": sorted({d.get("id") for d in child.iter() if d is not child and d.get("id")})})
             holds_block = any(_local(d.tag) in BLOCK_TAGS for d in child.iter() if d is not child)
             if name in BLOCK_TAGS and not holds_block:
                 text = _text(child)
                 if len(text) >= MIN_CHARS:
                     found.append({"file": path, "location": here, "tag": name, "text": text, "id": child.get("id") or "",
-                                  "markup": markup_of(path, child)})
+                                  "markup": markup_of(path, child), "own": own_attributes(child)})
             else:
                 walk(child, here)
 
@@ -162,10 +173,11 @@ def find(files):
         if path.endswith(".dita"):
             blocks.extend(blocks_of(path, entry.get("xml") or ""))
     whole_groups, blocks = _whole(files, blocks)
-    # Units: the blocks with the same text (case, spaces and punctuation aside) of one element type.
+    # Units: the blocks with the same text (case, spaces and punctuation aside) of one element type
+    # and the same own attributes (conditions).
     by_text = collections.defaultdict(list)
     for block in blocks:
-        by_text[(block["tag"], _key(block["text"]))].append(block)
+        by_text[(block["tag"], block["own"], _key(block["text"]))].append(block)
     units = list(by_text.items())
     parent = list(range(len(units)))
 
@@ -180,20 +192,20 @@ def find(files):
             parent[root(a)] = root(b)
     # The same text but for its numbers.
     by_template = collections.defaultdict(list)
-    for index, ((tag, key), _) in enumerate(units):
-        by_template[(tag, re.sub(r"\d+", "#", key))].append(index)
+    for index, ((tag, own, key), _) in enumerate(units):
+        by_template[(tag, own, re.sub(r"\d+", "#", key))].append(index)
     for members in by_template.values():
         for a, b in zip(members, members[1:]):
             join(a, b)
     # Nearly the same words: MinHash LSH finds the candidate pairs, the word triples decide.
     shingles = [_shingles(members[0]["text"]) for _, members in units]
     buckets = collections.defaultdict(list)
-    for index, ((tag, key), _) in enumerate(units):
+    for index, ((tag, own, key), _) in enumerate(units):
         if len(key.split()) < 6:
             continue
         signature = _minhash(shingles[index])
         for band in range(BANDS):
-            buckets[(tag, band, tuple(signature[band * ROWS:(band + 1) * ROWS]))].append(index)
+            buckets[(tag, own, band, tuple(signature[band * ROWS:(band + 1) * ROWS]))].append(index)
     for members in buckets.values():
         for a, b in zip(members, members[1:]):
             if _jaccard(shingles[a], shingles[b]) >= WORDING_SIMILARITY or _contained(shingles[a], shingles[b]) >= CONTAINED:
@@ -206,7 +218,7 @@ def find(files):
         members = [b for i in indexes for b in units[i][1]]
         if len({b["file"] for b in members}) < MIN_FILES:
             continue
-        templates = {re.sub(r"\d+", "#", units[i][0][1]) for i in indexes}
+        templates = {re.sub(r"\d+", "#", units[i][0][2]) for i in indexes}
         kind = "same" if len(indexes) == 1 else "numbers" if len(templates) == 1 else "wording"
         groups.append(_group(kind, units[indexes[0]][0][0], members))
     groups.extend(whole_groups)
@@ -251,7 +263,7 @@ def _whole(files, blocks):
     for _ in range(2):                                # a copied list inside a copied step goes with the step
         by_text = collections.defaultdict(list)
         for block in keep:
-            by_text[(block["tag"], _key(block["text"]), block["markup"])].append(block)
+            by_text[(block["tag"], _key(block["text"]), block["markup"], block["own"])].append(block)
         chosen = [m for m in by_text.values() if len({b["file"] for b in m}) >= MIN_FILES]
         taken = collections.defaultdict(set)
         for block in pieces:
