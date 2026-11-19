@@ -21,6 +21,7 @@ everything already reused (an element with conref or conkeyref, and what is insi
 """
 import argparse
 import collections
+import difflib
 import hashlib
 import os
 import re
@@ -38,6 +39,13 @@ WHOLE_TAGS = {"ul", "ol", "step"}
 MIN_PARTS = 2
 WORDING_SIMILARITY = 0.85
 CONTAINED = 0.9            # or: nearly all of the shorter copy's word triples are in the longer one
+# And at most this many words added, removed or changed. Measured on 19 Nov 2026 on 50 groups of
+# customer content (labelled from the text, not by a writer): without it, 24 of 44 wording groups
+# were a sentence and a longer sentence that says more ("...is posted" and "...is posted and is checked
+# by the controller", a made-up example), not copies; with 3, 4 of 19, and 5 real copies are no longer found.
+MAX_CHANGED_WORDS = 3
+EDGE_MIN_WORDS = 8         # copies this long or longer are compared word by word when their ends match
+EDGE_MAX_BUCKET = 40       # more blocks than this with the same three first (or last) words: no evidence
 BANDS, ROWS = 20, 5          # MinHash LSH: 100 hashes; pairs near 0.85 meet in a band almost always
 
 
@@ -160,6 +168,45 @@ def _contained(a, b):
     return len(small & large) / float(len(small)) if small else 0.0
 
 
+def _changed_words(a, b):
+    """How many words differ between two texts (their keys): added, removed or replaced."""
+    x, y = a.split(), b.split()
+    return sum(max(i2 - i1, j2 - j1) for op, i1, i2, j1, j2 in
+               difflib.SequenceMatcher(None, x, y, autojunk=False).get_opcodes() if op != "equal")
+
+
+NEGATIONS = {"not", "no", "never", "cannot", "none", "nor", "without", "neither", "nothing", "t"}  # "t": don't, isn't
+
+
+def _says_otherwise(a, b):
+    """Why two nearly equal texts still say different things, or None: one says "not" (or never, no,
+    don't...) where the other does not, or a name is put in place of other words (Payroll for Billing,
+    Acme Payroll for the customer).
+    Words only added or left out are not a different name; the changed-words limit covers those."""
+    words_a, words_b = re.findall(r"[A-Za-z0-9]+", a), re.findall(r"[A-Za-z0-9]+", b)
+    negations = lambda words: sorted("not" if w.lower() == "t" else w.lower() for w in words if w.lower() in NEGATIONS)
+    if negations(words_a) != negations(words_b):
+        return "negation"
+    capital = lambda words: {w.lower() for w in words if w[0].isupper()}
+    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, [w.lower() for w in words_a], [w.lower() for w in words_b],
+                                                      autojunk=False).get_opcodes():
+        # The first word is a capital by place, not a name; a one-word change of a few letters is a typo.
+        left, right = capital(words_a[max(i1, 1):i2]), capital(words_b[max(j1, 1):j2])
+        typo = i2 - i1 == j2 - j1 == 1 and difflib.SequenceMatcher(None, words_a[i1].lower(), words_b[j1].lower()).ratio() >= 0.8
+        # A name on either side: "the customer" and "Acme Payroll" are other readers, not a reworded copy.
+        if op == "replace" and (left or right) and not typo:
+            return "name"
+        # Two words or more put in place of two words or more that are not the same words in other
+        # case or punctuation: another statement ("checking their eligibility" for "scheduling a
+        # demo"), seen on customer content (19 Nov 2026). One word for another stays a copy.
+        if op == "replace" and i2 - i1 >= 2 and j2 - j1 >= 2:
+            plain_a = " ".join(re.findall(r"[a-z0-9]+", " ".join(words_a[i1:i2]).lower()))
+            plain_b = " ".join(re.findall(r"[a-z0-9]+", " ".join(words_b[j1:j2]).lower()))
+            if difflib.SequenceMatcher(None, plain_a, plain_b).ratio() < 0.8:
+                return "other words"
+    return None
+
+
 def _jaccard(a, b):
     return len(a & b) / float(len(a | b)) if a and b else 0.0
 
@@ -208,8 +255,28 @@ def find(files):
             buckets[(tag, own, band, tuple(signature[band * ROWS:(band + 1) * ROWS]))].append(index)
     for members in buckets.values():
         for a, b in zip(members, members[1:]):
-            if _jaccard(shingles[a], shingles[b]) >= WORDING_SIMILARITY or _contained(shingles[a], shingles[b]) >= CONTAINED:
+            if (_jaccard(shingles[a], shingles[b]) >= WORDING_SIMILARITY or _contained(shingles[a], shingles[b]) >= CONTAINED) \
+                    and _changed_words(units[a][0][2], units[b][0][2]) <= MAX_CHANGED_WORDS \
+                    and not _says_otherwise(units[a][1][0]["text"], units[b][1][0]["text"]):
                 join(a, b)
+    # Short copies: one changed word changes three word triples, so in a sentence of fifteen words
+    # the triples of two copies never meet (seen on samples/dupes-drift: "and the attachments" added,
+    # "service desk" for "support team"). Copies that keep their first or last three words are
+    # compared word by word; an opening that many blocks share ("Select the ...") is no evidence.
+    edges = collections.defaultdict(list)
+    for index, ((tag, own, key), _) in enumerate(units):
+        words = key.split()
+        if len(words) >= EDGE_MIN_WORDS:
+            edges[(tag, own, "head", " ".join(words[:3]))].append(index)
+            edges[(tag, own, "tail", " ".join(words[-3:]))].append(index)
+    for members in edges.values():
+        if len(members) > EDGE_MAX_BUCKET:
+            continue
+        for i, a in enumerate(members):
+            for b in members[i + 1:]:
+                if root(a) != root(b) and _changed_words(units[a][0][2], units[b][0][2]) <= MAX_CHANGED_WORDS \
+                        and not _says_otherwise(units[a][1][0]["text"], units[b][1][0]["text"]):
+                    join(a, b)
     clusters = collections.defaultdict(list)
     for index in range(len(units)):
         clusters[root(index)].append(index)

@@ -1,0 +1,44 @@
+{
+ "groups": [
+  {
+   "text_starts": "Closed periods are kept for",
+   "label": "facts differ",
+   "right": null,
+   "why": "90 days in two topics, 60 in one: which is true is the author's to say"
+  },
+  {
+   "text_starts": "Back up the ledger database",
+   "label": "drifted",
+   "right": "Back up the ledger database and the attachments",
+   "why": "one copy gained three words; the others should say the same"
+  },
+  {
+   "text_starts": "Open Ledger, select the period",
+   "label": "meant to differ",
+   "right": null,
+   "why": "the product name is meant to change by topic"
+  },
+  {
+   "text_starts": "Read the closing checklist",
+   "label": "drifted",
+   "right": null,
+   "why": "one copy sends the copy to the auditor, two to the controller; the link is kept"
+  },
+  {
+   "text_starts": "Ask the IT",
+   "label": "drifted",
+   "right": null,
+   "audience": "internal",
+   "why": "copies for internal readers; one says help desk; the condition must stay"
+  },
+  {
+   "text_starts": "Export the trial balance",
+   "label": "not the same text",
+   "right": null,
+   "why": "one copy adds a whole step: another sentence, not a copy that drifted"
+  }
+ ],
+ "not_listed": [
+  "Every posting in a closed period keeps t"
+ ]
+}

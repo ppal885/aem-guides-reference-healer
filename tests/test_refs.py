@@ -20,6 +20,8 @@ import subjectscheme  # noqa: E402
 import usage  # noqa: E402
 from unittest import mock  # noqa: E402
 import meaning  # noqa: E402
+import fixrate  # noqa: E402
+fixrate.PATH = os.path.join(tempfile.mkdtemp(), "copies-shown.jsonl")  # tests never write the real record
 
 TOPIC = '<topic id="t"><title>Using it</title><body>%s</body></topic>'
 
@@ -2018,9 +2020,57 @@ class CopiedText(unittest.TestCase):
         # Not one whole list; its items may be shared, as the list around each keeps its condition.
         self.assertEqual([g["tag"] for g in duplicates.find(lists)], ["li"])
 
+    def test_a_not_or_another_name_makes_it_a_different_sentence(self):
+        said = "We guarantee that the closed period will be reopened for the controller within the agreed period."
+        other = [("b", said.replace("will be", "will not be")),
+                 ("c", said.replace("We guarantee", "We cannot guarantee")),
+                 ("d", said.replace("the controller", "Acme Payroll"))]
+        files = [self.topic("a", "<p>%s</p>" % said)] + [self.topic(n, "<p>%s</p>" % t) for n, t in other]
+        self.assertEqual(duplicates.find(files), [])
+        # A small wording change that says the same is still one group.
+        files = [self.topic("a", "<p>%s</p>" % said), self.topic("e", "<p>%s</p>" % said.replace("agreed period.", "agreed period of time."))]
+        self.assertEqual([g["kind"] for g in duplicates.find(files)], ["wording"])
+
     def test_a_notes_type_does_not_split_a_group(self):
         files = [self.topic("a", '<note type="note">%s</note>' % self.WARN), self.topic("b", "<note>%s</note>" % self.WARN)]
         self.assertEqual(len(duplicates.find(files)), 1)
+
+
+class FixRate(unittest.TestCase):
+    """What became of the copy groups shown: fixed and still shared, undone, or not acted on."""
+
+    def test_shown_fixed_undone_and_untouched_groups(self):
+        import fixrate
+        folder = tempfile.mkdtemp()
+        shown, log = os.path.join(folder, "shown.jsonl"), os.path.join(folder, "audit.jsonl")
+        loc = "/topic[1]/body[1]/p[1]"
+        groups = [{"key": k, "kind": "same", "decision": "share", "copies": [{"file": "/d/%s.dita" % k, "location": loc}]}
+                  for k in ("kept", "undone", "left")]
+        self.assertEqual(fixrate.record_shown("/m.ditamap", groups, path=shown), 3)
+        self.assertEqual(fixrate.record_shown("/m.ditamap", groups, path=shown), 0)   # once per group
+        for k in ("kept", "undone"):
+            audit.record("/m.ditamap", "author", [{"file": "/d/%s.dita" % k, "location": loc, "attribute": "conref",
+                                                   "was": "(copied text) x", "now": "s.dita#s/p1",
+                                                   "settled_by": "Reuse agent"}], path=log)
+        topic = lambda p: "<topic id='t'><title>T</title><body>%s</body></topic>" % p
+        files = {"d/kept.dita": topic("<p conref='s.dita#s/p1'/>"), "d/undone.dita": topic("<p>copied again</p>"),
+                 "d/left.dita": topic("<p>x</p>")}
+        out = fixrate.report(files, "/m.ditamap", shown_path=shown, audit_path=log)
+        self.assertEqual({g["key"]: g["state"] for g in out["groups"]},
+                         {"kept": "still in place", "undone": "undone", "left": "not acted on"})
+        self.assertEqual(out["by_kind"]["all"]["shown"], 3)
+
+
+class KnownAnswerPairs(unittest.TestCase):
+    """Pairs made from the demo topics with one change each: every change must come out as expected."""
+
+    def test_each_change_is_kept_together_or_apart_as_expected(self):
+        import pairtest
+        results = pairtest.run(os.path.join(os.path.dirname(__file__), "..", "samples", "dupes-demo"), per_change=10)
+        for change, rows in results.items():
+            wrong = [r for r in rows if r["expected"] != r["got"]]
+            self.assertEqual(wrong, [], change)
+        self.assertTrue(results["not put in"])
 
 
 class CopiedWholeBlocks(unittest.TestCase):
@@ -2161,7 +2211,9 @@ class ReuseAgent(unittest.TestCase):
             return {"groups": [{"id": g["id"], "decision": "share", "variant": 0, "reason": "x"} for g in groups]}
         cache = {}
         out = [g for g in reuse.decide(self.files(), model, judge=2, cache=cache) if g["kind"] != "map"]
-        self.assertEqual([reuse.removable(g) for g in out], sorted((reuse.removable(g) for g in out), reverse=True))
+        # A group with a piece that exists loses that piece's own copy after sorting: left out here.
+        order = [reuse.removable(g) for g in out if g["decision"] != "use existing"]
+        self.assertEqual(order, sorted(order, reverse=True))
         self.assertEqual(asked, [2])
         self.assertEqual(sum(1 for g in out if g["decision"] == "unjudged"), 3)   # 6 groups: 1 by rule, 2 asked
         again = [g for g in reuse.decide(self.files(), model, judge=2, cache=cache) if g["kind"] != "map"]
