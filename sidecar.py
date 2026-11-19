@@ -14,6 +14,7 @@
     GET  /copies      ?map=<path>[&judge=<n>][&ids=g1,g7]: the text copied across the map's topics (most
                       removable copies first; n more groups judged, none when not given), and what the reuse
                       agent says about each group (asked on request, kept until the files change)
+    POST /copies-keep {map, mode | keep | unkeep}: "Keep copies" for a map, or one group kept as it is
     GET  /alt         ?map=<path>: the images of the map's last check whose alt text says nothing (no model)
     POST /alt-suggest {map, id, image_base64, media_type}: one alt text from a model that sees the image
     GET  /health
@@ -110,6 +111,53 @@ DECISIONS = {}       # reuse.decision_key: the reuse agent's decision, kept for 
 
 FULL_UP_TO = 200      # groups sent with their copies at once; above that, a summary and copies on request
 
+# "Keep copies": a team that does not want conrefs keeps its copies and is shown only the groups whose
+# copies no longer say the same. Per map: the mode the author chose, and the groups the author said
+# to keep as they are (by reuse.decision_key, so a group keeps that answer in the next check).
+KEEP_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out", "keep-copies.json")
+_KEEP_LOCK = __import__("threading").Lock()
+
+
+def _keep_state():
+    try:
+        with open(KEEP_PATH) as f:
+            state = json.load(f)
+        return state if isinstance(state, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def keep_of(map_path):
+    entry = _keep_state().get(map_path or "", {})
+    return {"mode": entry.get("mode") or "share", "kept": list(entry.get("kept") or [])}
+
+
+def set_keep(body):
+    """The author's "Keep copies" choices for a map: {"map", "mode": "keep"|"share"} chooses the mode;
+    {"map", "keep": key} or {"map", "unkeep": key} says to keep one group's copies as they are, or not."""
+    map_path = body.get("map") or ""
+    if not map_path:
+        raise ValueError("map is required")
+    with _KEEP_LOCK:
+        state = _keep_state()
+        entry = state.setdefault(map_path, {"mode": "share", "kept": []})
+        if body.get("mode") is not None:
+            if body["mode"] not in ("keep", "share"):
+                raise ValueError("mode is keep or share")
+            entry["mode"] = body["mode"]
+        kept = set(entry.get("kept") or [])
+        if body.get("keep"):
+            kept.add(str(body["keep"]))
+        if body.get("unkeep"):
+            kept.discard(str(body["unkeep"]))
+        entry["kept"] = sorted(kept)
+        os.makedirs(os.path.dirname(KEEP_PATH), exist_ok=True)
+        temporary = KEEP_PATH + ".tmp"
+        with open(temporary, "w") as f:
+            json.dump(state, f, indent=1)
+        os.replace(temporary, KEEP_PATH)
+    return keep_of(map_path)
+
 
 def copies_of(map_path, model=None, judge=None, ids=None):
     """The copied text of a map's last check, most removable copies first, and the reuse agent's
@@ -132,9 +180,19 @@ def copies_of(map_path, model=None, judge=None, ids=None):
                                                           for f in g["files"]]) for g in groups])
         COPIES[map_path] = cached
     full = cached[1]
+    try:
+        import fixrate
+        fixrate.record_shown(map_path, full)     # what the author was offered, for the fix rate (fixrate.py)
+    except (OSError, KeyError, TypeError) as exc:
+        _log("copies shown not recorded: %s" % exc)
     wanted = set((ids or "").split(",")) - {""}
     small = len(full) <= FULL_UP_TO
-    return {"groups": [g if small or g["id"] in wanted else _summary(g) for g in full], "total": len(full),
+    keep = keep_of(map_path)
+    kept = set(keep["kept"])
+    drifted = [g for g in full if g["kind"] in ("numbers", "wording")]
+    return {"groups": [dict(g if small or g["id"] in wanted else _summary(g), kept=g["key"] in kept) for g in full],
+            "total": len(full), "mode": keep["mode"],
+            "drifted": sum(1 for g in drifted if g["key"] not in kept), "kept": sum(1 for g in drifted if g["key"] in kept),
             "unjudged": sum(1 for g in full if g["decision"] == "unjudged"),
             "copies": sum(len(g["copies"]) for g in full), "removable": sum(max(0, len(g["copies"]) - 1) for g in full)}
 
@@ -200,7 +258,9 @@ def _compact(group):
         else:
             copy["text"] = c["text"]
         copies.append(copy)
-    return {"id": group["id"], "kind": group["kind"], "tag": group["tag"], "decision": group["decision"],
+    import reuse
+    return {"id": group["id"], "key": reuse.decision_key(group), "kind": group["kind"], "tag": group["tag"],
+            "decision": group["decision"],
             "text": group.get("variant_text") or group["text"], "differs": group.get("differs", ""),
             "reason": group.get("reason", ""), "decided_by": group.get("decided_by", ""),
             "existing": dict(group["existing"], path=slash(group["existing"]["path"])) if group.get("existing") else None,
@@ -311,6 +371,14 @@ def serve(port, model=None):
                 except Exception as exc:
                     _log("alt suggestion failed: %s" % exc)
                     self.send_json(502, {"error": "The model did not answer: %s" % " ".join(str(exc).split())[:200]})
+                return
+            if self.path == "/copies-keep":
+                # From the editor: the "Keep copies" mode of a map, or a group to keep as it is.
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                    self.send_json(200, set_keep(json.loads(self.rfile.read(length).decode("utf-8"))))
+                except (ValueError, AttributeError, TypeError) as exc:
+                    self.send_json(400, {"error": str(exc)})
                 return
             if self.path in ("/feedback", "/applied"):
                 # From the editor, as text/plain so the browser needs no preflight request.

@@ -82,8 +82,8 @@ TRUTH = [
      "why": "the release number is meant to differ: one shared sentence with the number as a variable"},
     {"text_starts": "Select OK to close the dialog box", "kind": "same", "files": 4, "decision": "skip",
      "why": "a generic interface line: sharing it adds a conref for nothing"},
-    {"text_starts": "Record the change in the audit log", "kind": "wording", "files": 3, "decision": "share",
-     "why": "the same instruction, one copy added words: share the common one and keep the addition"},
+    {"text_starts": "Record the change in the audit log", "kind": "same", "files": 2, "decision": "share",
+     "why": "the same instruction in two topics; a third adds a step (\"and attach the reversal\"), which is another sentence, not a copy"},
     {"text_starts": "Only a ledger administrator", "kind": "same", "files": 2, "decision": "use existing",
      "why": "already shared as reuse/library.dita#library/n_reopen: conref the copy to it"},
 ]
