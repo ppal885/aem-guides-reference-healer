@@ -824,6 +824,36 @@ def link_text_caveat(repo, ref, value):
     return "The text of the link (\"%s\") is not found in %s. Check that the link lands on the right place." % (text, what)
 
 
+def asset_in_use_caveat(repo, ref, value):
+    """What the author must know before accepting another image for a missing one when that image
+    is already used by other topics. No model.
+
+    Seen on 19 Nov 2026 on customer content: a screenshot was missing from a sign-in topic; the
+    finder proposed one with the same name and a "1" added, from the same folder, a person accepted
+    it, and it was the sign-up topic's screenshot (a confirmation email). An image other topics already show is
+    most likely their own picture, not the missing one moved. "" for a DITA target and when no other
+    file uses the image."""
+    if not value or ref["attribute"] != "href":
+        return ""
+    target = repo.split_target(dict(ref, value=value))[0]
+    if refcheck.is_dita_path(target):
+        return ""
+    users = getattr(repo, "_asset_users", None)
+    if users is None:
+        users = {}
+        for other in repo.refs:
+            if other["attribute"] == "href" and not refcheck.is_dita_path(other["value"].partition("#")[0]):
+                users.setdefault(repo.split_target(other)[0], set()).add(other["file"])
+        repo._asset_users = users
+    others = sorted(users.get(target, set()) - {ref["file"]})
+    if not others:
+        return ""
+    names = ", ".join("\"%s\"" % ((repo.files.get(f) or {}).get("title") or os.path.basename(f)) for f in others[:3])
+    more = " and %d more" % (len(others) - 3) if len(others) > 3 else ""
+    return ("This image is already used in %s%s. It may be that topic's own picture, not the missing one moved: "
+            "open it and check before accepting." % (names, more))
+
+
 def target_label(repo, ref, value):
     """A repair in words a person can read: AEM stores "GUID-1234.dita#topic/id", which says nothing."""
     if ref["attribute"] in ("keyref", "conkeyref"):

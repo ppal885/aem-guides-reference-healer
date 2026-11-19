@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="backup_reopen"><title>About backup reopen</title><conbody><note>Back up the ledger database before you close the period, every single time.</note></conbody></concept>

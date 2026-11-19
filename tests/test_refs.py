@@ -1506,6 +1506,26 @@ class ImagesAndOtherAssets(unittest.TestCase):
         self.assertEqual(self.broken(assets), [("keyref", "product-logo", "key-undefined")])
 
 
+class AnImageAnotherTopicShows(unittest.TestCase):
+    """Seen on customer content: a finder offered the sign-up topic's screenshot for the sign-in
+    topic's missing one (a name with "1" added). An image other topics show gets a warning."""
+
+    def repo(self):
+        files = [{"path": "/x/sign_up.dita", "xml": '<topic id="u"><title>Sign up</title><body><p><image href="images/sign1.png"/></p></body></topic>'},
+                 {"path": "/x/sign_in.dita", "xml": '<topic id="i"><title>Sign in</title><body><p><image href="images/sign.png"/></p></body></topic>'}]
+        return refcheck.Repo(files=files, assets=["/x/images/sign1.png", "/x/images/other.png"])
+
+    def test_a_finders_image_that_another_topic_shows_is_named_and_held_for_a_look(self):
+        repo = self.repo()
+        ref = next(r for r in repo.refs if r["file"] == "x/sign_in.dita")
+        self.assertIn('already used in "Sign up"', refheal.asset_in_use_caveat(repo, ref, "images/sign1.png"))
+        self.assertEqual(refheal.asset_in_use_caveat(repo, ref, "images/other.png"), "")
+        said = refplan.Session._with_text_check("", repo, ref, "images/sign1.png", "finder")
+        self.assertIn("open it and check", said)
+        # The rule finds the same file name moved: an image other topics share is the same image.
+        self.assertEqual(refplan.Session._with_text_check("", repo, ref, "images/sign1.png", "rule"), "")
+
+
 class ImagesStoredByGuid(unittest.TestCase):
     """AEM Guides stores an image reference as a GUID file name, also when the image is gone. The
     server says which path a dangling name stood for, and which assets exist under which name."""
@@ -1985,6 +2005,23 @@ class CopiedText(unittest.TestCase):
                  self.topic("b", "<p>Click Save.</p>")]
         self.assertEqual(duplicates.find(files), [])
 
+    def test_copies_for_other_readers_are_not_one_piece(self):
+        # Shared as one piece, the internal copy would reach the external output (or drop out of it).
+        files = [self.topic(n, '<p audience="%s">%s</p>' % (a, self.WARN))
+                 for n, a in (("a", "external"), ("b", "external"), ("c", "internal"), ("d", "internal admin"))]
+        files.append(self.topic("e", '<p audience="admin internal">%s</p>' % self.WARN))
+        files.append(self.topic("f", '<p product="payroll">%s</p>' % self.WARN))
+        groups = duplicates.find(files)
+        self.assertEqual(sorted(g["files"] for g in groups), [["d/a.dita", "d/b.dita"], ["d/d.dita", "d/e.dita"]])
+        lists = [self.topic(n, '<ul audience="%s"><li>%s</li><li>%s</li></ul>' % (a, self.WARN, self.WARN.lower()))
+                 for n, a in (("g", "external"), ("h", "internal"))]
+        # Not one whole list; its items may be shared, as the list around each keeps its condition.
+        self.assertEqual([g["tag"] for g in duplicates.find(lists)], ["li"])
+
+    def test_a_notes_type_does_not_split_a_group(self):
+        files = [self.topic("a", '<note type="note">%s</note>' % self.WARN), self.topic("b", "<note>%s</note>" % self.WARN)]
+        self.assertEqual(len(duplicates.find(files)), 1)
+
 
 class CopiedWholeBlocks(unittest.TestCase):
     """A whole list or step copied word for word is one group; its items are not grouped again."""
@@ -2145,12 +2182,15 @@ class ReuseAgent(unittest.TestCase):
                                for g in json.loads(user)["groups"]]}
         sidecar.LAST_FILES["/m.ditamap"] = [dict(f, path="/" + f["path"]) for f in self.files()]
         with mock.patch.object(sidecar, "call_model", side_effect=model):
-            first = sidecar.copies_of("/m.ditamap")
-            sidecar.copies_of("/m.ditamap")
+            # Opening the list asks the model nothing; the author asks for a page of judgements.
+            self.assertEqual(sidecar.copies_of("/m.ditamap")["unjudged"], 5)
+            self.assertEqual(len(calls), 0)
+            first = sidecar.copies_of("/m.ditamap", judge=100)
+            sidecar.copies_of("/m.ditamap", judge=100)
             self.assertEqual(len(calls), 1)
             # Another state of the files with the same wordings: the kept decisions, no new call.
             sidecar.LAST_FILES["/m.ditamap"][0]["xml"] += " "
-            sidecar.copies_of("/m.ditamap")
+            sidecar.copies_of("/m.ditamap", judge=100)
             self.assertEqual(len(calls), 1)
         self.assertEqual((first["total"], first["unjudged"]), (len(first["groups"]), 0))
         group = first["groups"][0]

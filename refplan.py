@@ -1180,9 +1180,14 @@ class Session:
         """The caveat, with the warning that the link's text is not found in the new target. Not for
         a rename the version history proves (the link was to that element before, whatever its text
         says), and not twice: the topic id rule says the same in its own words."""
-        if how == "history" or not value or "text of the link" in caveat.lower() or "link text" in caveat.lower():
+        if how == "history" or not value:
             return caveat
-        return " ".join(filter(None, [caveat, refheal.link_text_caveat(repo, ref, value)]))
+        said = caveat.lower()
+        text = "" if "text of the link" in said or "link text" in said else refheal.link_text_caveat(repo, ref, value)
+        # An image that other topics already show, offered for a missing one with another name. Not for
+        # the rule, which finds the same file name moved, where a shared image is the same image.
+        image = "" if how == "rule" or "already used in" in said else refheal.asset_in_use_caveat(repo, ref, value)
+        return " ".join(filter(None, [caveat, text, image]))
 
     def _tool_use_line(self):
         """Said once, at the end: the finders may be asked in more than one round of a check."""
