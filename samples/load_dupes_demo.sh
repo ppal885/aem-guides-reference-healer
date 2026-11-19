@@ -5,7 +5,7 @@
 set -e
 A=http://127.0.0.1:4502
 AUTH=admin:admin
-ROOT=/content/dam/dupes-demo
+ROOT=${ROOT:-/content/dam/dupes-demo}
 cd "$(dirname "$0")/dupes-demo"
 up() {  # file, relative to the sample
   local dir=$(dirname "$1"); local target="$ROOT/$dir"; [ "$dir" = "." ] && target="$ROOT"
