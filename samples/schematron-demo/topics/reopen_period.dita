@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="reopen_period"><title>Reopen a period</title><shortdesc>Select Reopen to post to a closed period.</shortdesc><body><section outputclass="draft"><p>Only a ledger administrator can reopen a period.</p></section><note type="tip">Reopen only the period you need.</note></body></topic>
