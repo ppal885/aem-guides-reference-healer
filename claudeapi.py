@@ -81,15 +81,19 @@ def _stream(**request):
     return message
 
 
-def call_model(system, user, model=None):
-    """One request that must answer with a JSON object."""
+def call_model(system, user, model=None, image=None):
+    """One request that must answer with a JSON object. `image`: (bytes, media type), sent before the text."""
+    import base64
+    content = user if not image else [
+        {"type": "image", "source": {"type": "base64", "media_type": image[1], "data": base64.b64encode(image[0]).decode()}},
+        {"type": "text", "text": user}]
     response = _create(
         model=model or MODEL,
         max_tokens=16000,
         system=system,
         thinking={"type": "adaptive"},
         output_config={"effort": "medium"},
-        messages=[{"role": "user", "content": user}],
+        messages=[{"role": "user", "content": content}],
     )
     if response.stop_reason == "refusal":
         raise RuntimeError("The model declined this request")

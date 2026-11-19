@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="entry_states"><title>Journal entry states</title><body><p>An entry moves from draft to review to posted.</p><p><image href="../images/entry_flow.png"><alt>entry_flow.png</alt></image></p></body></topic>

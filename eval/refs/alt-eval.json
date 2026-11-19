@@ -1,0 +1,125 @@
+{
+ "backend": "cli",
+ "runs": [
+  {
+   "run": 1,
+   "right": 6,
+   "of": 6,
+   "seconds": 45,
+   "model_calls": 6,
+   "input_tokens": 30503,
+   "output_tokens": 1400,
+   "cost_usd": 0.0924,
+   "rows": [
+    {
+     "image": "signin.png",
+     "alt": "Ledgerline Sign in page with Work email and Password fields, a Sign in button and a Forgot password? link",
+     "decorative": false,
+     "caveat": "",
+     "right": true,
+     "why": "ok"
+    },
+    {
+     "image": "close_dialog.png",
+     "alt": "Close period - March 2026 dialog showing Open entries: 0 and Pending approvals: 0, with Close period and Cancel buttons",
+     "decorative": false,
+     "caveat": "",
+     "right": true,
+     "why": "ok"
+    },
+    {
+     "image": "divider.png",
+     "alt": "",
+     "decorative": true,
+     "caveat": "",
+     "right": true,
+     "why": "decorative"
+    },
+    {
+     "image": "entry_flow.png",
+     "alt": "Flow diagram: a journal entry goes from Draft to Review to Posted, with arrows pointing one way only",
+     "decorative": false,
+     "caveat": "",
+     "right": true,
+     "why": "ok"
+    },
+    {
+     "image": "postings_chart.png",
+     "alt": "Bar chart of postings per month in 2026, rising each month from 120 in January to 150, 210, 260 and 300 in May",
+     "decorative": false,
+     "caveat": "",
+     "right": true,
+     "why": "ok"
+    },
+    {
+     "image": "settings.png",
+     "alt": "Settings - Company screen with Time zone set to (UTC+05:30) Asia/Kolkata, between Company name and Fiscal year starts, and a Save button",
+     "decorative": false,
+     "caveat": "",
+     "right": true,
+     "why": "ok"
+    }
+   ]
+  },
+  {
+   "run": 2,
+   "right": 6,
+   "of": 6,
+   "seconds": 43,
+   "model_calls": 6,
+   "input_tokens": 30487,
+   "output_tokens": 1382,
+   "cost_usd": 0.0795,
+   "rows": [
+    {
+     "image": "signin.png",
+     "alt": "Ledgerline Sign in page with Work email and Password fields, a Sign in button and a Forgot password? link",
+     "decorative": false,
+     "caveat": "",
+     "right": true,
+     "why": "ok"
+    },
+    {
+     "image": "close_dialog.png",
+     "alt": "Close period - March 2026 dialog showing Open entries: 0 and Pending approvals: 0, with Close period and Cancel buttons",
+     "decorative": false,
+     "caveat": "",
+     "right": true,
+     "why": "ok"
+    },
+    {
+     "image": "divider.png",
+     "alt": "",
+     "decorative": true,
+     "caveat": "",
+     "right": true,
+     "why": "decorative"
+    },
+    {
+     "image": "entry_flow.png",
+     "alt": "Flow diagram of three boxes joined by arrows, left to right: Draft, then Review, then Posted",
+     "decorative": false,
+     "caveat": "",
+     "right": true,
+     "why": "ok"
+    },
+    {
+     "image": "postings_chart.png",
+     "alt": "Bar chart of postings per month in 2026, rising each month from 120 in January to 300 in May",
+     "decorative": false,
+     "caveat": "",
+     "right": true,
+     "why": "ok"
+    },
+    {
+     "image": "settings.png",
+     "alt": "Settings - Company page with fields for Company name, Time zone (set to (UTC+05:30) Asia/Kolkata) and Fiscal year starts, and a Save button",
+     "decorative": false,
+     "caveat": "",
+     "right": true,
+     "why": "ok"
+    }
+   ]
+  }
+ ]
+}

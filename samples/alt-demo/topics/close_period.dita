@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="close_period"><title>Close a period</title><taskbody><steps><step><cmd>Open Periods and select Close period.</cmd><info><p>Check that no entries are open, then confirm with Close period.</p><p><image href="../images/close_dialog.png"/></p></info></step></steps></taskbody></task>

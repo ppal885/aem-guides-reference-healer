@@ -28,6 +28,7 @@ import threading
 import time
 
 import agentloop
+import alttext
 import duplicates
 import refcheck
 import refheal
@@ -1431,6 +1432,17 @@ def plan_files(payload, backend="cli", model=None, log=print, progress=None, mem
                                                          format(len(everything), ","), "piece is" if len(everything) == 1 else "pieces are",
                                                          maps, format(copies, ","), format(copies - len(everything), ","))]
         out.setdefault("stats", {}).update(copied_groups=len(copied), copied_map_groups=len(copied_maps))
+    # Images whose alt text says nothing to a screen reader: found by code on every check; a model
+    # sees an image only when the author asks for its alt in "Images without alt text" (POST /alt-suggest).
+    weak_alts = alttext.images(payload.get("files") or [], payload.get("assets"), payload.get("missing_paths"))
+    if weak_alts:
+        places = sum(g["weak_uses"] for g in weak_alts)
+        out["plan"] = list(out.get("plan") or []) + ["Images without alt text: %s %s, in %s %s, %s nothing to a screen "
+                                                     "reader. Open \"Images without alt text\" to have one suggested." % (
+                                                         format(len(weak_alts), ","), "image" if len(weak_alts) == 1 else "images",
+                                                         format(places, ","), "place" if places == 1 else "places",
+                                                         "says" if len(weak_alts) == 1 else "say")]
+        out.setdefault("stats", {}).update(images_without_alt=len(weak_alts))
     # Attribute values a subject scheme no longer allows: found and, where the scheme's previous
     # version proves a rename, repaired by code. They are not references, so AEM's report does not
     # list them and the planner's groups do not hold them.
