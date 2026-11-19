@@ -11,7 +11,8 @@
     POST /audit       the references an author changed, and who accepted them
     GET  /audit       the audit record; ?map=<path>, &format=csv for a download
     GET  /memory      what the planner remembers of authors' answers
-    GET  /copies      ?map=<path>: the text copied across the map's topics, and what the reuse
+    GET  /copies      ?map=<path>[&judge=<n>][&ids=g1,g7]: the text copied across the map's topics (most
+                      removable copies first; n more groups judged, 100 when not given), and what the reuse
                       agent says about each group (asked on request, kept until the files change)
     GET  /health
 
@@ -88,37 +89,67 @@ IDLE = {"running": False, "lines": [], "timeline": []}
 # The files of the last check of each map, for the reuse agent to read when the author opens
 # "Copied content" (GET /copies), and what it decided, kept until the files change.
 LAST_FILES = {}
-COPIES = {}
+COPIES = {}          # map path: (fingerprint of its files, the groups found in them)
+DECISIONS = {}       # reuse.decision_key: the reuse agent's decision, kept for the next page and check
 
 
-def copies_of(map_path, model=None):
-    """The reuse agent's decisions for the copied text of a map's last check."""
+FULL_UP_TO = 200      # groups sent with their copies at once; above that, a summary and copies on request
+
+
+def copies_of(map_path, model=None, judge=None, ids=None):
+    """The copied text of a map's last check, most removable copies first, and the reuse agent's
+    word on each group judged so far: `judge` more groups are asked this time (reuse.PAGE when not
+    given, 0 for none). A map with more than FULL_UP_TO groups gets a summary of each (17.6 MB in
+    full on the customer sample); `ids` ("g1,g7") names the groups to send with their copies."""
     import hashlib
     import reuse
     files = LAST_FILES.get(map_path or "")
     if not files:
         return {"groups": [], "note": "Run the health check first: the agents have not seen this map's files."}
     fingerprint = hashlib.sha1("".join(f.get("path", "") + (f.get("xml") or "") for f in files).encode("utf-8")).hexdigest()
+    judge = reuse.PAGE if judge is None else max(0, int(judge))
     cached = COPIES.get(map_path)
-    if cached and cached[0] == fingerprint:
-        return cached[1]
-    groups = reuse.decide(files, lambda system, user: call_model(system, user, model), _log)
-    titles = reuse._titles(files)
-    answer = {"groups": [dict(_compact(g), topics=[{"file": "/" + f.lstrip("/"), "title": titles.get(f.lstrip("/"), "")}
-                                                   for f in g["files"]]) for g in groups]}
-    COPIES[map_path] = (fingerprint, answer)
-    return answer
+    if not (cached and cached[0] == fingerprint and judge == 0):
+        groups = reuse.decide(files, lambda system, user: call_model(system, user, model), _log, judge=judge, cache=DECISIONS)
+        titles = reuse._titles(files)
+        cached = (fingerprint, [dict(_compact(g), topics=[{"file": "/" + f.lstrip("/"), "title": titles.get(f.lstrip("/"), "")}
+                                                          for f in g["files"]]) for g in groups])
+        COPIES[map_path] = cached
+    full = cached[1]
+    wanted = set((ids or "").split(",")) - {""}
+    small = len(full) <= FULL_UP_TO
+    return {"groups": [g if small or g["id"] in wanted else _summary(g) for g in full], "total": len(full),
+            "unjudged": sum(1 for g in full if g["decision"] == "unjudged"),
+            "copies": sum(len(g["copies"]) for g in full), "removable": sum(max(0, len(g["copies"]) - 1) for g in full)}
+
+
+def _summary(group):
+    """A group without its copies: what the list of groups shows."""
+    out = {k: v for k, v in group.items() if k not in ("copies", "files", "topics", "variants")}
+    out.update(text=group["text"][:300], summary=True, topic_count=len(group["files"]), copy_count=len(group["copies"]),
+               wordings=len(group["variants"]))
+    return out
 
 
 def _compact(group):
+    """A group as the editor reads it. Each copy names its wording by index into "variants" (the full
+    text, which the editor compares before it replaces a copy) instead of repeating it."""
     slash = lambda path: "/" + path.lstrip("/")
+    variants = [v["text"] for v in group["variants"]]
+    copies = []
+    for c in group["copies"]:
+        copy = {"file": slash(c["file"]), "location": c["location"]}
+        if c["text"] in variants:
+            copy["v"] = variants.index(c["text"])
+        else:
+            copy["text"] = c["text"]
+        copies.append(copy)
     return {"id": group["id"], "kind": group["kind"], "tag": group["tag"], "decision": group["decision"],
             "text": group.get("variant_text") or group["text"], "differs": group.get("differs", ""),
             "reason": group.get("reason", ""), "decided_by": group.get("decided_by", ""),
             "existing": dict(group["existing"], path=slash(group["existing"]["path"])) if group.get("existing") else None,
-            "files": [slash(f) for f in group["files"]],
-            "copies": [{"file": slash(c["file"]), "location": c["location"], "text": c["text"]} for c in group["copies"]],
-            "variants": [{"text": v["text"][:400], "count": v["count"]} for v in group["variants"][:6]],
+            "files": [slash(f) for f in group["files"]], "copies": copies,
+            "variants": [{"text": v["text"], "count": v["count"]} for v in group["variants"]],
             "navtitle": group.get("navtitle", ""), "refs": group.get("refs", 0)}
 
 
@@ -147,7 +178,10 @@ def serve(port, model=None):
             elif self.path.split("?")[0] == "/copies":
                 query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
                 try:
-                    self.send_json(200, copies_of((query.get("map") or [""])[0], model))
+                    judge = (query.get("judge") or [None])[0]
+                    self.send_json(200, copies_of((query.get("map") or [""])[0], model,
+                                                  int(judge) if judge and judge.isdigit() else None,
+                                                  (query.get("ids") or [""])[0]))
                 except Exception as exc:
                     _log("copies failed: %s" % exc)
                     self.send_json(500, {"error": str(exc)})

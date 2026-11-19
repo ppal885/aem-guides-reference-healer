@@ -11,15 +11,20 @@ piece, and how (garage-week PoC).
                   becomes a conref to it. Decided by code, no model.
 
 The model sees the text of each group as data, never as instructions. It answers for several
-groups in one call, to keep the cost down; at most MAX_GROUPS groups per check, most files first.
+groups in one call, to keep the cost down. Groups come most removable copies first (on the
+customer sample the first 100 hold 47 percent of them); PAGE groups are judged per request and each
+decision is kept by its wordings, so the next page or the next check does not ask again.
 """
+import concurrent.futures
+import hashlib
 import json
 import re
 
 import duplicates
 
-MAX_GROUPS = 40
+PAGE = 100            # groups judged per request ("Judge next 100")
 PER_CALL = 15
+WORKERS = 3           # model calls at a time
 DECISIONS = ("share", "variable", "ask", "skip")
 
 SYSTEM = """You review text that is copied into several topics of a DITA documentation set, and decide for each group whether it should become one shared piece that the topics pull in by conref.
@@ -65,14 +70,56 @@ def _titles(files):
     return titles
 
 
-def decide(files, call_model, log=lambda message: None, max_groups=MAX_GROUPS):
-    """[{group fields..., decision, variant_text, differs, reason, existing, decided_by}], most files first."""
-    groups = duplicates.find(files)[:max_groups]
+def removable(group):
+    """How many copies a Fix could take away: all but one."""
+    return len(group["copies"]) - 1
+
+
+def decision_key(group):
+    """What a decision depends on: the element and its wordings, not where they stand. A group
+    with the same wordings in the next check gets the same decision without asking again."""
+    words = "\n".join(sorted(_key(v["text"]) for v in group["variants"]))
+    return hashlib.sha1(("%s\n%s" % (group["tag"], words)).encode("utf-8")).hexdigest()
+
+
+def _ask(batch, titles, call_model, log):
+    """The model's answers for one call: {group id: answer}."""
+    asked = {"groups": [{"id": g["id"], "element": g["tag"], "topics": len(g["files"]),
+                         "variants": [{"index": i, "copies": v["count"], "text": v["text"][:400]}
+                                      for i, v in enumerate(g["variants"][:6])],
+                         "in_topics": sorted({titles.get(f, f) for f in g["files"]})[:5]} for g in batch]}
+    try:
+        answer = call_model(SYSTEM, json.dumps(asked, ensure_ascii=False))
+    except Exception as exc:  # the model did not answer: these groups get no decision this time
+        log("reuse agent failed: %s" % exc)
+        return None
+    return {a.get("id"): a for a in (answer or {}).get("groups") or [] if isinstance(a, dict)}
+
+
+def _decided(group, a):
+    decision = a.get("decision") if a.get("decision") in DECISIONS else "ask"
+    index = a.get("variant")
+    variant = group["variants"][index]["text"] if isinstance(index, int) and 0 <= index < len(group["variants"]) else group["text"]
+    if decision == "share" and group["kind"] == "numbers":
+        decision = "ask"                    # numbers that differ are never merged without the author
+    return {"decision": decision, "variant_text": variant if decision in ("share", "variable") else "",
+            "differs": str(a.get("differs") or "")[:200], "reason": str(a.get("reason") or "No answer.")[:300],
+            "decided_by": "agent" if a else "default"}
+
+
+def decide(files, call_model, log=lambda message: None, judge=PAGE, cache=None, workers=WORKERS):
+    """Every group, most removable copies first: [{group fields..., id, decision, variant_text,
+    differs, reason, existing, decided_by}]. A text already shared is "use existing" (code); the
+    others are asked of the model, the first `judge` of them not decided before (in `cache`, by
+    decision_key), PER_CALL to a call and `workers` calls at a time. The rest stay "unjudged"
+    until the author asks for the next page. Groups of map references follow, decided by code."""
+    cache = {} if cache is None else cache
+    groups = sorted(duplicates.find(files), key=lambda g: (-removable(g), -len(g["files"]), g["text"]))
     existing = shared_pieces(files)
     titles = _titles(files)
     out, to_ask = [], []
     for number, group in enumerate(groups):
-        group = dict(group, id="g%d" % (number + 1))
+        group = dict(group, id="g%d" % (number + 1), existing=None)
         piece = next((existing[(group["tag"], _key(v["text"]))] for v in group["variants"]
                       if (group["tag"], _key(v["text"])) in existing), None)
         if piece:
@@ -80,31 +127,22 @@ def decide(files, call_model, log=lambda message: None, max_groups=MAX_GROUPS):
             out.append(dict(group, decision="use existing", existing=piece, variant_text=group["text"], differs="",
                             decided_by="rule", reason="The same text is already shared as %s#%s/%s." % (
                                 piece["path"], piece["topic"], piece["id"])))
-        else:
+            continue
+        out.append(group)
+        if decision_key(group) not in cache and len(to_ask) < judge:
             to_ask.append(group)
-    for start in range(0, len(to_ask), PER_CALL):
-        batch = to_ask[start:start + PER_CALL]
-        asked = {"groups": [{"id": g["id"], "element": g["tag"], "topics": len(g["files"]),
-                             "variants": [{"index": i, "copies": v["count"], "text": v["text"][:400]}
-                                          for i, v in enumerate(g["variants"][:6])],
-                             "in_topics": sorted({titles.get(f, f) for f in g["files"]})[:5]} for g in batch]}
-        try:
-            answer = call_model(SYSTEM, json.dumps(asked, ensure_ascii=False))
-        except Exception as exc:  # the model did not answer: these groups get no decision this time
-            log("reuse agent failed: %s" % exc)
-            answer = {"groups": []}
-        by_id = {a.get("id"): a for a in answer.get("groups") or [] if isinstance(a, dict)}
+    batches = [to_ask[i:i + PER_CALL] for i in range(0, len(to_ask), PER_CALL)]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        answers = list(pool.map(lambda batch: _ask(batch, titles, call_model, log), batches))
+    for batch, by_id in zip(batches, answers):
+        if by_id is None:
+            continue                         # no answer: asked again with the next page
         for group in batch:
-            a = by_id.get(group["id"]) or {}
-            decision = a.get("decision") if a.get("decision") in DECISIONS else "ask"
-            index = a.get("variant")
-            variant = group["variants"][index]["text"] if isinstance(index, int) and 0 <= index < len(group["variants"]) else group["text"]
-            if decision == "share" and group["kind"] == "numbers":
-                decision = "ask"                    # numbers that differ are never merged without the author
-            out.append(dict(group, decision=decision, variant_text=variant if decision in ("share", "variable") else "",
-                            differs=str(a.get("differs") or "")[:200], reason=str(a.get("reason") or "No answer.")[:300],
-                            existing=None, decided_by="agent" if a else "default"))
-    out = sorted(out, key=lambda g: (-len(g["files"]), g["id"]))
+            cache[decision_key(group)] = _decided(group, by_id.get(group["id"]) or {})
+    for group in out:
+        if "decision" not in group:
+            group.update(cache.get(decision_key(group)) or {"decision": "unjudged", "variant_text": "", "differs": "",
+                                                            "reason": "", "decided_by": ""})
     return out + map_groups(files, start=len(groups))
 
 

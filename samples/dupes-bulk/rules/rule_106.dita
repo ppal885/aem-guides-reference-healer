@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="rule_106"><title>Posting rule 106</title><body><p>Posting rule 106 moves amounts between account group 106 and account group 107.</p><note type="caution">Back up the ledger database before you change a posting rule, so that you can go back if the rule is wrong.</note><note type="caution">Only a ledger administrator can change a posting rule, and every change is written to the audit log.</note><note type="caution">A posting rule takes effect at the start of the next period, not in the period that is open now.</note></body></topic>
