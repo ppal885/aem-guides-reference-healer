@@ -285,7 +285,9 @@ def _compact(group):
             "existing": dict(group["existing"], path=slash(group["existing"]["path"])) if group.get("existing") else None,
             "files": [slash(f) for f in group["files"]], "copies": copies,
             "variants": [{"text": v["text"], "count": v["count"]} for v in group["variants"]],
-            "navtitle": group.get("navtitle", ""), "refs": group.get("refs", 0)}
+            "navtitle": group.get("navtitle", ""), "refs": group.get("refs", 0),
+            # A maybe group: "other words" put for others, or "says more" (one copy with words added).
+            "why": group.get("why", "")}
 
 
 def progress_of(map_path):

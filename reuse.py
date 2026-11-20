@@ -33,6 +33,8 @@ Each group gives the element type, how many topics hold it, its variants (the di
 
 A group marked "maybe": true has wordings that differ by two words or more put for others ("service desk" and "support team", or "receipts" and "payments"). First decide whether they say the same thing: if they do, it is a copy whose wording drifted; if one says another thing, it is not a copy.
 
+A group marked "says_more": true is a maybe group where one wording is another with words added (a condition, a step, a detail). Decide whether the added words are something every topic should say that some copies lost ("share", and choose the variant with the added words), or something meant for some topics only ("variable", and name the added part in "differs").
+
 Decide for each group:
 - "share": the copies say the same thing and keeping them in step matters (a warning, a caution, a legal or safety line, a procedure step or instruction that must read the same everywhere). Small differences in punctuation, case or a few added words do not change this; choose the variant that should become the shared text.
 - "variable": the copies are one sentence in which one part is meant to differ by topic (a release or version number, a product or country name). Name that part.
@@ -87,7 +89,7 @@ def decision_key(group):
 
 def _ask(batch, titles, call_model, log):
     """The model's answers for one call: {group id: answer}."""
-    asked = {"groups": [{"id": g["id"], "element": g["tag"], "topics": len(g["files"]), "maybe": g["kind"] == "maybe",
+    asked = {"groups": [{"id": g["id"], "element": g["tag"], "topics": len(g["files"]), "maybe": g["kind"] == "maybe", "says_more": g.get("why") == "says more",
                          "variants": [{"index": i, "copies": v["count"], "text": v["text"][:400]}
                                       for i, v in enumerate(g["variants"][:6])],
                          "in_topics": sorted({titles.get(f, f) for f in g["files"]})[:5]} for g in batch]}

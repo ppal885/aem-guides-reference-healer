@@ -33,9 +33,9 @@
   },
   {
    "text_starts": "Export the trial balance",
-   "label": "not the same text",
+   "label": "says more",
    "right": null,
-   "why": "one copy adds a whole step: another sentence, not a copy that drifted"
+   "why": "one copy adds a whole step: code cannot tell a lost step from one meant for that topic, so it is a maybe group (why: says more), listed in Keep copies and never shared until the author or the reuse agent settles it"
   },
   {
    "text_starts": "Do not share the closing",
