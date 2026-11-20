@@ -214,6 +214,24 @@
    }
   },
   {
+   "id": "links-24",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "A link that names only a missing GUID, with no link text and no previous version, is not sent to the agents to guess",
+   "check": {
+    "py": "test_refs.TargetsNothingNames.test_a_guid_with_no_link_text_and_no_history_is_not_sent_to_the_agents"
+   }
+  },
+  {
+   "id": "links-25",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "A target not found is called removed only when a previous version shows it",
+   "check": {
+    "py": "test_refs.TargetsNothingNames.test_removed_only_when_a_previous_version_shows_it"
+   }
+  },
+  {
    "id": "images-01",
    "feature": "Images (repair)",
    "level": "simple",

@@ -224,6 +224,11 @@ MAX_GROUPS = int(os.environ.get("REFHEAL_MAX_GROUPS", "40"))
 # 0: no limit. A first check took about 7,000 tokens per broken target, so the default lets
 # about 40 targets through, as MAX_GROUPS does.
 TOKEN_BUDGET = int(os.environ.get("REFHEAL_TOKEN_BUDGET", "300000"))
+# Broken targets that nothing in the files names (a GUID file name, no link text, nothing in a previous
+# version) are not sent to finder agents unless this is set: on a customer export (20 Nov 2026) they
+# were 2,259 of 2,280 targets, and agents could only guess from the sentence around them.
+TRACE_ALL = os.environ.get("REFHEAL_TRACE_ALL", "") not in ("", "0", "false")
+GUID_FILE = re.compile(r"^(?:.*/)?GUID-[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\.\w+$")
 
 CHOOSE_SYSTEM = """A shared piece of DITA content was changed and references to it broke. Two or three candidate targets could replace it. Different topics may have meant different candidates.
 
@@ -402,8 +407,9 @@ class Session:
 
     def __init__(self, files, backend="cli", model=None, log=print, progress=None, memory=None, reported=None,
                  outside=None, timeline=None, cache=None, max_groups=None,
-                 choose=None, assets=None, missing=None, token_budget=None):
+                 choose=None, assets=None, missing=None, token_budget=None, trace_all=None):
         self.backend, self.model, self.log = backend, model, log
+        self.trace_all = TRACE_ALL if trace_all is None else trace_all
         self.token_budget = TOKEN_BUDGET if token_budget is None else token_budget
         self.token_mark = usage.position()      # the tokens of this check are counted from here
         self.over_budget = []                   # groups whose finder did not start: the limit was reached
@@ -622,6 +628,10 @@ class Session:
                 entry["repair"]["caveat"] = known["caveat"][:200]
             if "same_text" in known:
                 entry["repair"]["text_unchanged"] = known["same_text"]
+            if known.get("unnamed"):
+                entry["repair"]["nothing_names_it"] = True
+            if "removed" in known:
+                entry["repair"]["removed"] = known["removed"]     # True only with a previous version as proof
         if known and not known["new_value"] and known.get("how") != "planner":
             ways = self._ways(self.current["repo"], group)
             if ways["options"]:
@@ -640,6 +650,30 @@ class Session:
 
     # ---- tools -----------------------------------------------------------------------------
 
+    def _nothing_names(self, repo, group):
+        """Whether nothing in these files says what a broken target was: its value is a GUID file name
+        no file has, no reference to it has link text, and no previous version knows it. An agent could
+        only guess from the sentence around it."""
+        refs = group["refs"]
+        first = refs[0]
+        if first["attribute"] not in ("href", "conref", "conrefend"):
+            return False
+        if not GUID_FILE.match(self.readable(first["value"]).split("#", 1)[0]):
+            return False
+        if any((r.get("link_text") or "").strip() for r in refs):
+            return False
+        target = repo.split_target(first)[0]
+        return target not in repo.previous and not refheal.text_at(repo, first, first["value"], previous=True)
+
+    def _removal_proven(self, repo, group):
+        """Whether the files show that a target without a new value existed and was taken out: a previous
+        version of its file, or of the element, is known. Without that it was only not found here."""
+        first = group["refs"][0]
+        if first["attribute"] in ("keyref", "conkeyref"):
+            return bool(refheal.text_at(repo, first, first["value"], previous=True))
+        target = repo.split_target(first)[0]
+        return target in repo.previous or bool(refheal.text_at(repo, first, first["value"], previous=True))
+
     def tool_overview(self, args):
         groups = self.current["groups"]
         total = sum(len(g["refs"]) for g in groups.values())
@@ -655,6 +689,17 @@ class Session:
         wanted.sort(key=lambda g: -len(g["refs"]))
         remembered = [g for g in wanted if self._from_cache(repo, g)]
         fresh = [g for g in wanted if g not in remembered]
+        unnamed = [] if self.trace_all else [g for g in fresh if self._nothing_names(repo, g)]
+        for group in unnamed:
+            group["known"] = {"new_value": None, "verdict": "none", "how": "planner", "caveat": "", "unnamed": True,
+                              "reason": "Nothing in these files says what this was: the link names only a GUID, it has "
+                                        "no link text and no previous version knows it. It may be in files outside "
+                                        "this map, or removed. Check it where the content came from."}
+        if unnamed:
+            self.plan.append("Only a GUID, no link text and no previous version: %s (%s). Nothing here names them, so I "
+                             "did not ask the agents to guess; they may be outside this map or removed." % (
+                                 _count(len(unnamed), "broken target"), _count(sum(len(g["refs"]) for g in unnamed), "reference")))
+        fresh = [g for g in fresh if g not in unnamed]
         waiting, fresh = fresh[self.max_groups:], fresh[:self.max_groups]
         for group in waiting:
             group["known"] = {"new_value": None, "verdict": "none", "how": "planner", "caveat": "", "reason":
@@ -725,16 +770,20 @@ class Session:
                                      collections.Counter(g["choice"].values()).values(), reverse=True)))
                                  for g in split)))
         found = sum(1 for g in done if g["known"]["new_value"])
-        self.step("handed-%d" % number, "done", "Planner agent", "Handed %s to finder agents: %d found, %d gone" % (
+        self.step("handed-%d" % number, "done", "Planner agent", "Handed %s to finder agents: %d found, %d not found" % (
             _count(len(fresh), "group"), sum(1 for g in fresh if g["known"]["new_value"]),
             sum(1 for g in fresh if not g["known"]["new_value"])))
         if fresh:
+            # "Removed" only with proof (a previous version of it); without it, it was only not found here.
+            gone = [g for g in fresh if not g["known"]["new_value"]]
+            proven = [g for g in gone if self._removal_proven(repo, g)]
+            for group in gone:
+                group["known"]["removed"] = group in proven
             self.plan.append("Sent %d to finder agents, each answer checked by a reviewer agent: %d found under "
-                             "a new name or place, %d removed for good." % (
-                                 len(fresh), sum(1 for g in fresh if g["known"]["new_value"]),
-                                 sum(1 for g in fresh if not g["known"]["new_value"])))
+                             "a new name or place, %d removed (a previous version shows them), %d not found in "
+                             "these files." % (len(fresh), len(fresh) - len(gone), len(proven), len(gone) - len(proven)))
         return {"summary": "%d investigated, %d with a target" % (len(done), found), "unknown_ids": unknown,
-                "waiting_for_the_next_check": len(waiting),
+                "waiting_for_the_next_check": len(waiting), "nothing_names_them": len(unnamed),
                 "groups": [self._describe(g) for g in done]}
 
     def _settle(self, repo, group):
