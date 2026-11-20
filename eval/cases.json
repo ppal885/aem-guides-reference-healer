@@ -664,7 +664,8 @@
    "level": "edge",
    "case": "A fix that asks the author for a value (sqf:user-entry)",
    "check": {
-    "note": "not built in the Schematron work (it says so in its README row)"
+    "measured": "README.md",
+    "says": "3 of 3 passed and matched"
    }
   },
   {
@@ -673,7 +674,8 @@
    "level": "edge",
    "case": "A fix that reaches outside the element it fired on",
    "check": {
-    "note": "not built in the Schematron work (it says so in its README row)"
+    "measured": "README.md",
+    "says": "3 of 3 with the element"
    }
   },
   {

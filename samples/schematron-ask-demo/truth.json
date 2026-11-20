@@ -1,0 +1,60 @@
+{
+ "note": "What Content Health should find and offer for rules.sch on these two topics. 'value' is what the author types; 'after' is the changed element as AEM returns it (attribute order may differ); 'path' is the element the fix changes. 'starts_as' is the value the author's box starts with: AEM stores the image's href as a GUID, so the rule's default (made from @href) is left empty rather than shown as a GUID.",
+ "asks_the_author": [
+  {
+   "file": "topics/export_ledger.dita",
+   "rule": "image-alt",
+   "question": "What does the image show?",
+   "starts_as": "",
+   "value": "The Export dialog with CSV selected",
+   "path": "/topic[1]/body[1]/p[2]/image[1]",
+   "after": "<image alt=\"The Export dialog with CSV selected\" href=\"export-dialog.png\"/>"
+  },
+  {
+   "file": "topics/export_ledger.dita",
+   "rule": "xref-text",
+   "question": "Link text",
+   "starts_as": "",
+   "value": "Ledgerline CSV format",
+   "path": "/topic[1]/body[1]/p[3]/xref[1]",
+   "after": "<xref format=\"html\" href=\"https://example.com/ledgerline/csv\" scope=\"external\">Ledgerline CSV format</xref>"
+  },
+  {
+   "file": "topics/archive_ledger.dita",
+   "rule": "comment-author",
+   "question": "Who wrote the comment?",
+   "starts_as": "",
+   "value": "Ledger team",
+   "path": "/topic[1]/body[1]/p[1]/draft-comment[1]",
+   "after": "<draft-comment author=\"Ledger team\">Check this with the finance team.</draft-comment>"
+  }
+ ],
+ "reaches_outside": [
+  {
+   "file": "topics/export_ledger.dita",
+   "rule": "title-shortdesc",
+   "fired_on": "/topic[1]/title[1]",
+   "path": "/topic[1]",
+   "contains": "<title>Export the ledger</title><shortdesc>Export the ledger.</shortdesc>"
+  },
+  {
+   "file": "topics/export_ledger.dita",
+   "rule": "ol-one-item",
+   "fired_on": "/topic[1]/body[1]/ol[1]/li[1]",
+   "path": "/topic[1]/body[1]",
+   "contains": "<ul>"
+  },
+  {
+   "file": "topics/archive_ledger.dita",
+   "rule": "section-id",
+   "fired_on": "/topic[1]/body[1]/section[1]/title[1]",
+   "path": "/topic[1]/body[1]/section[1]",
+   "contains": "<section id=\"before-you-archive\">"
+  }
+ ],
+ "not_reported": [
+  "archive_ledger image (has alt)",
+  "archive_ledger ol (two items)",
+  "archive_ledger title (has a short description)"
+ ]
+}
