@@ -31,11 +31,14 @@ class CopiesThatDrifted(unittest.TestCase):
         for case in truth["groups"]:
             found = kinds(case["text_starts"]) & {"numbers", "wording", "maybe"}
             want = {"drifted": {"numbers", "wording"}, "facts differ": {"numbers", "wording"},
-                    "maybe, same": {"maybe"}, "maybe, other": {"maybe"}}.get(case["label"], set())
+                    "maybe, same": {"maybe"}, "maybe, other": {"maybe"}, "says more": {"maybe"}}.get(case["label"], set())
             # meant to differ, or another sentence: not listed at all
             self.assertEqual(bool(found), bool(want), case["why"])
             if want:
                 self.assertTrue(found <= want, (case["why"], found))
+            if case["label"] == "says more":
+                self.assertEqual({g.get("why") for g in groups if g["kind"] == "maybe"
+                                  and any(v["text"].startswith(case["text_starts"]) for v in g["variants"])}, {"says more"})
         self.assertFalse(kinds(truth["not_listed"][0]) & {"numbers", "wording", "maybe"})
 
     def test_a_short_copy_with_a_word_or_three_changed_is_found(self):
@@ -43,6 +46,30 @@ class CopiesThatDrifted(unittest.TestCase):
         files = [topic("a", "<p>%s</p>" % base), topic("b", "<p>%s</p>" % base),
                  topic("c", "<p>%s</p>" % base.replace("database", "database and the attachments"))]
         self.assertEqual([g["kind"] for g in duplicates.find(files)], ["wording"])
+
+    def test_a_copy_that_says_more_is_a_maybe_group_not_dropped(self):
+        a = "Record the change in the audit log and tell the controller which accounts it touched."
+        b = a.rstrip(".") + ", and attach the signed approval form to the closing case."
+        found = duplicates.find([topic("a", "<p>%s</p>" % a), topic("b", "<p>%s</p>" % b)])
+        # Never a group of copies: code cannot tell a lost instruction from one meant for that topic.
+        self.assertEqual([(g["kind"], g.get("why")) for g in found], [("maybe", "says more")])
+
+    def test_words_changed_as_well_as_added_are_not_says_more(self):
+        a = "Record the change in the audit log and tell the controller which accounts it touched."
+        b = "Write the change to the audit log and tell the controller which accounts it touched, and attach the form."
+        self.assertEqual(duplicates.find([topic("a", "<p>%s</p>" % a), topic("b", "<p>%s</p>" % b)]), [])
+
+    def test_a_sentence_that_is_a_small_part_of_a_long_paragraph_is_not_says_more(self):
+        a = "Record the change in the audit log before the period closes."
+        b = a.rstrip(".") + (", then export the trial balance, compare it with the bank statement, mark each"
+                             " difference in the review sheet and send the sheet to the controller for approval.")
+        self.assertEqual(duplicates.find([topic("a", "<p>%s</p>" % a), topic("b", "<p>%s</p>" % b)]), [])
+
+    def test_one_word_written_as_two_is_the_same_word(self):
+        a = "Customers on version 4.2 must remove both the Ledgerline Installer and the Scanner Webclient first."
+        b = a.replace("Webclient", "Web client")
+        self.assertEqual([g["kind"] for g in duplicates.find([topic("a", "<p>%s</p>" % a), topic("b", "<p>%s</p>" % b)])],
+                         ["wording"])
 
     def test_two_words_or_more_put_for_others_are_another_sentence(self):
         a = "Assist a client with checking their eligibility for the new cash flow tool today."
@@ -82,12 +109,12 @@ class KeepCopiesInTheSidecar(unittest.TestCase):
 
     def test_the_mode_and_a_kept_group_are_remembered_per_map(self):
         first = self.sidecar.copies_of("/drift.ditamap")
-        self.assertEqual((first["mode"], first["drifted"], first["kept"]), ("share", 8, 0))   # 6 drifted, 2 maybe
+        self.assertEqual((first["mode"], first["drifted"], first["kept"]), ("share", 9, 0))   # 6 drifted, 3 maybe (1 "says more")
         self.assertEqual(self.sidecar.set_keep({"map": "/drift.ditamap", "mode": "keep"})["mode"], "keep")
         drifted = next(g for g in first["groups"] if g["kind"] == "numbers")
         self.sidecar.set_keep({"map": "/drift.ditamap", "keep": drifted["key"]})
         again = self.sidecar.copies_of("/drift.ditamap")
-        self.assertEqual((again["mode"], again["drifted"], again["kept"]), ("keep", 7, 1))
+        self.assertEqual((again["mode"], again["drifted"], again["kept"]), ("keep", 8, 1))
         self.assertTrue(next(g for g in again["groups"] if g["key"] == drifted["key"])["kept"])
         self.assertEqual(self.sidecar.keep_of("/other.ditamap"), {"mode": "share", "kept": []})
         self.sidecar.set_keep({"map": "/drift.ditamap", "unkeep": drifted["key"]})

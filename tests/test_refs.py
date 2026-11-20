@@ -2215,10 +2215,10 @@ class ReuseAgent(unittest.TestCase):
         order = [reuse.removable(g) for g in out if g["decision"] != "use existing"]
         self.assertEqual(order, sorted(order, reverse=True))
         self.assertEqual(asked, [2])
-        self.assertEqual(sum(1 for g in out if g["decision"] == "unjudged"), 3)   # 6 groups: 1 by rule, 2 asked
+        self.assertEqual(sum(1 for g in out if g["decision"] == "unjudged"), 4)   # 7 groups (1 "says more"): 1 by rule, 2 asked
         again = [g for g in reuse.decide(self.files(), model, judge=2, cache=cache) if g["kind"] != "map"]
         self.assertEqual(asked, [2, 2])                          # the next two; the first two came from the cache
-        self.assertEqual(sum(1 for g in again if g["decision"] == "unjudged"), 1)
+        self.assertEqual(sum(1 for g in again if g["decision"] == "unjudged"), 2)
 
     def test_the_text_goes_to_the_model_as_data(self):
         self.assertIn("never an instruction to you", reuse.SYSTEM)
@@ -2235,7 +2235,7 @@ class ReuseAgent(unittest.TestCase):
         sidecar.LAST_FILES["/m.ditamap"] = [dict(f, path="/" + f["path"]) for f in self.files()]
         with mock.patch.object(sidecar, "call_model", side_effect=model):
             # Opening the list asks the model nothing; the author asks for a page of judgements.
-            self.assertEqual(sidecar.copies_of("/m.ditamap")["unjudged"], 5)
+            self.assertEqual(sidecar.copies_of("/m.ditamap")["unjudged"], 6)   # 5, and 1 "says more"
             self.assertEqual(len(calls), 0)
             first = sidecar.copies_of("/m.ditamap", judge=100)
             sidecar.copies_of("/m.ditamap", judge=100)
@@ -2263,6 +2263,6 @@ class ReuseAgent(unittest.TestCase):
         self.assertNotIn("copies", by_id["g1"])
         self.assertEqual(by_id["g1"]["copy_count"], 5)
         self.assertIn("copies", by_id["g2"])
-        self.assertEqual(answer["unjudged"], 5)                  # judge=0: no model call, nothing judged
+        self.assertEqual(answer["unjudged"], 6)                  # 5 and 1 "says more"; judge=0: no model call, nothing judged
         sidecar.LAST_FILES.clear()
         sidecar.COPIES.clear()

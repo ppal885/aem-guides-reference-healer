@@ -212,6 +212,19 @@ def long_forms(key):
     return out.strip()
 
 
+SAYS_MORE_SHARE = 0.4      # the shorter copy is at least this share of the longer one's words
+
+
+def _says_more(a, b):
+    """Whether one text (a key) is the other with words added, none changed or left out, and the
+    shorter is not a small part of the longer (a sentence that happens to stand in a long paragraph)."""
+    x, y = long_forms(a).split(), long_forms(b).split()
+    if not x or not y or min(len(x), len(y)) < SAYS_MORE_SHARE * max(len(x), len(y)):
+        return False
+    ops = {op for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, x, y, autojunk=False).get_opcodes() if op != "equal"}
+    return ops in ({"insert"}, {"delete"})
+
+
 def _changed_words(a, b):
     """How many words differ between two texts (their keys): added, removed or replaced. A short form
     and its long form are the same words."""
@@ -242,6 +255,9 @@ def _says_otherwise(a, b):
     for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, [w.lower() for w in words_a], [w.lower() for w in words_b],
                                                       autojunk=False).get_opcodes():
         # The first word is a capital by place, not a name; a one-word change of a few letters is a typo.
+        # One word written as two ("Webclient", "Web client") is the same word, not a name.
+        if op == "replace" and "".join(words_a[i1:i2]).lower() == "".join(words_b[j1:j2]).lower():
+            continue
         left, right = capital(words_a[max(i1, 1):i2]), capital(words_b[max(j1, 1):j2])
         typo = i2 - i1 == j2 - j1 == 1 and difflib.SequenceMatcher(None, words_a[i1].lower(), words_b[j1].lower()).ratio() >= 0.8
         # A name on either side: "the customer" and "Acme Payroll" are other readers, not a reworded copy.
@@ -314,12 +330,22 @@ def find(files):
         if why is None:
             join(a, b)
         elif why == "other words":
-            maybe.append((a, b))
+            maybe.append((a, b, why))
+
+    # One copy that holds every word of the other and more than MAX_CHANGED_WORDS words besides: a
+    # lost instruction or a part meant for some topics only. On 50 labelled groups of customer content
+    # (20 Nov 2026) the 26 such pairs were 15 drifted, 8 on purpose, 3 unclear: code cannot tell, so
+    # they become "maybe" groups (why "says more") instead of being left out.
+    def judge(a, b):
+        changed = _changed_words(units[a][0][2], units[b][0][2])
+        if changed <= MAX_CHANGED_WORDS:
+            join_or_maybe(a, b)
+        elif _says_more(units[a][0][2], units[b][0][2]):
+            maybe.append((a, b, "says more"))
     for members in buckets.values():
         for a, b in zip(members, members[1:]):
-            if (_jaccard(shingles[a], shingles[b]) >= WORDING_SIMILARITY or _contained(shingles[a], shingles[b]) >= CONTAINED) \
-                    and _changed_words(units[a][0][2], units[b][0][2]) <= MAX_CHANGED_WORDS:
-                join_or_maybe(a, b)
+            if _jaccard(shingles[a], shingles[b]) >= WORDING_SIMILARITY or _contained(shingles[a], shingles[b]) >= CONTAINED:
+                judge(a, b)
     # Short copies: one changed word changes three word triples, so in a sentence of fifteen words
     # the triples of two copies never meet (seen on samples/dupes-drift: "and the attachments" added,
     # "service desk" for "support team"). Copies that keep their first or last three words are
@@ -335,8 +361,8 @@ def find(files):
             continue
         for i, a in enumerate(members):
             for b in members[i + 1:]:
-                if root(a) != root(b) and _changed_words(units[a][0][2], units[b][0][2]) <= MAX_CHANGED_WORDS:
-                    join_or_maybe(a, b)
+                if root(a) != root(b):
+                    judge(a, b)
     clusters = collections.defaultdict(list)
     for index in range(len(units)):
         clusters[root(index)].append(index)
@@ -363,21 +389,28 @@ def _maybe_groups(pairs, root, clusters, units):
         while parent.get(r, r) != r:
             r = parent[r]
         return r
-    for a, b in pairs:
+    for a, b, _ in pairs:
         ra, rb = top(root(a)), top(root(b))
         if ra != rb:
             parent[max(ra, rb)] = min(ra, rb)
     sets = collections.defaultdict(set)
-    for a, b in pairs:
+    whys = collections.defaultdict(set)
+    for a, b, why in pairs:
+        if root(a) == root(b):
+            continue
         for r in (root(a), root(b)):
             sets[top(r)].add(r)
+        whys[top(root(a))].add(why)
     out = []
-    for roots in sets.values():
+    for key, roots in sets.items():
         if len(roots) < 2:
             continue
         members = [blk for r in sorted(roots) for i in clusters[r] for blk in units[i][1]]
         if len({blk["file"] for blk in members}) >= MIN_FILES:
-            out.append(_group("maybe", units[min(roots)][0][0], members))
+            group = _group("maybe", units[min(roots)][0][0], members)
+            # "says more" only when every pair is one copy with words added; else "other words".
+            group["why"] = "says more" if whys[key] == {"says more"} else "other words"
+            out.append(group)
     return out
 
 
