@@ -1025,6 +1025,56 @@ class RememberedFindings(unittest.TestCase):
                 session.tool_investigate({"group_ids": list(session.current["groups"])})
 
 
+class TargetsNothingNames(unittest.TestCase):
+    """A broken target that nothing in the files names is not sent to the agents to guess, and a target
+    with no new value is called removed only when a previous version shows it."""
+
+    GONE = "GUID-0aad28a0-eee0-4d88-877e-310b3721336f.dita"
+    LIB = '<topic id="lib"><title>Lib</title><body><note id="kept">Back up first.</note></body></topic>'
+    OLD = '<topic id="lib"><title>Lib</title><body><note id="kept">Back up first.</note><note id="backup">Old.</note></body></topic>'
+
+    def session(self, body, **more):
+        files = [{"id": "GUID-lib", "path": "/d/lib.dita", "xml": self.LIB, "previous": [self.OLD]},
+                 {"id": "GUID-t1", "path": "/d/t1.dita", "previous": [],
+                  "xml": '<topic id="t1"><title>T1</title><body><p>%s</p></body></topic>' % body}]
+        return refplan.Session(files, log=lambda message: None, **more)
+
+    def test_a_guid_with_no_link_text_and_no_history_is_not_sent_to_the_agents(self):
+        session = self.session('See <xref href="%s"/>.' % self.GONE)
+        with mock.patch.object(refplan.refheal, "heal_one", side_effect=RuntimeError("started")):
+            result = session.tool_investigate({"group_ids": list(session.current["groups"])})
+        self.assertEqual(result["nothing_names_them"], 1)
+        group = next(iter(session.current["groups"].values()))
+        self.assertTrue(group["known"]["unnamed"])
+        self.assertIn("Nothing in these files says what this was", group["known"]["reason"])
+        self.assertIn("Only a GUID, no link text and no previous version: 1 broken target (1 reference)", " ".join(session.plan))
+
+    def test_asked_to_trace_all_the_agents_get_it_anyway(self):
+        session = self.session('See <xref href="%s"/>.' % self.GONE, trace_all=True)
+        with mock.patch.object(refplan.refheal, "heal_one", side_effect=RuntimeError("started")):
+            with self.assertRaisesRegex(RuntimeError, "started"):
+                session.tool_investigate({"group_ids": list(session.current["groups"])})
+
+    def test_link_text_is_something_to_trace(self):
+        session = self.session('See <xref href="%s">Replacing the fan</xref>.' % self.GONE)
+        nothing = {"new_value": None, "verdict": "none", "candidates": [], "reason": "Not found.", "caveat": "", "review": None}
+        with mock.patch.object(refplan.refheal, "heal_one", return_value=nothing):
+            session.tool_investigate({"group_ids": list(session.current["groups"])})
+        group = next(iter(session.current["groups"].values()))
+        self.assertFalse(group["known"].get("unnamed"))
+        self.assertFalse(group["known"]["removed"])            # not found here is not proof it was removed
+        self.assertIn("0 removed (a previous version shows them), 1 not found in these files", " ".join(session.plan))
+
+    def test_removed_only_when_a_previous_version_shows_it(self):
+        session = self.session('<ph conref="GUID-lib.dita#lib/backup"/>')
+        nothing = {"new_value": None, "verdict": "none", "candidates": [], "reason": "Gone.", "caveat": "", "review": None}
+        with mock.patch.object(refplan.refheal, "heal_one", return_value=nothing):
+            session.tool_investigate({"group_ids": list(session.current["groups"])})
+        group = next(iter(session.current["groups"].values()))
+        self.assertTrue(group["known"]["removed"])
+        self.assertIn("1 removed (a previous version shows them), 0 not found in these files", " ".join(session.plan))
+
+
 class KeyFindingsAfterFixAll(unittest.TestCase):
     """A finding about a key rests on the maps' key definitions, not on every character of the maps."""
 
