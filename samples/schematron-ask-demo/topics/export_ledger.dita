@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="export_ledger">
+  <title>Export the ledger</title>
+  <body>
+    <p>Ledgerline writes the ledger of the open period to a CSV file.</p>
+    <p><image href="export-dialog.png"/></p>
+    <p>The file follows the <xref href="https://example.com/ledgerline/csv" scope="external" format="html"/>.</p>
+    <ol>
+      <li>Select <uicontrol>Export</uicontrol> in the toolbar.</li>
+    </ol>
+  </body>
+</topic>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="archive_ledger">
+  <title>Archive a ledger</title>
+  <shortdesc>Archive a ledger when its periods are closed.</shortdesc>
+  <body>
+    <p>An archived ledger can be read but not changed.<draft-comment>Check this with the finance team.</draft-comment></p>
+    <section>
+      <title>Before you archive</title>
+      <p>Close every period of the ledger.</p>
+    </section>
+    <p><image href="archive-button.png" alt="The Archive button"/></p>
+    <ol>
+      <li>Select <uicontrol>Archive</uicontrol>.</li>
+      <li>Confirm.</li>
+    </ol>
+  </body>
+</topic>
