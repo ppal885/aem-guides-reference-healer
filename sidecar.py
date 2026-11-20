@@ -287,7 +287,9 @@ def _compact(group):
             "variants": [{"text": v["text"], "count": v["count"]} for v in group["variants"]],
             "navtitle": group.get("navtitle", ""), "refs": group.get("refs", 0),
             # A maybe group: "other words" put for others, or "says more" (one copy with words added).
-            "why": group.get("why", "")}
+            "why": group.get("why", ""),
+            # a "says more" group whose longer wording is in a few copies and the shorter in many
+            "one_sided": group.get("one_sided")}
 
 
 def progress_of(map_path):

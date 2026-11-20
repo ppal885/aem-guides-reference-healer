@@ -575,6 +575,25 @@
    }
   },
   {
+   "id": "keep-20",
+   "feature": "Keep copies",
+   "level": "edge",
+   "case": "Copies that say more are grouped in pairs, never chained into one big group",
+   "check": {
+    "py": "test_keepcopies.CopiesThatDrifted.test_says_more_pairs_are_not_chained_and_a_rare_longer_wording_is_one_sided"
+   }
+  },
+  {
+   "id": "keep-21",
+   "feature": "Keep copies",
+   "level": "edge",
+   "case": "A longer wording in one or two topics of a sentence many topics use is marked one-sided",
+   "check": {
+    "editor": "test/controllers/dialogs/content_health_copies_dialog_controller.test.ts",
+    "name": "lists a maybe group only in Keep copies"
+   }
+  },
+  {
    "id": "scheme-01",
    "feature": "Subject scheme",
    "level": "simple",

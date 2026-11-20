@@ -54,6 +54,28 @@ class CopiesThatDrifted(unittest.TestCase):
         # Never a group of copies: code cannot tell a lost instruction from one meant for that topic.
         self.assertEqual([(g["kind"], g.get("why")) for g in found], [("maybe", "says more")])
 
+    def test_says_more_pairs_are_not_chained_and_a_rare_longer_wording_is_one_sided(self):
+        s = "Use the following table to find the part number for the replaceable unit in the ledger rack."
+        w = s.replace("replaceable unit", "replaceable part")              # a wording copy of s
+        l1 = s.rstrip(".") + ", and record the serial number on the service form first."
+        l2 = s.rstrip(".") + ", then call the ledger service desk before you order it."
+        files = ([topic("s%d" % i, "<p>%s</p>" % s) for i in range(12)] + [topic("w%d" % i, "<p>%s</p>" % w) for i in range(3)]
+                 + [topic("l1", "<p>%s</p>" % l1), topic("l2", "<p>%s</p>" % l2)])
+        groups = duplicates.find(files)
+        more = [g for g in groups if g.get("why") == "says more"]
+        # One group per longer wording, each with only its own two wordings: no chain through s.
+        self.assertEqual(sorted(len(g["copies"]) for g in more), [13, 13])
+        self.assertTrue(all(len(g["variants"]) == 2 and g["variants"][0]["text"] == s for g in more))
+        self.assertTrue(all(g["one_sided"] == {"longer_topics": 1, "shorter_topics": 12} for g in more))
+        # The wording copies of s stay one group of their own.
+        self.assertEqual([len(g["copies"]) for g in groups if g["kind"] == "wording"], [15])
+
+    def test_a_balanced_says_more_pair_is_not_one_sided(self):
+        a = "Record the change in the audit log and tell the controller which accounts it touched."
+        b = a.rstrip(".") + ", and attach the signed approval form to the closing case."
+        groups = duplicates.find([topic("a%d" % i, "<p>%s</p>" % a) for i in range(2)] + [topic("b%d" % i, "<p>%s</p>" % b) for i in range(2)])
+        self.assertEqual([(g.get("why"), g.get("one_sided")) for g in groups if g["kind"] == "maybe"], [("says more", None)])
+
     def test_words_changed_as_well_as_added_are_not_says_more(self):
         a = "Record the change in the audit log and tell the controller which accounts it touched."
         b = "Write the change to the audit log and tell the controller which accounts it touched, and attach the form."

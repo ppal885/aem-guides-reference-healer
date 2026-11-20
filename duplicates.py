@@ -374,9 +374,40 @@ def find(files):
         templates = {re.sub(r"\d+", "#", units[i][0][2]) for i in indexes}
         kind = "same" if len(indexes) == 1 else "numbers" if len(templates) == 1 else "wording"
         groups.append(_group(kind, units[indexes[0]][0][0], members))
-    groups.extend(_maybe_groups(maybe, root, clusters, units))
+    groups.extend(_maybe_groups([p for p in maybe if p[2] != "says more"], root, clusters, units))
+    groups.extend(_says_more_groups([p for p in maybe if p[2] == "says more"], root, units))
     groups.extend(whole_groups)
     return sorted(groups, key=lambda g: (-len(g["files"]), -len(g["copies"]), g["text"]))
+
+
+RARE_COPIES, COMMON_COPIES = 2, 10   # one-sided: the longer wording in this few copies, the shorter in this many
+
+
+def _says_more_groups(pairs, root, units):
+    """One "maybe" group (why "says more") for each pair of wordings, one with words the other lacks:
+    only the copies of those two wordings. Pairs are not chained: on a customer export (20 Nov 2026)
+    chaining made one group of 407 copies out of a sentence in 405 topics and a longer form in 2, so
+    "make them all say the longer one" would have changed 405 topics. Each copy group stays as it is.
+    `one_sided` is set when the longer wording is in RARE_COPIES copies or fewer and the shorter in
+    COMMON_COPIES or more: the extra words are most likely meant for those few topics."""
+    out, seen = [], set()
+    for a, b, _ in pairs:
+        if root(a) == root(b) or (min(a, b), max(a, b)) in seen:
+            continue
+        seen.add((min(a, b), max(a, b)))
+        members = units[a][1] + units[b][1]
+        if len({blk["file"] for blk in members}) < MIN_FILES:
+            continue
+        short, long_ = sorted((a, b), key=lambda i: len(units[i][0][2].split()))
+        group = _group("maybe", units[short][0][0], members)
+        group["why"] = "says more"
+        rare, common = len(units[long_][1]), len(units[short][1])
+        if rare <= RARE_COPIES and common >= COMMON_COPIES:
+            # Counted in topics, as the editor says them ("1 topic(s) say more than the 400 ...").
+            group["one_sided"] = {"longer_topics": len({blk["file"] for blk in units[long_][1]}),
+                                  "shorter_topics": len({blk["file"] for blk in units[short][1]})}
+        out.append(group)
+    return out
 
 
 def _maybe_groups(pairs, root, clusters, units):
