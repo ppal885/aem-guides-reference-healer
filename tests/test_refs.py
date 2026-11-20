@@ -4,6 +4,7 @@ import re
 import os
 import sys
 import tempfile
+import threading
 import time
 import unittest
 
@@ -1012,8 +1013,8 @@ class RememberedFindings(unittest.TestCase):
         with mock.patch.object(refplan.refheal, "heal_one", side_effect=lambda *a, **k: started.append(a) or {}):
             session.tool_investigate({"group_ids": list(session.current["groups"])})
         self.assertEqual(started, [])
-        self.assertTrue(all("limit of 1,000 tokens" in g["known"]["reason"] for g in session.current["groups"].values()))
-        self.assertIn("2 broken targets wait for the next check (3 references): this check reached its limit of 1,000 tokens",
+        self.assertTrue(all("limit of 1,000 in cost terms" in g["known"]["reason"] for g in session.current["groups"].values()))
+        self.assertIn("2 broken targets wait for the next check (3 references): this check reached its limit of 1,000 in cost terms",
                       " ".join(session.plan))
         self.assertEqual(cache, {})
 
@@ -1063,6 +1064,9 @@ class TargetsNothingNames(unittest.TestCase):
         group = next(iter(session.current["groups"].values()))
         self.assertFalse(group["known"].get("unnamed"))
         self.assertFalse(group["known"]["removed"])            # not found here is not proof it was removed
+        # Nothing found and nothing to put back: left broken by code, not by a planner call.
+        self.assertEqual(group["decision"], "leave_broken")
+        self.assertIn("Code left 1 reference broken (1 target)", " ".join(session.plan))
         self.assertIn("0 removed (a previous version shows them), 1 not found in these files", " ".join(session.plan))
 
     def test_removed_only_when_a_previous_version_shows_it(self):
@@ -1073,6 +1077,148 @@ class TargetsNothingNames(unittest.TestCase):
         group = next(iter(session.current["groups"].values()))
         self.assertTrue(group["known"]["removed"])
         self.assertIn("1 removed (a previous version shows them), 0 not found in these files", " ".join(session.plan))
+        self.assertIsNone(group["decision"])                   # something can be put back: the planner decides
+
+
+class TokenLimitCountsRunningFinders(unittest.TestCase):
+    """The token limit counts what the finders still running will likely spend, not only what is spent."""
+
+    def test_no_more_finders_start_once_running_ones_would_reach_the_limit(self):
+        lib = '<topic id="lib"><title>Lib</title><body><note id="kept">Kept.</note></body></topic>'
+        refs = "".join('<ph conref="GUID-lib.dita#lib/gone%d"/>' % i for i in range(5))
+        files = [{"id": "GUID-lib", "path": "/d/lib.dita", "xml": lib, "previous": []},
+                 {"id": "GUID-t1", "path": "/d/t1.dita", "previous": [],
+                  "xml": '<topic id="t1"><title>T1</title><body><p>%s</p></body></topic>' % refs}]
+        session = refplan.Session(files, log=lambda message: None, token_budget=20000)
+        started, gate = [], threading.Event()
+
+        def finder(*args, **kwargs):
+            started.append(args[1]["value"])
+            gate.wait(2)                      # all stay running until every start decision is made
+            usage.note(True, 7000, 0)
+            return {"new_value": None, "verdict": "none", "candidates": [], "reason": "x", "caveat": "", "review": None}
+        with mock.patch.object(refplan, "FINDER_TOKENS", 7000), mock.patch.object(refplan.refheal, "heal_one", side_effect=finder):
+            timer = threading.Timer(0.3, gate.set)
+            timer.start()
+            session.tool_investigate({"group_ids": list(session.current["groups"])})
+        # 0, 7,000 and 14,000 projected let three start; a fourth would make 21,000.
+        self.assertEqual(len(started), 3)
+        self.assertIn("Limit for this check: 20,000 in cost terms (cached input a tenth, output five times), counting the finders still running; 3 finder agents started.",
+                      " ".join(session.plan))
+
+
+class TokenLimitAverageOfFinishedFinders(unittest.TestCase):
+    """The estimate for a running finder is what finished finders spent themselves: the half-done calls
+    of the others are not divided by the finished ones (that stopped 6 of 15 finders on the large sample)."""
+
+    def test_finders_keep_starting_while_others_run(self):
+        lib = '<topic id="lib"><title>Lib</title><body><note id="kept">Kept.</note></body></topic>'
+        refs = "".join('<ph conref="GUID-lib.dita#lib/gone%d"/>' % i for i in range(10))
+        files = [{"id": "GUID-lib", "path": "/d/lib.dita", "xml": lib, "previous": []},
+                 {"id": "GUID-t1", "path": "/d/t1.dita", "previous": [],
+                  "xml": '<topic id="t1"><title>T1</title><body><p>%s</p></body></topic>' % refs}]
+        session = refplan.Session(files, log=lambda message: None, token_budget=200000)
+        started, gate, lock = [], threading.Event(), threading.Lock()
+
+        def finder(*args, **kwargs):
+            with lock:
+                first = not started
+                started.append(args[1]["value"])
+            usage.note(True, 5000, 0)            # half of its work done
+            if not first:
+                gate.wait(2)                     # the others run on while the first one finishes
+            usage.note(True, 2000, 0)
+            return {"new_value": None, "verdict": "none", "candidates": [], "reason": "x", "caveat": "", "review": None}
+        with mock.patch.object(refplan, "FINDER_TOKENS", 7000), mock.patch.object(refplan.refheal, "heal_one", side_effect=finder):
+            timer = threading.Timer(0.5, gate.set)
+            timer.start()
+            session.tool_investigate({"group_ids": list(session.current["groups"])})
+        self.assertEqual(len(started), 10)
+
+
+class OverviewInPages(unittest.TestCase):
+    """The overview comes in pages the agent loop passes on whole, and investigate ["all"] takes every page."""
+
+    def session(self, count, **more):
+        lib = '<topic id="lib"><title>Lib</title><body><note id="kept">Kept.</note></body></topic>'
+        refs = "".join('<ph conref="GUID-lib.dita#lib/gone-%03d-with-a-long-enough-id-to-fill-the-page"/>' % i for i in range(count))
+        files = [{"id": "GUID-lib", "path": "/d/lib.dita", "xml": lib, "previous": []},
+                 {"id": "GUID-t1", "path": "/d/t1.dita", "previous": [],
+                  "xml": '<topic id="t1"><title>T1</title><body><p>%s</p></body></topic>' % refs}]
+        return refplan.Session(files, log=lambda message: None, **more)
+
+    def test_every_page_fits_and_says_there_is_more(self):
+        session = self.session(120)
+        first = session.tool_overview({})
+        self.assertGreater(first["pages"], 1)
+        self.assertIn("call overview with page=2", first["more"])
+        seen = []
+        for number in range(1, first["pages"] + 1):
+            page = session.tool_overview({"page": number})
+            self.assertLessEqual(len(json.dumps(page["groups"], ensure_ascii=False)), refplan.OVERVIEW_PAGE_CHARS + 2000)
+            seen += [g["id"] for g in page["groups"]]
+        self.assertEqual(sorted(seen), sorted(session.current["groups"]))
+
+    def test_a_large_map_gets_short_entries_and_full_detail_on_request(self):
+        session = self.session(120)
+        first = session.tool_overview({})
+        self.assertIn("short_entries", first)
+        entry = first["groups"][0]
+        self.assertNotIn("why_broken", entry)
+        self.assertLessEqual(len(entry["broken_value"]), 90)
+        full = session.tool_overview({"group_ids": [entry["id"]]})["groups"][0]
+        self.assertEqual(full["id"], entry["id"])
+        self.assertIn("why_broken", full)
+
+    def test_a_small_map_keeps_full_entries_on_one_page(self):
+        session = self.session(3)
+        first = session.tool_overview({})
+        self.assertEqual(first["pages"], 1)
+        self.assertNotIn("short_entries", first)
+        self.assertIn("why_broken", first["groups"][0])
+
+    def test_investigate_all_takes_groups_on_every_page(self):
+        session = self.session(120, max_groups=0)
+        result = session.tool_investigate({"group_ids": ["all"]})
+        self.assertEqual(result["waiting_for_the_next_check"], 120)
+
+    def test_the_first_guess_for_a_finder_is_the_last_checks_average(self):
+        cache = {refplan.FINDER_TOKENS_KEY: {"when": time.time(), "average": 30000}}
+        session = self.session(5, cache=cache, token_budget=100000)
+        started, gate = [], threading.Event()
+
+        def finder(*args, **kwargs):
+            started.append(1)
+            gate.wait(2)
+            usage.note(True, 30000, 0)
+            return {"new_value": None, "verdict": "none", "candidates": [], "reason": "x", "caveat": "", "review": None}
+        with mock.patch.object(refplan.refheal, "heal_one", side_effect=finder):
+            threading.Timer(0.3, gate.set).start()
+            session.tool_investigate({"group_ids": ["all"]})
+        self.assertEqual(len(started), 4)         # 0, 30,000, 60,000, 90,000 projected; a fifth would make 120,000
+        self.assertEqual(cache[refplan.FINDER_TOKENS_KEY]["average"], 30000)
+
+
+class FindersTheModelDidNotAnswer(unittest.TestCase):
+    """A finder whose model calls failed is not a finding: it waits, and it does not set what a finder costs."""
+
+    def test_unanswered_finders_wait_and_leave_the_average_alone(self):
+        lib = '<topic id="lib"><title>Lib</title><body><note id="kept">Kept.</note></body></topic>'
+        refs = "".join('<ph conref="GUID-lib.dita#lib/gone%d"/>' % i for i in range(3))
+        files = [{"id": "GUID-lib", "path": "/d/lib.dita", "xml": lib, "previous": []},
+                 {"id": "GUID-t1", "path": "/d/t1.dita", "previous": [],
+                  "xml": '<topic id="t1"><title>T1</title><body><p>%s</p></body></topic>' % refs}]
+        cache = {}
+        session = refplan.Session(files, log=lambda message: None, cache=cache)
+        broke = {"new_value": None, "verdict": "none", "candidates": [], "reason": "Connection error.", "caveat": "",
+                 "review": None, "failed": True}
+        with mock.patch.object(refplan.refheal, "heal_one", return_value=broke):
+            session.tool_investigate({"group_ids": ["all"]})
+        plan = " ".join(session.plan)
+        self.assertIn("3 broken targets wait for the next check (3 references): the model did not answer", plan)
+        self.assertNotIn("not found in these files", plan)
+        self.assertTrue(all(g["known"].get("failed") for g in session.current["groups"].values()))
+        self.assertNotIn(refplan.FINDER_TOKENS_KEY, cache)
 
 
 class KeyFindingsAfterFixAll(unittest.TestCase):
@@ -1472,12 +1618,12 @@ class WhatACheckCost(unittest.TestCase):
         out, _ = self.check([{"ok": True, "input_tokens": 1200, "output_tokens": 300, "cost_usd": 0.02},
                              {"ok": True, "input_tokens": 800, "output_tokens": 100, "cost_usd": 0.01}])
         self.assertEqual(out["plan"], ["Found 3 broken references.",
-                                       "AI use in this check: 2 model calls, 2,000 tokens in and 400 out, about $0.03."])
+                                       "AI use in this check: 2 model calls, 2,000 tokens in and 400 out, 4,000 in cost terms, about $0.03."])
         self.assertEqual(out["usage"]["failed_calls"], 0)
 
     def test_no_money_is_claimed_when_the_backend_reports_none(self):
         out, _ = self.check([{"ok": True, "input_tokens": 10, "output_tokens": 5}])
-        self.assertEqual(out["plan"][-1], "AI use in this check: 1 model call, 10 tokens in and 5 out.")
+        self.assertEqual(out["plan"][-1], "AI use in this check: 1 model call, 10 tokens in and 5 out, 35 in cost terms.")
         self.assertIsNone(out["usage"]["cost_usd"])
 
     def test_a_model_that_does_not_answer_is_the_first_thing_the_author_reads(self):

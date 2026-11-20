@@ -232,6 +232,42 @@
    }
   },
   {
+   "id": "links-26",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "A large map's overview comes in pages of short entries, full detail on request, and investigate takes all",
+   "check": {
+    "py": "test_refs.OverviewInPages.test_a_large_map_gets_short_entries_and_full_detail_on_request"
+   }
+  },
+  {
+   "id": "links-27",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "The token limit counts the finders still running, at what finished finders spent themselves",
+   "check": {
+    "py": "test_refs.TokenLimitAverageOfFinishedFinders.test_finders_keep_starting_while_others_run"
+   }
+  },
+  {
+   "id": "links-28",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "A finder the model did not answer waits for the next check and does not count as not found",
+   "check": {
+    "py": "test_refs.FindersTheModelDidNotAnswer.test_unanswered_finders_wait_and_leave_the_average_alone"
+   }
+  },
+  {
+   "id": "links-29",
+   "feature": "Broken links",
+   "level": "edge",
+   "case": "Code leaves broken what nothing replaces and nothing can put back, so the planner need not decide it",
+   "check": {
+    "py": "test_refs.TargetsNothingNames.test_link_text_is_something_to_trace"
+   }
+  },
+  {
    "id": "images-01",
    "feature": "Images (repair)",
    "level": "simple",

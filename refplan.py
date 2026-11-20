@@ -219,7 +219,8 @@ CACHE_DAYS = 7
 # minutes for 15 targets and was 47 minutes for 388; past this number the targets with the most
 # references go first and the rest wait for the next check.
 MAX_GROUPS = int(os.environ.get("REFHEAL_MAX_GROUPS", "40"))
-# Tokens (input and output, all agents) one check may spend. When it is reached, the finder agents
+# What one check may spend, in fresh-input-token terms (usage.cost_since: cached input a tenth, output
+# five times), all agents. When it is reached, the finder agents
 # that have not started yet do not start; their targets wait for the next check, the biggest first.
 # 0: no limit. A first check took about 7,000 tokens per broken target, so the default lets
 # about 40 targets through, as MAX_GROUPS does.
@@ -228,6 +229,11 @@ TOKEN_BUDGET = int(os.environ.get("REFHEAL_TOKEN_BUDGET", "300000"))
 # version) are not sent to finder agents unless this is set: on a customer export (20 Nov 2026) they
 # were 2,259 of 2,280 targets, and agents could only guess from the sentence around them.
 TRACE_ALL = os.environ.get("REFHEAL_TRACE_ALL", "") not in ("", "0", "false")
+# What one finder agent is guessed to spend before any finder of the check is done (the first estimate,
+# about 7,000 tokens a target; on a customer export with long topics it was about 30,000).
+FINDER_TOKENS = int(os.environ.get("REFHEAL_FINDER_TOKENS", "7000"))
+FINDER_TOKENS_KEY = "finder-tokens"     # in the findings cache: what a finder spent on average in the last check
+OVERVIEW_PAGE_CHARS = 14000   # one overview page, under agentloop.MAX_RESULT_CHARS (16,000)
 GUID_FILE = re.compile(r"^(?:.*/)?GUID-[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\.\w+$")
 
 CHOOSE_SYSTEM = """A shared piece of DITA content was changed and references to it broke. Two or three candidate targets could replace it. Different topics may have meant different candidates.
@@ -246,7 +252,7 @@ PLANNER_SYSTEM = """You are in charge of repairing the broken references of one 
 A clean-up of shared content broke many references: ids and keys were renamed, content was reworded, moved, merged or removed. Your job is to get as many references as possible pointing at the right thing again with as few and as safe edits as possible, and to hand the author a short, clear list of what only a person can decide.
 
 You work with tools:
-- overview: the broken references of the current round, grouped by what they point at. A group may already carry a repair that code proved from the file's version history.
+- overview: the broken references of the current round, grouped by what they point at, a page at a time. A group may already carry a repair that code proved from the file's version history. Targets that nothing in the files names are counted apart (nothing_names_them): code already listed them for the author; they are not unreviewed.
 - investigate: give groups without a repair to finder agents. Each answer is checked by a reviewer agent. Send all such groups in one call; they run in parallel.
 - decide: choose what to do with one or more groups, with your reason.
 - apply_and_recheck: apply your decisions to a working copy and scan again. References that are still broken, or newly broken, come back as the next round.
@@ -265,8 +271,8 @@ When the content is gone, do not stop at leave_broken if the group lists ways_ou
 Read the old text (was) before you choose, and say in your reason what in the text made you choose.
 
 How to work:
-1. Call overview. Read it before you act.
-2. Investigate every group that has no repair, in one call.
+1. Call overview. Read it before you act. When it says there are more pages, read them too. On a large map each group is given in a few words: call overview with group_ids for the full detail of the groups you are about to decide.
+2. Investigate every group that has no repair, in one call: group_ids ["all"] takes them all, on every page. Groups where the finders found nothing and nothing can be put back are left broken by code (left_broken_by_code); do not decide them again.
 3. Decide every group. Group your decide calls by action. The reason is shown to the author as it is: one sentence of at most 25 plain words that says why, with an example from the content if it helps. No group ids, no file paths, no jargon such as "verdict".
 4. Call apply_and_recheck. Read what is still broken. An edit can uncover a second break in the same reference (a renamed key hid a renamed id). Handle the next round the same way.
 5. Finish when the recheck shows nothing left that you can settle. The summary is two short sentences for the author: what they should do next, and what to look at first. The counts are shown elsewhere; do not repeat them.
@@ -413,6 +419,7 @@ class Session:
         self.token_budget = TOKEN_BUDGET if token_budget is None else token_budget
         self.token_mark = usage.position()      # the tokens of this check are counted from here
         self.over_budget = []                   # groups whose finder did not start: the limit was reached
+        self.unanswered = []                    # groups whose finder's model calls failed
         # Who is doing what, as rows for a live view: [{"id", "state", "who", "text"}], state is
         # "done", "active" or "waiting". on_timeline gets the whole list after every change.
         self.steps, self.on_timeline = [], timeline or (lambda steps: None)
@@ -648,6 +655,35 @@ class Session:
             entry["decided"] = group["decision"]
         return entry
 
+    def _brief(self, group):
+        """One group in a few words: what _describe says, cut to what the planner needs to choose what
+        to read in full. On a customer export 250 full entries were about 125,000 characters, and reading
+        them a page at a time doubled the planner's tokens."""
+        full = self._describe(group)
+        out = {k: full[k] for k in ("id", "kind", "references", "files") if k in full}
+        out["broken_value"] = full["broken_value"][:90]
+        repair = full.get("repair")
+        if repair:
+            out["repair"] = {"verdict": repair["verdict"], "new_value": (repair.get("new_value") or "")[:90] or None,
+                             "reason": repair["reason"][:80]}
+            for flag in ("nothing_names_it", "removed", "text_unchanged"):
+                if flag in repair:
+                    out["repair"][flag] = repair[flag]
+        if "ways_out" in full:
+            out["ways_out"] = [w["decision"] for w in full["ways_out"]]
+            out["safety_content"] = full["safety_content"]
+        for key in ("decided", "source_option"):
+            if key in full:
+                out[key] = True if key == "source_option" else full[key]
+        return out
+
+    def _entries(self, groups):
+        """The planner's view of groups: full when they fit one page, else short (see _brief)."""
+        full = [self._describe(g) for g in groups]
+        if len(json.dumps(full, ensure_ascii=False)) <= OVERVIEW_PAGE_CHARS:
+            return full, False
+        return [self._brief(g) for g in groups], True
+
     # ---- tools -----------------------------------------------------------------------------
 
     def _nothing_names(self, repo, group):
@@ -674,22 +710,14 @@ class Session:
         target = repo.split_target(first)[0]
         return target in repo.previous or bool(refheal.text_at(repo, first, first["value"], previous=True))
 
-    def tool_overview(self, args):
-        groups = self.current["groups"]
-        total = sum(len(g["refs"]) for g in groups.values())
-        return {"summary": "round %d: %d broken references in %d groups" % (len(self.rounds), total, len(groups)),
-                "round": len(self.rounds), "broken_references": total, "left_for_the_author_so_far": len(self.left),
-                "groups": [self._describe(g) for g in groups.values()]}
-
-    def tool_investigate(self, args):
-        groups = self.current["groups"]
-        wanted = [groups[i] for i in args["group_ids"] if i in groups and not groups[i]["known"]]
-        unknown = [i for i in args["group_ids"] if i not in groups]
-        repo = self.current["repo"]
-        wanted.sort(key=lambda g: -len(g["refs"]))
-        remembered = [g for g in wanted if self._from_cache(repo, g)]
-        fresh = [g for g in wanted if g not in remembered]
-        unnamed = [] if self.trace_all else [g for g in fresh if self._nothing_names(repo, g)]
+    def _mark_unnamed(self, repo, groups):
+        """Marks the groups of `groups` that nothing in the files names (see _nothing_names) as settled
+        without agents, and says so in the plan. Groups with an earlier finding in the cache are left to
+        it. Returns the groups it marked."""
+        if self.trace_all:
+            return []
+        unnamed = [g for g in groups if not g["known"] and not (self.cache or {}).get(self._fingerprint(repo, g))
+                   and self._nothing_names(repo, g)]
         for group in unnamed:
             group["known"] = {"new_value": None, "verdict": "none", "how": "planner", "caveat": "", "unnamed": True,
                               "reason": "Nothing in these files says what this was: the link names only a GUID, it has "
@@ -699,6 +727,84 @@ class Session:
             self.plan.append("Only a GUID, no link text and no previous version: %s (%s). Nothing here names them, so I "
                              "did not ask the agents to guess; they may be outside this map or removed." % (
                                  _count(len(unnamed), "broken target"), _count(sum(len(g["refs"]) for g in unnamed), "reference")))
+        return unnamed
+
+    def _leave_what_nothing_replaces(self, repo, groups):
+        """Decides by code the groups a finder looked at and found nothing for, where nothing can be put
+        back or taken out (no ways_out): leave broken, with that reason. The planner spent model calls
+        writing the same decision for each of them (on a customer export, 17 to 22 groups a check)."""
+        settled = [g for g in groups if g["known"] and not g["known"]["new_value"] and g["known"].get("how") == "finder"
+                   and not g["decision"] and not self._ways(repo, g)["options"]]
+        for group in settled:
+            group["decision"] = "leave_broken"
+            group["reason"] = "Nothing in these files replaces it and nothing can be put back; check where the content came from."
+        if settled:
+            self.plan.append("Code left %s broken (%s): the finder agents found nothing that replaces them and "
+                             "nothing can be put back." % (_count(sum(len(g["refs"]) for g in settled), "reference"),
+                                                           _count(len(settled), "target")))
+        return settled
+
+    def tool_overview(self, args):
+        """The groups of this round. Targets that nothing names are settled first and given as one count,
+        not one entry each: on a customer export they were 2,049 entries, about 250,000 tokens, and the
+        planner read a list cut short."""
+        groups = self.current["groups"]
+        if args.get("group_ids"):
+            # The full detail of the groups asked for, as much as fits one page.
+            wanted = [groups[i] for i in args["group_ids"] if i in groups]
+            page, size = [], 0
+            for group in wanted:
+                entry = self._describe(group)
+                size += len(json.dumps(entry, ensure_ascii=False))
+                if page and size > OVERVIEW_PAGE_CHARS:
+                    break
+                page.append(entry)
+            out = {"groups": page}
+            if len(page) < len(wanted):
+                out["more"] = "Only the first %d fit; ask again for the others." % len(page)
+            return out
+        self._mark_unnamed(self.current["repo"], list(groups.values()))
+        total = sum(len(g["refs"]) for g in groups.values())
+        unnamed = [g for g in groups.values() if (g["known"] or {}).get("unnamed")]
+        # In pages that fit what the agent loop passes on (agentloop.MAX_RESULT_CHARS): a page cut short
+        # left the planner believing it had seen every group.
+        entries, short = self._entries([g for g in groups.values() if g not in unnamed])
+        pages, page, size = [], [], 0
+        for entry in entries:
+            length = len(json.dumps(entry, ensure_ascii=False))
+            if page and size + length > OVERVIEW_PAGE_CHARS:
+                pages.append(page)
+                page, size = [], 0
+            page.append(entry)
+            size += length
+        pages.append(page)
+        number = min(max(1, int(args.get("page") or 1)), len(pages))
+        out = {"summary": "round %d: %d broken references in %d groups" % (len(self.rounds), total, len(groups)),
+               "round": len(self.rounds), "broken_references": total, "left_for_the_author_so_far": len(self.left),
+               "page": number, "pages": len(pages), "groups": pages[number - 1]}
+        if short:
+            out["short_entries"] = "Each group is given in a few words. Call overview with group_ids to read the full " \
+                                   "detail (the old text, the ways out, the caveat) of the groups you decide on."
+        if number < len(pages):
+            out["more"] = "Groups on %d more page(s): call overview with page=%d. investigate with [\"all\"] takes every group " \
+                          "without a repair, on every page." % (len(pages) - number, number + 1)
+        if unnamed:
+            out["nothing_names_them"] = {
+                "groups": len(unnamed), "references": sum(len(g["refs"]) for g in unnamed),
+                "note": "Already settled by code and listed for the author: each link names only a GUID no file has, "
+                        "with no link text and no previous version. Do not investigate them or count them as unreviewed."}
+        return out
+
+    def tool_investigate(self, args):
+        groups = self.current["groups"]
+        ids = list(groups) if list(args.get("group_ids") or []) == ["all"] else args["group_ids"]
+        wanted = [groups[i] for i in ids if i in groups and not groups[i]["known"]]
+        unknown = [i for i in ids if i not in groups]
+        repo = self.current["repo"]
+        wanted.sort(key=lambda g: -len(g["refs"]))
+        remembered = [g for g in wanted if self._from_cache(repo, g)]
+        fresh = [g for g in wanted if g not in remembered]
+        unnamed = self._mark_unnamed(repo, fresh)
         fresh = [g for g in fresh if g not in unnamed]
         waiting, fresh = fresh[self.max_groups:], fresh[:self.max_groups]
         for group in waiting:
@@ -715,10 +821,29 @@ class Session:
         for group in fresh:
             self.step(group["id"], "waiting", "Finder agent", "%s: waiting" % self._short(group))
 
+        running = {"now": 0, "done": 0, "spent": 0}    # finders running, finished, and what the finished spent
+        # Before any finder of this check is done: what a finder spent on average in an earlier check of
+        # this content, else FINDER_TOKENS. On long topics a finder spent about 30,000, not 7,000, and
+        # 8 finders started on the low guess took a 300,000 limit to 373,000.
+        first_guess = ((self.cache or {}).get(FINDER_TOKENS_KEY) or {}).get("average") or FINDER_TOKENS
+
+        def projected_unlocked():
+            """Tokens of this check so far, plus what the finders still running will likely spend: the
+            average of what each finder done in this check spent itself (its own calls, counted by
+            thread), FINDER_TOKENS before any is done. Without the
+            running ones, 8 finders at a time took a 300,000 limit to 638,663 on a customer export.
+            Called with count_lock held."""
+            average = running["spent"] / running["done"] if running["done"] else first_guess
+            return usage.cost_since(self.token_mark) + running["now"] * average
+
         def run(group):
-            if self.token_budget and usage.tokens_since(self.token_mark) >= self.token_budget:
+            with self.count_lock:
+                over = bool(self.token_budget) and projected_unlocked() >= self.token_budget
+                if not over:
+                    running["now"] += 1
+            if over:
                 group["known"] = {"new_value": None, "verdict": "none", "how": "planner", "caveat": "", "reason":
-                                  "Not looked at in this check: it reached its limit of %s tokens. Run the check "
+                                  "Not looked at in this check: it reached its limit of %s in cost terms. Run the check "
                                   "again to continue." % format(self.token_budget, ",")}
                 with self.count_lock:
                     self.over_budget.append(group)
@@ -726,11 +851,30 @@ class Session:
                 return group
             self.step(group["id"], "active", "Finder agent", "%s: searching files, ids, keys and the previous version"
                       % self._short(group))
-            outcome = refheal.heal_one(repo, group["refs"][0], self.backend, FINDER_MODEL or self.model, False, self.log,
-                                       declined=self._declined(group["refs"][0]))
+            own = usage.position()
+            outcome = None
+            try:
+                outcome = refheal.heal_one(repo, group["refs"][0], self.backend, FINDER_MODEL or self.model, False, self.log,
+                                           declined=self._declined(group["refs"][0]))
+            finally:
+                spent = usage.cost_since(own, thread=threading.get_ident())
+                with self.count_lock:
+                    running["now"] -= 1
+                    # A finder whose model calls failed spent nothing: it says nothing about what one costs.
+                    if outcome is not None and not outcome.get("failed") and spent:
+                        running["done"] += 1
+                        running["spent"] += spent
             searched = _searched(outcome.get("steps") or [])
             with self.count_lock:
                 self.tool_uses.update(step["tool"] for step in searched)
+            if outcome.get("failed"):
+                # The model did not answer: not a finding, so not "not found"; it waits for the next check.
+                group["known"] = {"new_value": None, "verdict": "none", "how": "planner", "caveat": "", "failed": True,
+                                  "reason": "Not looked at in this check: the model did not answer. Run the check again to continue."}
+                with self.count_lock:
+                    self.unanswered.append(group)
+                self.step(group["id"], "done", "Finder agent", "%s: the model did not answer" % self._short(group))
+                return group
             group["known"] = {"new_value": outcome["new_value"], "verdict": outcome["verdict"], "how": "finder",
                               "candidates": outcome["candidates"], "searched": searched,
                               "closest": outcome.get("closest"),
@@ -746,13 +890,19 @@ class Session:
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
             done = list(pool.map(run, fresh)) + remembered
+        if self.cache is not None and running["done"]:
+            self.cache[FINDER_TOKENS_KEY] = {"when": time.time(), "average": round(running["spent"] / running["done"])}
         self.reused += len(remembered)
         if remembered:
             self.plan.append("%s: nothing changed since an earlier check, so I used what the agents found then." % (
                 _count(len(remembered), "broken target")))
-        if self.over_budget:
-            stopped = [g for g in fresh if g in self.over_budget]
-            self.plan.append("%s wait for the next check (%s): this check reached its limit of %s tokens, so I "
+        if fresh and self.token_budget:
+            self.plan.append("Limit for this check: %s in cost terms (cached input a tenth, output five times), "
+                             "counting the finders still running; %s started." % (
+                format(self.token_budget, ","), _count(len([g for g in fresh if g not in self.over_budget]), "finder agent")))
+        stopped = [g for g in fresh if g in self.over_budget]
+        if stopped:
+            self.plan.append("%s wait for the next check (%s): this check reached its limit of %s in cost terms, so I "
                              "started no more finder agents." % (
                                  _count(len(stopped), "broken target"), _count(sum(len(g["refs"]) for g in stopped), "reference"),
                                  format(self.token_budget, ",")))
@@ -773,6 +923,12 @@ class Session:
         self.step("handed-%d" % number, "done", "Planner agent", "Handed %s to finder agents: %d found, %d not found" % (
             _count(len(fresh), "group"), sum(1 for g in fresh if g["known"]["new_value"]),
             sum(1 for g in fresh if not g["known"]["new_value"])))
+        if self.unanswered:
+            failed = [g for g in fresh if g in self.unanswered]
+            if failed:
+                self.plan.append("%s wait for the next check (%s): the model did not answer their finder agents." % (
+                    _count(len(failed), "broken target"), _count(sum(len(g["refs"]) for g in failed), "reference")))
+            fresh = [g for g in fresh if g not in self.unanswered]
         if fresh:
             # "Removed" only with proof (a previous version of it); without it, it was only not found here.
             gone = [g for g in fresh if not g["known"]["new_value"]]
@@ -782,9 +938,11 @@ class Session:
             self.plan.append("Sent %d to finder agents, each answer checked by a reviewer agent: %d found under "
                              "a new name or place, %d removed (a previous version shows them), %d not found in "
                              "these files." % (len(fresh), len(fresh) - len(gone), len(proven), len(gone) - len(proven)))
+        left = self._leave_what_nothing_replaces(repo, done)
         return {"summary": "%d investigated, %d with a target" % (len(done), found), "unknown_ids": unknown,
+                "left_broken_by_code": [g["id"] for g in left],
                 "waiting_for_the_next_check": len(waiting), "nothing_names_them": len(unnamed),
-                "groups": [self._describe(g) for g in done]}
+                "groups": self._entries(done)[0]}
 
     def _settle(self, repo, group):
         """What code does with a finder's answer, fresh or remembered: drops what an author declined,
@@ -1095,9 +1253,12 @@ class Session:
     def tools(self):
         string, array = {"type": "string"}, {"type": "array", "items": {"type": "string"}}
         return [
-            {"name": "overview", "description": "The broken references of the current round, grouped by target.",
-             "properties": {}, "required": [], "fn": self.tool_overview},
-            {"name": "investigate", "description": "Hand groups that have no repair to finder agents; a reviewer agent checks each answer. Send all of them in one call.",
+            {"name": "overview", "description": "The broken references of the current round, grouped by target, a page at a time.",
+             "properties": {"page": {"type": "integer", "description": "1 for the first page"},
+                            "group_ids": {"type": "array", "items": {"type": "string"},
+                                          "description": "only these groups, in full detail"}},
+             "required": [], "fn": self.tool_overview},
+            {"name": "investigate", "description": "Hand groups that have no repair to finder agents; a reviewer agent checks each answer. Send all of them in one call: [\"all\"] takes every group without a repair, on every page.",
              "properties": {"group_ids": array}, "required": ["group_ids"], "fn": self.tool_investigate},
             # The parameter is not called "action": the CLI protocol uses that word for the tool's name.
             {"name": "decide", "description": "Decide what to do with groups. decision: repair_references, repair_at_source, ask_author, leave_broken, or for content that is gone one of restore_at_source, remove_references, keep_text_in_topics.",

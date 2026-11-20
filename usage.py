@@ -44,6 +44,7 @@ def note(ok, input_tokens=0, output_tokens=0, cost_usd=None, error=None, cached=
     with _lock:
         _calls.append({"ok": bool(ok), "in": int(input_tokens or 0), "out": int(output_tokens or 0), "cached": int(cached or 0),
                        "who": getattr(_who, "name", None) or "other",
+                       "thread": threading.get_ident(),     # so one finder's own calls can be counted
                        "cost": cost_usd, "error": (" ".join(str(error).split())[:160] if error else None)})
 
 
@@ -75,11 +76,28 @@ def position():
         return len(_calls)
 
 
-def tokens_since(mark):
-    """Input and output tokens of the calls since position() or start() returned mark. A check that
-    runs at the same time adds its calls too, so a limit on this stops early rather than late."""
+# What a token costs next to a fresh input token, from the model's price list: input read from the
+# prompt cache is a tenth, output is five times. A limit counted this way follows the money: on a
+# customer export 71% of the input was read from the cache.
+CACHED_INPUT_WEIGHT = 0.1
+OUTPUT_WEIGHT = 5
+
+
+def cost_since(mark, thread=None):
+    """The calls since mark in fresh-input-token terms: fresh input as it is, cached input at
+    CACHED_INPUT_WEIGHT, output at OUTPUT_WEIGHT. With thread, only that thread's calls."""
     with _lock:
-        return sum(call["in"] + call["out"] for call in _calls[mark:])
+        calls = [call for call in _calls[mark:] if thread is None or call.get("thread") == thread]
+    return sum(call["in"] - call["cached"] + call["cached"] * CACHED_INPUT_WEIGHT + call["out"] * OUTPUT_WEIGHT
+               for call in calls)
+
+
+def tokens_since(mark, thread=None):
+    """Input and output tokens of the calls since position() or start() returned mark. A check that
+    runs at the same time adds its calls too, so a limit on this stops early rather than late.
+    With thread, only the calls made in that thread (one finder agent and its reviewer)."""
+    with _lock:
+        return sum(call["in"] + call["out"] for call in _calls[mark:] if thread is None or call.get("thread") == thread)
 
 
 def finish(mark):
@@ -116,8 +134,12 @@ def sentence(totals):
     agents = sorted((totals.get("by_agent") or {}).items(), key=lambda item: -item[1]["input_tokens"])
     split = " By agent: %s." % "; ".join("%s %d call%s, %s tokens in" % (
         name, use["model_calls"], "" if use["model_calls"] == 1 else "s", format(use["input_tokens"], ",")) for name, use in agents) if len(agents) > 1 else ""
-    return "AI use in this check: %d model call%s, %s tokens in and %s out%s.%s%s" % (
-        totals["model_calls"], "" if totals["model_calls"] == 1 else "s", format(totals["input_tokens"], ","), format(totals["output_tokens"], ","), money, split, shared)
+    cached = totals.get("of_which_read_from_cache") or 0
+    weighted = totals["input_tokens"] - cached + cached * CACHED_INPUT_WEIGHT + totals["output_tokens"] * OUTPUT_WEIGHT
+    from_cache = " (%s of them read from the cache)" % format(cached, ",") if cached else ""
+    return "AI use in this check: %d model call%s, %s tokens in%s and %s out, %s in cost terms%s.%s%s" % (
+        totals["model_calls"], "" if totals["model_calls"] == 1 else "s", format(totals["input_tokens"], ","), from_cache,
+        format(totals["output_tokens"], ","), format(int(round(weighted)), ","), money, split, shared)
 
 
 def warning(totals):
