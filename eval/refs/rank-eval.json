@@ -5,7 +5,7 @@
  "runs": [
   {
    "run": 1,
-   "seconds": 112,
+   "seconds": 104,
    "scores": {
     "first right": 9
    },
@@ -20,8 +20,8 @@
      "candidates": 2,
      "outcome": "first right",
      "likelihoods": [
-      70,
-      25
+      75,
+      20
      ]
     },
     {
@@ -33,8 +33,8 @@
      "candidates": 2,
      "outcome": "first right",
      "likelihoods": [
-      70,
-      25
+      75,
+      20
      ]
     },
     {
@@ -46,8 +46,8 @@
      "candidates": 2,
      "outcome": "first right",
      "likelihoods": [
-      65,
-      30
+      55,
+      40
      ]
     },
     {
@@ -72,7 +72,7 @@
      "candidates": 2,
      "outcome": "first right",
      "likelihoods": [
-      90,
+      92,
       5
      ]
     },
@@ -110,7 +110,7 @@
      "candidates": 1,
      "outcome": "first right",
      "likelihoods": [
-      55
+      60
      ]
     },
     {
@@ -119,20 +119,20 @@
      "right": "billing_payment_methods.dita",
      "proposed": "billing_payment_methods.dita#billing_payment_methods",
      "verdict": "review",
-     "candidates": 1,
+     "candidates": 2,
      "outcome": "first right",
      "likelihoods": [
-      75
+      65,
+      10
      ]
     }
    ]
   },
   {
    "run": 2,
-   "seconds": 93,
+   "seconds": 107,
    "scores": {
-    "first right": 8,
-    "not offered": 1
+    "first right": 9
    },
    "applied_without_asking_and_wrong": 0,
    "rows": [
@@ -211,7 +211,7 @@
      "outcome": "first right",
      "likelihoods": [
       90,
-      8
+      5
      ]
     },
     {
@@ -230,11 +230,13 @@
      "file": "get_help.dita",
      "old": "support-email",
      "right": "support-contact",
-     "proposed": null,
-     "verdict": "none",
-     "candidates": 0,
-     "outcome": "not offered",
-     "likelihoods": []
+     "proposed": "support-contact",
+     "verdict": "review",
+     "candidates": 1,
+     "outcome": "first right",
+     "likelihoods": [
+      55
+     ]
     },
     {
      "file": "change_card.dita",
@@ -245,8 +247,8 @@
      "candidates": 2,
      "outcome": "first right",
      "likelihoods": [
-      65,
-      15
+      75,
+      10
      ]
     }
    ]
