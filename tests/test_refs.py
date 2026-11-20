@@ -671,6 +671,13 @@ class Planner(unittest.TestCase):
         self.assertEqual(len(self.decide("lib.dita#lib/help", "leave_broken")["accepted"]), 1)
         self.assertIn("error", self.session.tool_decide({"group_ids": [], "decision": "delete_everything", "reason": "x"}))
 
+    def test_decide_and_recheck_name_a_few_open_groups_and_count_the_rest(self):
+        with mock.patch.object(refplan, "LIST_IN_RESULT", 1):
+            result = self.decide("lib.dita#lib/help", "leave_broken")
+            self.assertEqual((result["still_undecided"], len(result["first_undecided"])), (2, 1))
+            recheck = self.session.tool_apply_and_recheck({})
+            self.assertEqual((recheck["defaulted_groups"], len(recheck["first_defaulted"])), (2, 1))
+
     def test_apply_and_recheck_reports_what_resolves_and_the_result_says_how_each_reference_was_settled(self):
         self.decide("lib.dita#lib/hot", "repair_references")
         found_by_an_agent(self.session, "app")
@@ -1097,7 +1104,8 @@ class TokenLimitCountsRunningFinders(unittest.TestCase):
             gate.wait(2)                      # all stay running until every start decision is made
             usage.note(True, 7000, 0)
             return {"new_value": None, "verdict": "none", "candidates": [], "reason": "x", "caveat": "", "review": None}
-        with mock.patch.object(refplan, "FINDER_TOKENS", 7000), mock.patch.object(refplan.refheal, "heal_one", side_effect=finder):
+        with mock.patch.object(refplan, "FINDER_TOKENS", 7000), mock.patch.object(refplan, "PLANNER_CLOSING_TOKENS", 0), \
+                mock.patch.object(refplan.refheal, "heal_one", side_effect=finder):
             timer = threading.Timer(0.3, gate.set)
             timer.start()
             session.tool_investigate({"group_ids": list(session.current["groups"])})
@@ -1134,6 +1142,102 @@ class TokenLimitAverageOfFinishedFinders(unittest.TestCase):
             timer.start()
             session.tool_investigate({"group_ids": list(session.current["groups"])})
         self.assertEqual(len(started), 10)
+
+
+class TokenLimitKeepsRoomForThePlanner(unittest.TestCase):
+    """Finders stop early enough that the planner's own calls after them still fit in the limit, and
+    what the planner spent after its finders is kept for the next check."""
+
+    def session(self, cache):
+        lib = '<topic id="lib"><title>Lib</title><body><note id="kept">Kept.</note></body></topic>'
+        refs = "".join('<ph conref="GUID-lib.dita#lib/gone%d"/>' % i for i in range(10))
+        files = [{"id": "GUID-lib", "path": "/d/lib.dita", "xml": lib, "previous": []},
+                 {"id": "GUID-t1", "path": "/d/t1.dita", "previous": [],
+                  "xml": '<topic id="t1"><title>T1</title><body><p>%s</p></body></topic>' % refs}]
+        return refplan.Session(files, log=lambda message: None, token_budget=100000, cache=cache)
+
+    def started(self, cache):
+        session, started = self.session(cache), []
+
+        def finder(*args, **kwargs):
+            started.append(args[1]["value"])
+            usage.note(True, 10000, 0)
+            return {"new_value": None, "verdict": "none", "candidates": [], "reason": "x", "caveat": "", "review": None}
+        with mock.patch.object(refplan, "FINDER_TOKENS", 10000), mock.patch.object(refplan.refheal, "heal_one", side_effect=finder), \
+                mock.patch.object(refplan.concurrent.futures, "ThreadPoolExecutor", lambda max_workers: _OneAtATime()):
+            session.tool_investigate({"group_ids": list(session.current["groups"])})
+        return session, len(started)
+
+    def test_the_planners_share_is_kept_out_of_the_finders_limit(self):
+        # 100,000 limit, half kept for the planner at most: 5 finders of 10,000 fit.
+        self.assertEqual(self.started({refplan.PLANNER_CLOSING_KEY: {"spent": 80000}})[1], 5)
+        # The planner's own figure from the last check: 30,000 kept, 7 finders fit.
+        self.assertEqual(self.started({refplan.PLANNER_CLOSING_KEY: {"spent": 30000}})[1], 7)
+
+    def test_what_the_planner_spent_after_its_finders_is_kept(self):
+        cache = {}
+        session, _ = self.started(cache)
+        usage.note(True, 4000, 100)
+        session.keep_planner_closing(threading.get_ident())
+        self.assertEqual(cache[refplan.PLANNER_CLOSING_KEY]["spent"], 4500)
+
+
+class TokenLimitCountsACostlyRunningFinderAtItsOwnSpend(unittest.TestCase):
+    """A finder still running that has already spent more than the guess counts at what it spent: the
+    finders that end late are the costly ones, and the guess alone let a check go past its limit."""
+
+    def test_no_finder_starts_while_a_running_one_has_used_up_the_room(self):
+        lib = '<topic id="lib"><title>Lib</title><body><note id="kept">Kept.</note></body></topic>'
+        refs = "".join('<ph conref="GUID-lib.dita#lib/gone%d"/>' % i for i in range(2))
+        files = [{"id": "GUID-lib", "path": "/d/lib.dita", "xml": lib, "previous": []},
+                 {"id": "GUID-t1", "path": "/d/t1.dita", "previous": [],
+                  "xml": '<topic id="t1"><title>T1</title><body><p>%s</p></body></topic>' % refs}]
+        session = refplan.Session(files, log=lambda message: None, token_budget=40000)
+        started, spent, gate = [], threading.Event(), threading.Event()
+
+        def finder(*args, **kwargs):
+            started.append(args[1]["value"])
+            if len(started) == 1:
+                usage.note(True, 30000, 0)       # the first one has spent 30,000 and is still running
+                spent.set()
+                gate.wait(2)
+            return {"new_value": None, "verdict": "none", "candidates": [], "reason": "x", "caveat": "", "review": None}
+
+        class SecondStartsWhileFirstRuns:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def map(self, function, items):
+                items, results = list(items), []
+                first = threading.Thread(target=lambda: results.append(function(items[0])))
+                first.start()
+                spent.wait(2)
+                results.append(function(items[1]))
+                gate.set()
+                first.join()
+                return results
+        with mock.patch.object(refplan, "FINDER_TOKENS", 5000), mock.patch.object(refplan, "PLANNER_CLOSING_TOKENS", 0), \
+                mock.patch.object(refplan.refheal, "heal_one", side_effect=finder), \
+                mock.patch.object(refplan.concurrent.futures, "ThreadPoolExecutor", lambda max_workers: SecondStartsWhileFirstRuns()):
+            session.tool_investigate({"group_ids": list(session.current["groups"])})
+        # 30,000 spent and the running finder counted at its 30,000, not at the 5,000 guess: 60,000.
+        self.assertEqual(len(started), 1)
+
+
+class _OneAtATime:
+    """A stand-in for the finders' thread pool that runs them one after another, in this thread."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def map(self, function, items):
+        return [function(item) for item in items]
 
 
 class OverviewInPages(unittest.TestCase):
@@ -1192,7 +1296,7 @@ class OverviewInPages(unittest.TestCase):
             gate.wait(2)
             usage.note(True, 30000, 0)
             return {"new_value": None, "verdict": "none", "candidates": [], "reason": "x", "caveat": "", "review": None}
-        with mock.patch.object(refplan.refheal, "heal_one", side_effect=finder):
+        with mock.patch.object(refplan, "PLANNER_CLOSING_TOKENS", 0), mock.patch.object(refplan.refheal, "heal_one", side_effect=finder):
             threading.Timer(0.3, gate.set).start()
             session.tool_investigate({"group_ids": ["all"]})
         self.assertEqual(len(started), 4)         # 0, 30,000, 60,000, 90,000 projected; a fifth would make 120,000

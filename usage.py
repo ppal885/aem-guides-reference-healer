@@ -113,10 +113,12 @@ def finish(mark):
     costs = [call["cost"] for call in calls if call["cost"] is not None]
     by_agent = {}
     for call in calls:
-        mine = by_agent.setdefault(call.get("who") or "other", {"model_calls": 0, "input_tokens": 0, "output_tokens": 0})
+        mine = by_agent.setdefault(call.get("who") or "other", {"model_calls": 0, "input_tokens": 0, "output_tokens": 0,
+                                                                "read_from_cache": 0})
         mine["model_calls"] += 1
         mine["input_tokens"] += call["in"]
         mine["output_tokens"] += call["out"]
+        mine["read_from_cache"] += call["cached"]
     return {"model_calls": len(calls), "failed_calls": len(failed), "by_agent": by_agent,
             "input_tokens": sum(call["in"] for call in calls),
             "of_which_read_from_cache": sum(call["cached"] for call in calls), "output_tokens": sum(call["out"] for call in calls),
@@ -132,8 +134,10 @@ def sentence(totals):
     money = ", about $%.2f" % totals["cost_usd"] if totals["cost_usd"] is not None else ""
     shared = " Another check ran at the same time; its calls are counted in." if totals["shared_with_another_check"] else ""
     agents = sorted((totals.get("by_agent") or {}).items(), key=lambda item: -item[1]["input_tokens"])
-    split = " By agent: %s." % "; ".join("%s %d call%s, %s tokens in" % (
-        name, use["model_calls"], "" if use["model_calls"] == 1 else "s", format(use["input_tokens"], ",")) for name, use in agents) if len(agents) > 1 else ""
+    split = " By agent: %s." % "; ".join("%s %d call%s, %s tokens in%s" % (
+        name, use["model_calls"], "" if use["model_calls"] == 1 else "s", format(use["input_tokens"], ","),
+        " (%s from the cache)" % format(use["read_from_cache"], ",") if use.get("read_from_cache") else "")
+        for name, use in agents) if len(agents) > 1 else ""
     cached = totals.get("of_which_read_from_cache") or 0
     weighted = totals["input_tokens"] - cached + cached * CACHED_INPUT_WEIGHT + totals["output_tokens"] * OUTPUT_WEIGHT
     from_cache = " (%s of them read from the cache)" % format(cached, ",") if cached else ""
