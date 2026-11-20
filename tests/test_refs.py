@@ -1263,6 +1263,21 @@ class OverviewInPages(unittest.TestCase):
             seen += [g["id"] for g in page["groups"]]
         self.assertEqual(sorted(seen), sorted(session.current["groups"]))
 
+    def test_decided_and_waiting_groups_are_counted_not_listed(self):
+        session = self.session(120)
+        ids = list(session.current["groups"])
+        for group_id in ids[:100]:
+            session.current["groups"][group_id]["decision"] = "leave_broken"
+        for group_id in ids[100:105]:
+            session.current["groups"][group_id]["known"] = {"new_value": None, "verdict": "none", "how": "planner",
+                                                           "caveat": "", "reason": "Not looked at in this check: test"}
+        first = session.tool_overview({})
+        self.assertEqual(sorted(g["id"] for g in first["groups"]), sorted(ids[105:]))
+        self.assertEqual(first["pages"], 1)
+        self.assertEqual((first["already_decided"]["groups"], first["waiting_for_the_next_check"]["groups"]), (100, 5))
+        detail = session.tool_overview({"group_ids": [ids[0]]})
+        self.assertEqual(detail["groups"][0]["id"], ids[0])
+
     def test_a_large_map_gets_short_entries_and_full_detail_on_request(self):
         session = self.session(120)
         first = session.tool_overview({})

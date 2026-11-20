@@ -263,7 +263,7 @@ PLANNER_SYSTEM = """You are in charge of repairing the broken references of one 
 A clean-up of shared content broke many references: ids and keys were renamed, content was reworded, moved, merged or removed. Your job is to get as many references as possible pointing at the right thing again with as few and as safe edits as possible, and to hand the author a short, clear list of what only a person can decide.
 
 You work with tools:
-- overview: the broken references of the current round, grouped by what they point at, a page at a time. A group may already carry a repair that code proved from the file's version history. Targets that nothing in the files names are counted apart (nothing_names_them): code already listed them for the author; they are not unreviewed.
+- overview: the broken references of the current round, grouped by what they point at, a page at a time. A group may already carry a repair that code proved from the file's version history. Targets that nothing in the files names are counted apart (nothing_names_them): code already listed them for the author; they are not unreviewed. Groups already decided, and groups waiting for the next check, are counted apart too (already_decided, waiting_for_the_next_check) and are not on the pages.
 - investigate: give groups without a repair to finder agents. Each answer is checked by a reviewer agent. Send all such groups in one call; they run in parallel.
 - decide: choose what to do with one or more groups, with your reason.
 - apply_and_recheck: apply your decisions to a working copy and scan again. References that are still broken, or newly broken, come back as the next round.
@@ -792,7 +792,14 @@ class Session:
         unnamed = [g for g in groups.values() if (g["known"] or {}).get("unnamed")]
         # In pages that fit what the agent loop passes on (agentloop.MAX_RESULT_CHARS): a page cut short
         # left the planner believing it had seen every group.
-        entries, short = self._entries([g for g in groups.values() if g not in unnamed])
+        listed = [g for g in groups.values() if g not in unnamed]
+        decided = [g for g in listed if g["decision"]]
+        waits = [g for g in listed if not g["decision"] and (g["known"] or {}).get("reason", "").startswith("Not looked at")]
+        # Only the groups that still need a decision go on the pages; the decided and the waiting are
+        # counted apart. On a customer export 226 of 249 listed groups were already decided by code and
+        # filled 5 of 6 pages the planner read, and sent again, with every later call.
+        open_groups = [g for g in listed if g not in decided and g not in waits]
+        entries, short = self._entries(open_groups)
         pages, page, size = [], [], 0
         for entry in entries:
             length = len(json.dumps(entry, ensure_ascii=False))
@@ -803,6 +810,10 @@ class Session:
             size += length
         pages.append(page)
         number = min(max(1, int(args.get("page") or 1)), len(pages))
+        if number == 1:
+            self.log("overview: %d pages, %d groups to decide; %d already decided, %d waiting for the next check, "
+                     "%d that nothing names, counted apart" % (
+                         len(pages), len(open_groups), len(decided), len(waits), len(unnamed)))
         out = {"summary": "round %d: %d broken references in %d groups" % (len(self.rounds), total, len(groups)),
                "round": len(self.rounds), "broken_references": total, "left_for_the_author_so_far": len(self.left),
                "page": number, "pages": len(pages), "groups": pages[number - 1]}
@@ -812,6 +823,15 @@ class Session:
         if number < len(pages):
             out["more"] = "Groups on %d more page(s): call overview with page=%d. investigate with [\"all\"] takes every group " \
                           "without a repair, on every page." % (len(pages) - number, number + 1)
+        if decided:
+            out["already_decided"] = {
+                "groups": len(decided), "references": sum(len(g["refs"]) for g in decided),
+                "note": "Decided already (by code, from an earlier check, or by you) and not on the pages. Call overview "
+                        "with group_ids only to look at one again."}
+        if waits:
+            out["waiting_for_the_next_check"] = {
+                "groups": len(waits), "references": sum(len(g["refs"]) for g in waits),
+                "note": "Not looked at in this check (limit reached or the model did not answer); they get the safe default."}
         if unnamed:
             out["nothing_names_them"] = {
                 "groups": len(unnamed), "references": sum(len(g["refs"]) for g in unnamed),
