@@ -22,6 +22,21 @@ def run(system, task, tools, finish, backend="cli", model=None, max_calls=8, log
     return _run_cli(system, task, tools, finish, model, max_calls, log)
 
 
+def _log_call(response, steps, log):
+    """One line per model call: what it read (and how much of that came from the prompt cache), what it
+    wrote, and the biggest tool result it carries. To see where an agent's tokens go."""
+    use = getattr(response, "usage", None)
+    if use is None:
+        return
+    fresh, read, written = (int(getattr(use, k, 0) or 0) for k in ("input_tokens", "cache_read_input_tokens",
+                                                                     "cache_creation_input_tokens"))
+    biggest = max(steps, key=lambda step: step.get("chars", 0), default=None)
+    log("    model call: %d in (%d read from the cache, %d written to it), %d out; %d tool results so far, %d chars%s" % (
+        fresh + read + written, read, written, int(getattr(use, "output_tokens", 0) or 0), len(steps),
+        sum(step.get("chars", 0) for step in steps),
+        ", biggest %s %d" % (biggest["tool"], biggest["chars"]) if biggest else ""))
+
+
 def _summary(observation):
     if isinstance(observation, dict) and observation.get("summary"):
         return str(observation["summary"])[:120]
@@ -34,10 +49,12 @@ def _call_tool(tool, args, steps, log):
         failed = False
     except Exception as exc:  # a tool failure is an observation for the model, not a crash
         observation, failed = {"error": "tool failed: %s" % str(exc)[:200]}, True
-    steps.append({"tool": tool["name"], "args": args, "result": _summary(observation)})
+    text = json.dumps(observation, ensure_ascii=False)
+    steps.append({"tool": tool["name"], "args": args, "result": _summary(observation),
+                  "chars": min(len(text), MAX_RESULT_CHARS)})     # how much of the next calls' context it is
     log("    step %d %-13s %s -> %s" % (len(steps), tool["name"], json.dumps(args, ensure_ascii=False)[:70],
                                          _summary(observation)[:70]))
-    return json.dumps(observation, ensure_ascii=False)[:MAX_RESULT_CHARS], failed
+    return text[:MAX_RESULT_CHARS], failed
 
 
 def _coerce(spec, value):
@@ -103,6 +120,7 @@ def _run_sdk(system, task, tools, finish, model, max_calls, log):
             return None, steps, "The Claude API returned an error (HTTP %s)." % exc.status_code
         except anthropic.APIConnectionError:
             return None, steps, "The Claude API could not be reached."
+        _log_call(response, steps, log)
         if response.stop_reason == "refusal":
             return None, steps, "The model declined this request."
         if response.stop_reason == "max_tokens":

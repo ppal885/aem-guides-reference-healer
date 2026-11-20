@@ -5,7 +5,7 @@
  "runs": [
   {
    "run": 1,
-   "seconds": 104,
+   "seconds": 112,
    "scores": {
     "first right": 9
    },
@@ -20,8 +20,8 @@
      "candidates": 2,
      "outcome": "first right",
      "likelihoods": [
-      75,
-      20
+      70,
+      25
      ]
     },
     {
@@ -33,8 +33,8 @@
      "candidates": 2,
      "outcome": "first right",
      "likelihoods": [
-      75,
-      20
+      70,
+      25
      ]
     },
     {
@@ -46,8 +46,8 @@
      "candidates": 2,
      "outcome": "first right",
      "likelihoods": [
-      60,
-      35
+      65,
+      30
      ]
     },
     {
@@ -69,10 +69,11 @@
      "right": "lib.dita#lib/hot-plate",
      "proposed": "lib.dita#lib/hot-plate",
      "verdict": "review",
-     "candidates": 1,
+     "candidates": 2,
      "outcome": "first right",
      "likelihoods": [
-      92
+      90,
+      5
      ]
     },
     {
@@ -84,7 +85,7 @@
      "candidates": 2,
      "outcome": "first right",
      "likelihoods": [
-      88,
+      90,
       8
      ]
     },
@@ -121,16 +122,17 @@
      "candidates": 1,
      "outcome": "first right",
      "likelihoods": [
-      65
+      75
      ]
     }
    ]
   },
   {
    "run": 2,
-   "seconds": 114,
+   "seconds": 93,
    "scores": {
-    "first right": 9
+    "first right": 8,
+    "not offered": 1
    },
    "applied_without_asking_and_wrong": 0,
    "rows": [
@@ -195,7 +197,7 @@
      "candidates": 2,
      "outcome": "first right",
      "likelihoods": [
-      92,
+      90,
       5
      ]
     },
@@ -209,7 +211,7 @@
      "outcome": "first right",
      "likelihoods": [
       90,
-      5
+      8
      ]
     },
     {
@@ -228,13 +230,11 @@
      "file": "get_help.dita",
      "old": "support-email",
      "right": "support-contact",
-     "proposed": "support-contact",
-     "verdict": "review",
-     "candidates": 1,
-     "outcome": "first right",
-     "likelihoods": [
-      55
-     ]
+     "proposed": null,
+     "verdict": "none",
+     "candidates": 0,
+     "outcome": "not offered",
+     "likelihoods": []
     },
     {
      "file": "change_card.dita",
@@ -246,7 +246,7 @@
      "outcome": "first right",
      "likelihoods": [
       65,
-      10
+      15
      ]
     }
    ]

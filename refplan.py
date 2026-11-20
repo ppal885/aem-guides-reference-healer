@@ -233,7 +233,18 @@ TRACE_ALL = os.environ.get("REFHEAL_TRACE_ALL", "") not in ("", "0", "false")
 # about 7,000 tokens a target; on a customer export with long topics it was about 30,000).
 FINDER_TOKENS = int(os.environ.get("REFHEAL_FINDER_TOKENS", "7000"))
 FINDER_TOKENS_KEY = "finder-tokens"     # in the findings cache: what a finder spent on average in the last check
+# What the planner is guessed to spend after its finder agents are done (deciding, checking again), kept
+# out of the limit for finders so the check ends near the limit, not past it. On a customer export
+# (21 Nov 2026) it was about 72,000 in cost terms and the check ended at 338,860 against 300,000; in the
+# next check, where the planner read its overview pages before the finders, it was 18,309.
+# After a check the planner's own figure is kept in the findings cache and used instead.
+PLANNER_CLOSING_TOKENS = int(os.environ.get("REFHEAL_PLANNER_CLOSING_TOKENS", "72000"))
+PLANNER_CLOSING_KEY = "planner-closing-tokens"
 OVERVIEW_PAGE_CHARS = 14000   # one overview page, under agentloop.MAX_RESULT_CHARS (16,000)
+# decide and apply_and_recheck name at most this many group ids and give the full count. Every
+# tool result is sent again with each later planner call; on a map with 2,298 groups the full
+# lists filled the 16,000-character limit and the planner re-read them on every call after.
+LIST_IN_RESULT = 20
 GUID_FILE = re.compile(r"^(?:.*/)?GUID-[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\.\w+$")
 
 CHOOSE_SYSTEM = """A shared piece of DITA content was changed and references to it broke. Two or three candidate targets could replace it. Different topics may have meant different candidates.
@@ -420,6 +431,7 @@ class Session:
         self.token_mark = usage.position()      # the tokens of this check are counted from here
         self.over_budget = []                   # groups whose finder did not start: the limit was reached
         self.unanswered = []                    # groups whose finder's model calls failed
+        self.finders_done = None                # usage.position() when the last finders of this check were done
         # Who is doing what, as rows for a live view: [{"id", "state", "who", "text"}], state is
         # "done", "active" or "waiting". on_timeline gets the whole list after every change.
         self.steps, self.on_timeline = [], timeline or (lambda steps: None)
@@ -510,6 +522,18 @@ class Session:
             groups[group["id"]] = group
         self.rounds.append({"repo": repo, "groups": groups})
         return groups
+
+    def planner_closing(self):
+        """What the planner is guessed to spend after its finders are done: its own figure from the
+        last check, else PLANNER_CLOSING_TOKENS."""
+        return ((self.cache or {}).get(PLANNER_CLOSING_KEY) or {}).get("spent") or PLANNER_CLOSING_TOKENS
+
+    def keep_planner_closing(self, thread):
+        """After the planner is done: keeps what it spent, in its own thread, after its last finders."""
+        if self.cache is not None and self.finders_done is not None:
+            spent = usage.cost_since(self.finders_done, thread=thread)
+            if spent:
+                self.cache[PLANNER_CLOSING_KEY] = {"when": time.time(), "spent": round(spent)}
 
     def _declined(self, ref):
         return set(self.memory["rejected"].get("%s|%s" % (ref["attribute"], ref["value"]), []))
@@ -821,26 +845,35 @@ class Session:
         for group in fresh:
             self.step(group["id"], "waiting", "Finder agent", "%s: waiting" % self._short(group))
 
-        running = {"now": 0, "done": 0, "spent": 0}    # finders running, finished, and what the finished spent
+        # finders running, finished with an answer, and what those spent; ended: finished in any way
+        running = {"now": 0, "done": 0, "spent": 0, "ended": 0}
+        started_at = {}     # thread of a finder still running -> usage.position() when it started
         # Before any finder of this check is done: what a finder spent on average in an earlier check of
         # this content, else FINDER_TOKENS. On long topics a finder spent about 30,000, not 7,000, and
         # 8 finders started on the low guess took a 300,000 limit to 373,000.
         first_guess = ((self.cache or {}).get(FINDER_TOKENS_KEY) or {}).get("average") or FINDER_TOKENS
+        # The planner still decides and checks again after the finders: that part of the limit is kept
+        # for it. At most half the limit, so a small limit still lets finders start.
+        reserve = min(self.planner_closing(), self.token_budget // 2)
 
         def projected_unlocked():
-            """Tokens of this check so far, plus what the finders still running will likely spend: the
-            average of what each finder done in this check spent itself (its own calls, counted by
-            thread), FINDER_TOKENS before any is done. Without the
-            running ones, 8 finders at a time took a 300,000 limit to 638,663 on a customer export.
+            """Tokens of this check so far, plus what the finders still running will likely spend. Each
+            running finder counts as the largest of: what it has spent itself so far (its own calls,
+            counted by thread), the average of the finders done in this check, and first_guess. Without
+            the running ones, 8 finders at a time took a 300,000 limit to 638,663 on a customer export.
+            The finders that end first are the cheap ones (21 Nov 2026: the first three about 24,000, the
+            last three about 34,500), so the average of the finished alone took a check to 357,422.
             Called with count_lock held."""
-            average = running["spent"] / running["done"] if running["done"] else first_guess
-            return usage.cost_since(self.token_mark) + running["now"] * average
+            average = max(running["spent"] / running["done"], first_guess) if running["done"] else first_guess
+            return usage.cost_since(self.token_mark) + sum(
+                max(usage.cost_since(mark, thread=thread), average) for thread, mark in started_at.items())
 
         def run(group):
             with self.count_lock:
-                over = bool(self.token_budget) and projected_unlocked() >= self.token_budget
+                over = bool(self.token_budget) and projected_unlocked() >= self.token_budget - reserve
                 if not over:
                     running["now"] += 1
+                    started_at[threading.get_ident()] = usage.position()
             if over:
                 group["known"] = {"new_value": None, "verdict": "none", "how": "planner", "caveat": "", "reason":
                                   "Not looked at in this check: it reached its limit of %s in cost terms. Run the check "
@@ -851,7 +884,7 @@ class Session:
                 return group
             self.step(group["id"], "active", "Finder agent", "%s: searching files, ids, keys and the previous version"
                       % self._short(group))
-            own = usage.position()
+            own, started = usage.position(), time.time()
             outcome = None
             try:
                 outcome = refheal.heal_one(repo, group["refs"][0], self.backend, FINDER_MODEL or self.model, False, self.log,
@@ -860,10 +893,17 @@ class Session:
                 spent = usage.cost_since(own, thread=threading.get_ident())
                 with self.count_lock:
                     running["now"] -= 1
+                    started_at.pop(threading.get_ident(), None)
                     # A finder whose model calls failed spent nothing: it says nothing about what one costs.
                     if outcome is not None and not outcome.get("failed") and spent:
                         running["done"] += 1
                         running["spent"] += spent
+                    running["ended"] += 1
+                    ended = running["ended"]
+                # Whether the finders that end late are the costly ones, which the average of the finished
+                # ones does not yet know about: one line per finder in the sidecar log.
+                self.log("finder %d done: %s in cost terms, after %d s" % (
+                    ended, format(round(spent), ","), time.time() - started))
             searched = _searched(outcome.get("steps") or [])
             with self.count_lock:
                 self.tool_uses.update(step["tool"] for step in searched)
@@ -892,6 +932,7 @@ class Session:
             done = list(pool.map(run, fresh)) + remembered
         if self.cache is not None and running["done"]:
             self.cache[FINDER_TOKENS_KEY] = {"when": time.time(), "average": round(running["spent"] / running["done"])}
+        self.finders_done = usage.position()
         self.reused += len(remembered)
         if remembered:
             self.plan.append("%s: nothing changed since an earlier check, so I used what the agents found then." % (
@@ -1177,7 +1218,8 @@ class Session:
         self.step("decide-%d" % len(self.rounds), "active" if undecided else "done", "Planner agent", "Decided: " + ", ".join(
             "%s %s" % (words[action], format(count, ",")) for action, count in counts.items()))
         return {"summary": "%d accepted, %d rejected" % (len(accepted), len(rejected)), "accepted": accepted,
-                "rejected": rejected, "still_undecided": undecided}
+                "rejected": rejected, "still_undecided": len(undecided),
+                "first_undecided": undecided[:LIST_IN_RESULT]}
 
     def _default(self, group):
         """The cautious decision for a group the planner did not decide."""
@@ -1228,7 +1270,8 @@ class Session:
             ", %s still open" % format(still, ",") if still else ""))
         result = {"summary": "%d still to settle" % still, "reference_edits": len(edits), "edits_at_the_source": sources,
                   "left_for_the_author": left, "still_broken_and_undecided": still,
-                  "defaulted_groups": [g["id"] for g in defaulted]}
+                  "defaulted_groups": len(defaulted),
+                  "first_defaulted": [g["id"] for g in defaulted[:LIST_IN_RESULT]]}
         if still and len(self.rounds) <= MAX_ROUNDS:
             result["next"] = "Round %d has %d groups. Call overview." % (len(self.rounds), len(remaining))
         else:
@@ -1607,6 +1650,8 @@ def _ask_planner(session, backend, model, log, progress):
     with usage.as_agent("planner"):
         answer, steps, problem = agentloop.run(PLANNER_SYSTEM, task, session.tools(), FINISH, backend=backend, model=model,
                                                max_calls=MAX_PLANNER_CALLS, log=log)
+    if not problem:
+        session.keep_planner_closing(threading.get_ident())
     if problem:
         log("planner stopped: %s" % problem)
         session.plan.append("The planner stopped early (%s). What it had not decided got the safe default: repair when "
