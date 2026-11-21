@@ -31,6 +31,7 @@ import time
 
 import meaning
 import refplan
+import teamsearch
 import usage
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -122,6 +123,71 @@ MOVED_FILES = {
 }
 
 
+# The team set (--team): the links use a team's own names (a project's code name, a nickname for a
+# tool), which no dictionary knows and only the team's vocabulary maps to the plain title. The old
+# files are gone and each piece is in another file, as in --moved. Three decoys share a word with a
+# team name and mean something else ("Atlas of regions" for "the Atlas report").
+TEAM = [
+    ("Kestrel setup", "kestrel.dita#kestrel/setup", "console_install.dita#console_install/install-console",
+     "Before your first invoice run, finish the %s."),
+    ("the Q-close", "finance.dita#finance/q-close", "books.dita#books/close-quarter", "Do not change prices during %s."),
+    ("Open a Bluebird ticket", "bluebird.dita#bluebird/open-ticket", "help.dita#help/ask-help-desk",
+     "If a payment is stuck, %s."),
+    ("the Atlas report", "atlas.dita#atlas/report", "usage.dita#usage/monthly-usage", "Seat counts come from %s."),
+    ("the night batch", "batch.dita#batch/night", "schedules.dita#schedules/two-am-transfers",
+     "Large files are moved in %s."),
+    ("the gold path", "paths.dita#paths/gold", "recommended.dita#recommended/most-teams", "New customers follow %s."),
+    ("the red card procedure", "safety.dita#safety/red-card", "emergency.dita#emergency/stop-all",
+     "If data goes to the wrong customer, start %s."),
+    ("Harbor login", "harbor.dita#harbor/login", "partners.dita#partners/partner-logon", "Resellers use %s."),
+    ("Pinecone sync", "pinecone.dita#pinecone/sync", "offices.dita#offices/keep-in-step",
+     "Branch offices rely on %s."),
+    ("Falcon tiers", "falcon.dita", "plans_and_fees.dita", "Sales quotes use the %s."),
+    ("the Juniper export", "juniper.dita#juniper/export", None, "Auditors used to ask for %s."),
+    ("Otter alerts", "otter.dita#otter/alerts", None, "On-call staff subscribe to %s."),
+]
+TEAM_FILES = {
+    "console_install.dita": ("console_install", "Putting the billing console in place", [
+        ("install-console", "Install the billing console", "Download the installer, enter the licence and choose a database.")]),
+    "books.dita": ("books", "Closing the books", [
+        ("close-quarter", "Close the quarter's books", "Lock the ledger, reconcile the bank and export the totals.")]),
+    "help.dita": ("help", "Getting help", [
+        ("ask-help-desk", "Ask the help desk", "Describe the problem and attach the invoice number.")]),
+    "usage.dita": ("usage", "Reports", [
+        ("monthly-usage", "Monthly usage report", "Seats, storage and transfers for each month.")]),
+    "regions.dita": ("regions", "Where your data lives", [
+        ("atlas-of-regions", "Atlas of regions", "A map of the countries where we keep data.")]),
+    "schedules.dita": ("schedules", "Scheduled work", [
+        ("two-am-transfers", "Scheduled transfers at 2 a.m.", "Files over a gigabyte are moved while offices are closed.")]),
+    "display.dita": ("display", "Display", [
+        ("night-mode", "Night mode", "Dark colours for working late.")]),
+    "recommended.dita": ("recommended", "Recommended setup", [
+        ("most-teams", "Recommended setup for most teams", "One console, two administrators and weekly backups.")]),
+    "emergency.dita": ("emergency", "Emergencies", [
+        ("stop-all", "Stop all transfers in an emergency", "Press Stop everything; nothing leaves until an administrator resumes.")]),
+    "partners.dita": ("partners", "For resellers", [
+        ("partner-logon", "Log on to the partner portal", "Resellers use the address and code from their contract.")]),
+    "offices.dita": ("offices", "Working across offices", [
+        ("keep-in-step", "Keep folders in step across offices", "Each office sees the same folders within a minute.")]),
+    "cards.dita": ("cards", "Payment cards", [
+        ("red-card", "Red payment cards", "Cards from some banks are red; they work the same.")]),
+    "plans_and_fees.dita": ("plans_and_fees", "Plans and fees", [
+        ("tiers", "The three tiers", "Starter, Team and Enterprise differ in seats and storage.")]),
+}
+
+
+def team_payload():
+    links = "".join("<p>%s</p>" % (sentence % '<xref href="%s">%s</xref>' % (old, text)) for text, old, _, sentence in TEAM)
+    files = {"guide.dita": HEAD + '<topic id="guide"><title>Getting around</title><body>%s</body></topic>\n' % links}
+    for name, (topic_id, title, sections) in TEAM_FILES.items():
+        files[name] = topic(topic_id, title, sections)
+    files["guide.ditamap"] = ('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">\n'
+                              '<map><title>Billing guide</title>%s</map>\n' % "".join(
+                                  '<topicref href="%s"/>' % name for name in files if name.endswith(".dita")))
+    return {"files": [{"id": "GUID-team-%02d" % n, "path": "/content/dam/team-demo/" + name, "xml": xml, "previous": []}
+                      for n, (name, xml) in enumerate(files.items())]}
+
+
 def moved_payload():
     links = "".join("<p>%s</p>" % (sentence % '<xref href="%s">%s</xref>' % (old, text)) for text, old, _, sentence in MOVED)
     files = {"guide.dita": HEAD + '<topic id="guide"><title>Getting around</title><body>%s</body></topic>\n' % links}
@@ -203,6 +269,8 @@ def main():
     parser.add_argument("--out", default=os.path.join(HERE, "eval", "refs", "synonym-eval.json"))
     parser.add_argument("--moved", action="store_true",
                         help="the harder set: the old files are gone and each piece is in another file under another name")
+    parser.add_argument("--team", action="store_true",
+                        help="the team set: links use a team's own names that only its vocabulary maps to plain titles")
     parser.add_argument("--meaning", action="store_true",
                         help="give the finder the search by meaning (meaning.py; needs model2vec)")
     args = parser.parse_args()
@@ -210,9 +278,9 @@ def main():
         meaning.ENABLED = True
         if not meaning.available():
             raise SystemExit("The search by meaning cannot be loaded: %s" % meaning.why_not())
-    cases, build = (MOVED, moved_payload) if args.moved else (CASES, payload)
-    if args.moved and args.out.endswith("synonym-eval.json"):
-        args.out = args.out.replace("synonym-eval.json", "synonym-moved-eval.json")
+    cases, build = (TEAM, team_payload) if args.team else (MOVED, moved_payload) if args.moved else (CASES, payload)
+    if args.out.endswith("synonym-eval.json") and (args.moved or args.team):
+        args.out = args.out.replace("synonym-eval.json", "synonym-team-eval.json" if args.team else "synonym-moved-eval.json")
     by_old = {old: case for case in cases for old in [case[1]]}
     runs = []
     for number in range(1, args.runs + 1):
@@ -242,7 +310,7 @@ def main():
                 print("   %-6s %-28s -> %s (%s)" % (row["score"], row["link"], row["proposed"][-44:] or "(nothing)", row["verdict"]))
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w") as handle:
-        json.dump({"cases": len(cases), "set": "moved" if args.moved else "same file", "search_by_meaning": meaning.ENABLED, "backend": args.backend, "model": args.model or "the CLI's default", "runs": runs}, handle, indent=1)
+        json.dump({"cases": len(cases), "set": "team" if args.team else "moved" if args.moved else "same file", "search_by_meaning": meaning.ENABLED, "team_search": teamsearch.available(), "backend": args.backend, "model": args.model or "the CLI's default", "runs": runs}, handle, indent=1)
     print("Wrote %s" % args.out)
 
 
