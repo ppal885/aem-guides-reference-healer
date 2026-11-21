@@ -94,5 +94,30 @@ class SuggestingAnAlt(unittest.TestCase):
             sidecar.LAST_FILES.clear()
 
 
+class TheListIsFoundOnceACheck(unittest.TestCase):
+    """Reading every topic of a large map takes seconds: the card and each suggestion use the list
+    found for the check, and a new check finds it again."""
+
+    def test_found_once_and_again_after_a_new_check(self):
+        import sidecar
+        files = [topic("a", '<p><image href="i.png"/></p>')]
+        with mock.patch.dict(sidecar.LAST_FILES, {"/m.ditamap": files}), \
+                mock.patch.dict(sidecar.LAST_ASSETS, {"/m.ditamap": (None, None)}), \
+                mock.patch.dict(sidecar.ALT, {}, clear=True), \
+                mock.patch.object(alttext, "images", wraps=alttext.images) as found:
+            first = sidecar.alt_of("/m.ditamap")
+            self.assertEqual(sidecar.alt_of("/m.ditamap"), first)
+            self.assertEqual(found.call_count, 1)
+            sidecar.LAST_FILES["/m.ditamap"] = [topic("a", '<p><image href="i.png"/></p>')]   # a new check
+            sidecar.alt_of("/m.ditamap")
+            self.assertEqual(found.call_count, 2)
+        self.assertEqual(len(first["images"]), 1)
+
+    def test_no_check_yet(self):
+        import sidecar
+        with mock.patch.dict(sidecar.LAST_FILES, {}, clear=True):
+            self.assertIn("Run the health check first", sidecar.alt_of("/none.ditamap")["note"])
+
+
 if __name__ == "__main__":
     unittest.main()
