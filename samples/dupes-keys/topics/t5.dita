@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="t5"><title>Posting rule 5</title><body><p>Posting rule 5 moves amounts between account group 5 and account group 6.</p><note type="caution">Back up the ledger database before you change a posting rule, so that you can go back if the rule is wrong.</note><p>The rule is saved and takes effect at the start of the next period.</p></body></topic>

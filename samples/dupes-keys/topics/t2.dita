@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="t2"><title>Posting rule 2</title><body><p>Posting rule 2 moves amounts between account group 2 and account group 3.</p><note type="caution">Back up the ledger database before you change a posting rule, so that you can go back if the rule is wrong.</note><p>Every change to a posting rule is written to the audit log with the name of the person who made it.</p></body></topic>

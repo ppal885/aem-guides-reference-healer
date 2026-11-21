@@ -18,6 +18,7 @@ decision is kept by its wordings, so the next page or the next check does not as
 import concurrent.futures
 import hashlib
 import json
+import os
 import re
 
 import duplicates
@@ -51,19 +52,76 @@ def _key(text):
 
 
 def shared_pieces(files):
-    """{(tag, text key): {"path", "topic", "id"}} for the elements some file already pulls in by conref."""
+    """{(tag, text key): {"path", "topic", "id"}} for the elements some file already pulls in by conref
+    or by conkeyref ("key/id": the file is matched by the id, as for a conref)."""
     conrefs = set()
     for entry in files:
         for value in re.findall(r'\sconref\s*=\s*"([^"#]*)#([^"]+)"', entry.get("xml") or ""):
             conrefs.add(value[1])                    # "topic/id"; the file is matched by the id below
+        for value in re.findall(r'\sconkeyref\s*=\s*"([^"/]+)/([^"]+)"', entry.get("xml") or ""):
+            conrefs.add("/" + value[1])              # no topic id in a conkeyref: the file's own below
     pieces = {}
     for entry in files:
         path = (entry.get("path") or "").lstrip("/")
         for block in duplicates.blocks_of(path, entry.get("xml") or ""):
             if block["id"] and any(ref.endswith("/" + block["id"]) for ref in conrefs):
                 topic = next((ref.split("/")[0] for ref in conrefs if ref.endswith("/" + block["id"])), "")
-                pieces[(block["tag"], _key(block["text"]))] = {"path": path, "topic": topic, "id": block["id"]}
+                pieces[(block["tag"], _key(block["text"]))] = {"path": path, "topic": topic or _root_id(entry.get("xml")),
+                                                               "id": block["id"]}
     return pieces
+
+
+def _root_id(xml):
+    body = re.sub(r"<\?[\s\S]*?\?>|<!DOCTYPE[^>\[]*(\[[^\]]*\])?[^>]*>|<!--[\s\S]*?-->", "", xml or "")
+    root = re.search(r"<[\w.-]+\b[^>]*>", body)
+    found = root and re.search(r'\sid="([^"]+)"', root.group(0))
+    return found.group(1) if found else ""
+
+
+# The shared topics the editor makes, beside the map: what a key for each is named when none exists.
+SHARED_TOPICS = {"reuse/shared-content.dita": "shared-content", "reuse/shared-steps.dita": "shared-steps"}
+_KEY_DEF = re.compile(r'<(?:keydef|topicref|mapref|topichead|chapter|appendix|part)\b[^>]*>')
+
+
+def _without_scopes(xml):
+    """The map without the elements that open a key scope, and what is inside them."""
+    before = None
+    while before != xml:
+        before = xml
+        xml = re.sub(r'<([\w.-]+)\b[^>]*\skeyscope="[^"]*"[^>]*?(?:/>|>(?:(?!<\1[\s>/])[\s\S])*?</\1>)', "", xml, count=1)
+    return xml
+
+
+def key_plan(files, map_path):
+    """How shared pieces are pulled in for this map: by key (conkeyref) when its topics already pull
+    content by key, else by conref. {"use": bool, "keys": {shared topic path: key name}, "maps": [the
+    maps of the check]}. A shared topic's key is the one a map already gives it, else a name no map
+    of the check uses for anything else."""
+    folder = os.path.dirname("/" + (map_path or "").lstrip("/"))
+    use = any(re.search(r'\sconkeyref\s*=\s*"', entry.get("xml") or "") for entry in files)
+    maps = sorted("/" + (e.get("path") or "").lstrip("/") for e in files if (e.get("path") or "").endswith(".ditamap"))
+    defined, outside = {}, {}         # key name -> href: every map of the check; and outside key scopes
+    for entry in files:
+        if not (entry.get("path") or "").endswith(".ditamap"):
+            continue
+        xml = entry.get("xml") or ""
+        for found, text in ((defined, xml), (outside, _without_scopes(xml))):
+            for tag in _KEY_DEF.findall(text):
+                keys, href = re.search(r'\skeys="([^"]+)"', tag), re.search(r'\shref="([^"]*)"', tag)
+                for key in (keys.group(1).split() if keys else []):
+                    found.setdefault(key, href.group(1) if href else "")
+    names = {}
+    for rel, base in SHARED_TOPICS.items():
+        path = "%s/%s" % (folder, rel)
+        name = os.path.basename(rel)
+        # A key inside a key scope is not reached from outside it: it is not the shared topic's key.
+        own = next((k for k, href in outside.items() if href and (href == name or href.endswith("/" + name))), "")
+        if not own:
+            own, n = base, 2
+            while own in defined:
+                own, n = "%s-%d" % (base, n), n + 1
+        names[path] = own
+    return {"use": use, "keys": names, "maps": maps}
 
 
 def _titles(files):

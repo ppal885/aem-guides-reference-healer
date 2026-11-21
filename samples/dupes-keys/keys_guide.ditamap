@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">
+<map><title>Ledgerline posting rules by key</title><keydef keys="notes" href="library/notes.dita"/><topicref href="topics/t1.dita"/><topicref href="topics/t2.dita"/><topicref href="topics/t3.dita"/><mapref href="sub.ditamap"/><topicgroup keyscope="archive"><keydef keys="shared-content" href="library/notes.dita"/><topicref href="topics/t6.dita"/></topicgroup></map>

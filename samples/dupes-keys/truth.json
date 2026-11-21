@@ -1,0 +1,22 @@
+{
+ "map": "keys_guide.ditamap",
+ "key_for_shared_content": "shared-content-2",
+ "by_key": [
+  "topics/t1.dita",
+  "topics/t2.dita",
+  "topics/t3.dita",
+  "topics/t4.dita",
+  "topics/t5.dita"
+ ],
+ "keeps_conref": {
+  "topics/t6.dita": "other_manual.ditamap uses it"
+ },
+ "existing_piece_by_key": {
+  "library/notes.dita#note_admin": "pulled by conkeyref notes/note_admin in t1; its copies in t3 and t4 become conkeyref notes/note_admin"
+ },
+ "groups": {
+  "caution": 6,
+  "audit": 3,
+  "result": 2
+ }
+}

@@ -209,6 +209,8 @@ def copies_of(map_path, model=None, judge=None, ids=None):
             "total": len(full), "mode": keep["mode"],
             "drifted": sum(1 for g in drifted if g["key"] not in kept), "kept": sum(1 for g in drifted if g["key"] in kept),
             "unjudged": sum(1 for g in full if g["decision"] == "unjudged"),
+            # by key (conkeyref) or by conref: what the map's topics already do (reuse.key_plan)
+            "keys": reuse.key_plan(files, map_path),
             "copies": sum(len(g["copies"]) for g in full), "removable": sum(max(0, len(g["copies"]) - 1) for g in full)}
 
 

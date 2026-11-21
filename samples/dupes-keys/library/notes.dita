@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="notes"><title>Shared notes</title><body><note id="note_admin" type="important">Only a ledger administrator can change a posting rule.</note></body></topic>
