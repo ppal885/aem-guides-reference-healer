@@ -107,6 +107,10 @@ IDLE = {"running": False, "lines": [], "timeline": []}
 # "Copied content" (GET /copies), and what it decided, kept until the files change.
 LAST_FILES = {}
 LAST_ASSETS = {}     # map path: (the assets that are not DITA, the paths dangling names stood for)
+# map path: (the check's files, its assets, the images found in them). Reading every topic of a large
+# map takes seconds (12 s for the 4,000 topics of the large sample), and the card and each alt text
+# suggestion ask for the list: it is found once a check and kept until the next check sends new files.
+ALT = {}
 COPIES = {}          # map path: (fingerprint of its files, the groups found in them)
 DECISIONS = {}       # reuse.decision_key: the reuse agent's decision, kept for the next page and check
 
@@ -204,14 +208,27 @@ def copies_of(map_path, model=None, judge=None, ids=None):
             "copies": sum(len(g["copies"]) for g in full), "removable": sum(max(0, len(g["copies"]) - 1) for g in full)}
 
 
-def alt_of(map_path):
-    """The images of a map's last check whose alt text says nothing (alttext.py). No model."""
+def _alt_images(map_path):
+    """The images found in the map's last check, found once a check (ALT)."""
     import alttext
     files = LAST_FILES.get(map_path or "")
     if not files:
-        return {"images": [], "note": "Run the health check first: the agents have not seen this map's files."}
+        return None
     assets, missing = LAST_ASSETS.get(map_path or "", (None, None))
+    kept = ALT.get(map_path or "")
+    # The same objects the check stored (held here, so they cannot be freed and their ids reused).
+    if kept and kept[0] is files and kept[1] is assets:
+        return kept[2]
     found = alttext.images(files, assets, missing)
+    ALT[map_path or ""] = (files, assets, found)
+    return found
+
+
+def alt_of(map_path):
+    """The images of a map's last check whose alt text says nothing (alttext.py). No model."""
+    found = _alt_images(map_path)
+    if found is None:
+        return {"images": [], "note": "Run the health check first: the agents have not seen this map's files."}
     return {"images": found, "uses": sum(len(g["uses"]) for g in found), "weak_uses": sum(g["weak_uses"] for g in found)}
 
 
@@ -465,6 +482,8 @@ def serve(port, model=None):
                 import refplan
                 LAST_FILES[payload.get("map") or ""] = payload.get("files") or []
                 LAST_ASSETS[payload.get("map") or ""] = (payload.get("assets"), payload.get("missing_paths"))
+                # The images without alt text are found while the agents work, so the card opens at once.
+                __import__("threading").Thread(target=_alt_images, args=(payload.get("map"),), daemon=True).start()
                 state = progress_of(payload.get("map"))
                 state.update(running=True, lines=[], timeline=[])
                 try:
