@@ -1,0 +1,244 @@
+{
+ "cases": 12,
+ "set": "team",
+ "search_by_meaning": false,
+ "team_search": true,
+ "backend": "cli",
+ "model": "the CLI's default",
+ "runs": [
+  {
+   "run": 1,
+   "seconds": 84,
+   "references": 12,
+   "scores": {
+    "right": 11,
+    "missed": 1
+   },
+   "applied_without_asking_and_wrong": 0,
+   "verdicts": {
+    "review": 9,
+    "none": 3
+   },
+   "model_calls": 92,
+   "failed_calls": 0,
+   "input_tokens": 249855,
+   "output_tokens": 11123,
+   "cost_usd": 1.15,
+   "rows": [
+    {
+     "link": "Kestrel setup",
+     "old": "kestrel.dita#kestrel/setup",
+     "proposed": "GUID-team-01.dita#console_install/install-console",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "the Q-close",
+     "old": "finance.dita#finance/q-close",
+     "proposed": "GUID-team-02.dita#books/close-quarter",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Open a Bluebird ticket",
+     "old": "bluebird.dita#bluebird/open-ticket",
+     "proposed": "",
+     "verdict": "none",
+     "score": "missed",
+     "found_by": "finder"
+    },
+    {
+     "link": "the Atlas report",
+     "old": "atlas.dita#atlas/report",
+     "proposed": "GUID-team-04.dita#usage/monthly-usage",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "the night batch",
+     "old": "batch.dita#batch/night",
+     "proposed": "GUID-team-06.dita#schedules/two-am-transfers",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "the gold path",
+     "old": "paths.dita#paths/gold",
+     "proposed": "GUID-team-08.dita#recommended/most-teams",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "the red card procedure",
+     "old": "safety.dita#safety/red-card",
+     "proposed": "GUID-team-09.dita#emergency/stop-all",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Harbor login",
+     "old": "harbor.dita#harbor/login",
+     "proposed": "GUID-team-10.dita#partners/partner-logon",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Pinecone sync",
+     "old": "pinecone.dita#pinecone/sync",
+     "proposed": "GUID-team-11.dita#offices/keep-in-step",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Falcon tiers",
+     "old": "falcon.dita",
+     "proposed": "GUID-team-13.dita#plans_and_fees",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "the Juniper export",
+     "old": "juniper.dita#juniper/export",
+     "proposed": "",
+     "verdict": "none",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Otter alerts",
+     "old": "otter.dita#otter/alerts",
+     "proposed": "",
+     "verdict": "none",
+     "score": "right",
+     "found_by": "finder"
+    }
+   ]
+  },
+  {
+   "run": 2,
+   "seconds": 80,
+   "references": 12,
+   "scores": {
+    "right": 11,
+    "missed": 1
+   },
+   "applied_without_asking_and_wrong": 0,
+   "verdicts": {
+    "review": 9,
+    "none": 3
+   },
+   "model_calls": 95,
+   "failed_calls": 0,
+   "input_tokens": 263216,
+   "output_tokens": 11428,
+   "cost_usd": 0.89,
+   "rows": [
+    {
+     "link": "Kestrel setup",
+     "old": "kestrel.dita#kestrel/setup",
+     "proposed": "GUID-team-01.dita#console_install/install-console",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "the Q-close",
+     "old": "finance.dita#finance/q-close",
+     "proposed": "GUID-team-02.dita#books/close-quarter",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Open a Bluebird ticket",
+     "old": "bluebird.dita#bluebird/open-ticket",
+     "proposed": "",
+     "verdict": "none",
+     "score": "missed",
+     "found_by": "finder"
+    },
+    {
+     "link": "the Atlas report",
+     "old": "atlas.dita#atlas/report",
+     "proposed": "GUID-team-04.dita#usage/monthly-usage",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "the night batch",
+     "old": "batch.dita#batch/night",
+     "proposed": "GUID-team-06.dita#schedules/two-am-transfers",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "the gold path",
+     "old": "paths.dita#paths/gold",
+     "proposed": "GUID-team-08.dita#recommended/most-teams",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "the red card procedure",
+     "old": "safety.dita#safety/red-card",
+     "proposed": "GUID-team-09.dita#emergency/stop-all",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Harbor login",
+     "old": "harbor.dita#harbor/login",
+     "proposed": "GUID-team-10.dita#partners/partner-logon",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Pinecone sync",
+     "old": "pinecone.dita#pinecone/sync",
+     "proposed": "GUID-team-11.dita#offices/keep-in-step",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Falcon tiers",
+     "old": "falcon.dita",
+     "proposed": "GUID-team-13.dita#plans_and_fees",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "the Juniper export",
+     "old": "juniper.dita#juniper/export",
+     "proposed": "",
+     "verdict": "none",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Otter alerts",
+     "old": "otter.dita#otter/alerts",
+     "proposed": "",
+     "verdict": "none",
+     "score": "right",
+     "found_by": "finder"
+    }
+   ]
+  }
+ ]
+}

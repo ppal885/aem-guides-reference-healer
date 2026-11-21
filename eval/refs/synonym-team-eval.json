@@ -1,0 +1,244 @@
+{
+ "cases": 12,
+ "set": "team",
+ "search_by_meaning": false,
+ "backend": "cli",
+ "model": "the CLI's default",
+ "runs": [
+  {
+   "run": 1,
+   "seconds": 116,
+   "references": 12,
+   "scores": {
+    "right": 9,
+    "missed": 3
+   },
+   "applied_without_asking_and_wrong": 0,
+   "verdicts": {
+    "review": 7,
+    "none": 5
+   },
+   "model_calls": 106,
+   "failed_calls": 0,
+   "input_tokens": 307574,
+   "output_tokens": 11765,
+   "cost_usd": 1.52,
+   "rows": [
+    {
+     "link": "Kestrel setup",
+     "old": "kestrel.dita#kestrel/setup",
+     "proposed": "GUID-team-01.dita#console_install/install-console",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "the Q-close",
+     "old": "finance.dita#finance/q-close",
+     "proposed": "GUID-team-02.dita#books/close-quarter",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Open a Bluebird ticket",
+     "old": "bluebird.dita#bluebird/open-ticket",
+     "proposed": "",
+     "verdict": "none",
+     "score": "missed",
+     "found_by": "finder"
+    },
+    {
+     "link": "the Atlas report",
+     "old": "atlas.dita#atlas/report",
+     "proposed": "GUID-team-04.dita#usage/monthly-usage",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "the night batch",
+     "old": "batch.dita#batch/night",
+     "proposed": "GUID-team-06.dita#schedules/two-am-transfers",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "the gold path",
+     "old": "paths.dita#paths/gold",
+     "proposed": "",
+     "verdict": "none",
+     "score": "missed",
+     "found_by": "finder"
+    },
+    {
+     "link": "the red card procedure",
+     "old": "safety.dita#safety/red-card",
+     "proposed": "",
+     "verdict": "none",
+     "score": "missed",
+     "found_by": "finder"
+    },
+    {
+     "link": "Harbor login",
+     "old": "harbor.dita#harbor/login",
+     "proposed": "GUID-team-10.dita#partners/partner-logon",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Pinecone sync",
+     "old": "pinecone.dita#pinecone/sync",
+     "proposed": "GUID-team-11.dita#offices/keep-in-step",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Falcon tiers",
+     "old": "falcon.dita",
+     "proposed": "GUID-team-13.dita#plans_and_fees",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "the Juniper export",
+     "old": "juniper.dita#juniper/export",
+     "proposed": "",
+     "verdict": "none",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Otter alerts",
+     "old": "otter.dita#otter/alerts",
+     "proposed": "",
+     "verdict": "none",
+     "score": "right",
+     "found_by": "finder"
+    }
+   ]
+  },
+  {
+   "run": 2,
+   "seconds": 139,
+   "references": 12,
+   "scores": {
+    "wrong": 1,
+    "right": 8,
+    "missed": 3
+   },
+   "applied_without_asking_and_wrong": 0,
+   "verdicts": {
+    "review": 7,
+    "none": 5
+   },
+   "model_calls": 110,
+   "failed_calls": 0,
+   "input_tokens": 342474,
+   "output_tokens": 12157,
+   "cost_usd": 1.47,
+   "rows": [
+    {
+     "link": "Kestrel setup",
+     "old": "kestrel.dita#kestrel/setup",
+     "proposed": "GUID-team-01.dita#console_install",
+     "verdict": "review",
+     "score": "wrong",
+     "found_by": "finder"
+    },
+    {
+     "link": "the Q-close",
+     "old": "finance.dita#finance/q-close",
+     "proposed": "GUID-team-02.dita#books/close-quarter",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Open a Bluebird ticket",
+     "old": "bluebird.dita#bluebird/open-ticket",
+     "proposed": "",
+     "verdict": "none",
+     "score": "missed",
+     "found_by": "finder"
+    },
+    {
+     "link": "the Atlas report",
+     "old": "atlas.dita#atlas/report",
+     "proposed": "GUID-team-04.dita#usage/monthly-usage",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "the night batch",
+     "old": "batch.dita#batch/night",
+     "proposed": "GUID-team-06.dita#schedules/two-am-transfers",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "the gold path",
+     "old": "paths.dita#paths/gold",
+     "proposed": "",
+     "verdict": "none",
+     "score": "missed",
+     "found_by": "finder"
+    },
+    {
+     "link": "the red card procedure",
+     "old": "safety.dita#safety/red-card",
+     "proposed": "",
+     "verdict": "none",
+     "score": "missed",
+     "found_by": "finder"
+    },
+    {
+     "link": "Harbor login",
+     "old": "harbor.dita#harbor/login",
+     "proposed": "GUID-team-10.dita#partners/partner-logon",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Pinecone sync",
+     "old": "pinecone.dita#pinecone/sync",
+     "proposed": "GUID-team-11.dita#offices/keep-in-step",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Falcon tiers",
+     "old": "falcon.dita",
+     "proposed": "GUID-team-13.dita#plans_and_fees/tiers",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "the Juniper export",
+     "old": "juniper.dita#juniper/export",
+     "proposed": "",
+     "verdict": "none",
+     "score": "right",
+     "found_by": "finder"
+    },
+    {
+     "link": "Otter alerts",
+     "old": "otter.dita#otter/alerts",
+     "proposed": "",
+     "verdict": "none",
+     "score": "right",
+     "found_by": "finder"
+    }
+   ]
+  }
+ ]
+}

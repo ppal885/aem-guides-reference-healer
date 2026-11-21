@@ -5,10 +5,9 @@
  "runs": [
   {
    "run": 1,
-   "seconds": 74,
+   "seconds": 90,
    "scores": {
-    "first right": 8,
-    "not offered": 1
+    "first right": 9
    },
    "applied_without_asking_and_wrong": 0,
    "rows": [
@@ -47,8 +46,8 @@
      "candidates": 2,
      "outcome": "first right",
      "likelihoods": [
-      55,
-      40
+      60,
+      35
      ]
     },
     {
@@ -70,11 +69,10 @@
      "right": "lib.dita#lib/hot-plate",
      "proposed": "lib.dita#lib/hot-plate",
      "verdict": "review",
-     "candidates": 2,
+     "candidates": 1,
      "outcome": "first right",
      "likelihoods": [
-      92,
-      5
+      92
      ]
     },
     {
@@ -86,8 +84,8 @@
      "candidates": 2,
      "outcome": "first right",
      "likelihoods": [
-      90,
-      5
+      88,
+      8
      ]
     },
     {
@@ -106,11 +104,13 @@
      "file": "get_help.dita",
      "old": "support-email",
      "right": "support-contact",
-     "proposed": null,
-     "verdict": "none",
-     "candidates": 0,
-     "outcome": "not offered",
-     "likelihoods": []
+     "proposed": "support-contact",
+     "verdict": "review",
+     "candidates": 1,
+     "outcome": "first right",
+     "likelihoods": [
+      55
+     ]
     },
     {
      "file": "change_card.dita",
@@ -129,9 +129,10 @@
   },
   {
    "run": 2,
-   "seconds": 100,
+   "seconds": 87,
    "scores": {
-    "first right": 9
+    "first right": 8,
+    "not offered": 1
    },
    "applied_without_asking_and_wrong": 0,
    "rows": [
@@ -209,8 +210,8 @@
      "candidates": 2,
      "outcome": "first right",
      "likelihoods": [
-      90,
-      5
+      88,
+      8
      ]
     },
     {
@@ -229,13 +230,11 @@
      "file": "get_help.dita",
      "old": "support-email",
      "right": "support-contact",
-     "proposed": "support-contact",
-     "verdict": "review",
-     "candidates": 1,
-     "outcome": "first right",
-     "likelihoods": [
-      45
-     ]
+     "proposed": null,
+     "verdict": "none",
+     "candidates": 0,
+     "outcome": "not offered",
+     "likelihoods": []
     },
     {
      "file": "change_card.dita",

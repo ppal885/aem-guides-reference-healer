@@ -33,6 +33,7 @@ import time
 
 import agentloop
 import meaning
+import teamsearch
 import refcheck
 import usage
 
@@ -113,6 +114,13 @@ class Tools:
                 "note": "closest in meaning first; closeness is not proof, read a candidate before you propose it",
                 "pieces": found}
 
+    def find_in_team_search(self, args):
+        """Files the team's own search finds through its vocabulary (teamsearch.py). Only offered when
+        the search is set up; what it returns is a candidate to read, not a proof."""
+        found = teamsearch.search(self.repo, args["query"])
+        self.seen_files.update(f["path"] for f in found["files"])
+        return found
+
     def find_keys(self, args):
         query = tokens(args["query"])
         scored = []
@@ -186,6 +194,9 @@ def tool_specs(tools, with_history):
     if meaning.available():
         specs.append({"name": "find_by_meaning", "description": "Search by meaning: titles of files and text of elements that say the same as your query in other words (\"sign in\" finds \"Log on to the console\"). Describe what the reference was about, in a few words or a sentence. Use it when the word searches find nothing that fits, or when the file the reference named is gone. Give tag to restrict to one element type; empty string for any. Closeness in meaning is not proof: read the candidate (outline) before you propose it.",
                       "properties": {"query": string, "tag": string}, "required": ["query", "tag"], "fn": tools.find_by_meaning})
+    if teamsearch.available():
+        specs.append({"name": "find_in_team_search", "description": "Search the team's own search, which knows the team's vocabulary: its own names for products, tools and procedures (a code name such as \"Kestrel\" for the billing console, a nickname such as \"the night batch\"). Give the link's words as written. Use it when the link's words look like a team's own name and the word searches find nothing that fits. A hit is not proof: read the candidate (outline) before you propose it.",
+                      "properties": {"query": string}, "required": ["query"], "fn": tools.find_in_team_search})
     if tools.repo.previous:
         specs.append({"name": "previous_version", "description": "What an element id or a key name was in the earlier versions of a file: its element type and text, or the key's target. Use it on the file the broken reference points at (for a key, on the map) to learn what the author was pointing to before it broke.",
                       "properties": {"path": string, "id_or_key": string}, "required": ["path", "id_or_key"], "fn": tools.previous_version})
