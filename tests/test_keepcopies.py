@@ -7,8 +7,11 @@ from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 import duplicates  # noqa: E402
-import fixrate  # noqa: E402
-fixrate.PATH = os.path.join(tempfile.mkdtemp(), "copies-shown.jsonl")  # tests never write the real record
+try:
+    import fixrate  # noqa: E402  (optional: not in every copy of the repository)
+    fixrate.PATH = os.path.join(tempfile.mkdtemp(), "copies-shown.jsonl")  # tests never write the real record
+except ImportError:
+    fixrate = None
 
 SAMPLE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "samples", "dupes-drift")
 

@@ -183,8 +183,10 @@ def copies_of(map_path, model=None, judge=None, ids=None):
         COPIES[map_path] = cached
     full = cached[1]
     try:
-        import fixrate
+        import fixrate   # optional: the fix-rate record is kept only where fixrate.py is present
         fixrate.record_shown(map_path, full)     # what the author was offered, for the fix rate (fixrate.py)
+    except ImportError:
+        pass
     except (OSError, KeyError, TypeError) as exc:
         _log("copies shown not recorded: %s" % exc)
     wanted = set((ids or "").split(",")) - {""}
