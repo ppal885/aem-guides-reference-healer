@@ -29,13 +29,15 @@ def repo():
 class Service:
     """A stand-in for the search service on a local port: answers with the given results, or the given status."""
 
-    def __init__(self, results=None, status=200):
+    def __init__(self, results=None, status=200, by_query=None):
         seen = self.seen = []
 
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_POST(self):
-                seen.append((self.headers.get("Authorization"), json.loads(self.rfile.read(int(self.headers["Content-Length"])))))
-                body = json.dumps({"results": results or [], "total": len(results or [])}).encode()
+                asked = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                seen.append((self.headers.get("Authorization"), asked))
+                found = by_query.get(asked["query"], []) if by_query is not None else results or []
+                body = json.dumps({"results": found, "total": len(found)}).encode()
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
@@ -82,6 +84,47 @@ class TeamSearch(unittest.TestCase):
         key, body = service.seen[0]
         self.assertEqual(key, "Bearer test-key")
         self.assertEqual((body["query"], body["search_type"], body["vocabulary_mode"]), ("Kestrel setup", "FULL_TEXT", "on"))
+
+    def test_a_phrase_that_finds_nothing_is_asked_in_shorter_pieces(self):
+        # The service finds a file only when every word matches: the phrase finds nothing, the name alone does.
+        service = Service(by_query={"Kestrel": [{"asset_id": "GUID-a1.dita", "title": "Putting the billing console in place"}]})
+        url, env = self.with_service(service)
+        with url, env:
+            found = refheal.Tools(self.repo).find_in_team_search({"query": "Open the Kestrel setup"})
+        service.stop()
+        self.assertEqual([q["query"] for _, q in service.seen],
+                         ["Open the Kestrel setup", "Open the Kestrel", "Kestrel setup", "Open", "Kestrel"])
+        self.assertEqual([(f["path"], f["found_by_piece"]) for f in found["files"]], [("content/dam/t/console_install.dita", "Kestrel")])
+        self.assertIn('found by "Kestrel"', found["summary"])
+
+    def test_a_name_of_several_words_is_kept_together(self):
+        # "red card procedure" is the team's name; "card" alone would bring a decoy, so longer pieces go first.
+        service = Service(by_query={"red card procedure": [{"asset_id": "GUID-a1", "title": "x"}],
+                                    "card": [{"asset_id": "GUID-a2", "title": "y"}]})
+        url, env = self.with_service(service)
+        with url, env:
+            found = teamsearch.search(self.repo, "start the red card procedure")
+        service.stop()
+        self.assertEqual([f["path"] for f in found["files"]], ["content/dam/t/console_install.dita"])
+        self.assertEqual(found["files"][0]["found_by_piece"], "red card procedure")
+
+    def test_nothing_found_says_what_was_tried(self):
+        service = Service(by_query={})
+        url, env = self.with_service(service)
+        with url, env:
+            found = teamsearch.search(self.repo, "Open a Bluebird ticket")
+        service.stop()
+        self.assertEqual(found["files"], [])
+        self.assertIn('nor did: "Open a Bluebird", "Bluebird ticket", "Open", "Bluebird", "ticket"', found["summary"])
+
+    def test_a_phrase_that_finds_something_is_not_split(self):
+        service = Service([{"asset_id": "GUID-a1", "title": "Putting the billing console in place"}])
+        url, env = self.with_service(service)
+        with url, env:
+            found = teamsearch.search(self.repo, "Kestrel setup")
+        service.stop()
+        self.assertEqual(len(service.seen), 1)
+        self.assertNotIn("found_by_piece", found["files"][0])
 
     def test_a_service_error_is_said_and_the_finder_goes_on(self):
         service = Service(status=500)

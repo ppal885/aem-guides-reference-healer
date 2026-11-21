@@ -30,6 +30,7 @@ import os
 import time
 
 import meaning
+import refheal
 import refplan
 import teamsearch
 import usage
@@ -273,6 +274,10 @@ def main():
                         help="the team set: links use a team's own names that only its vocabulary maps to plain titles")
     parser.add_argument("--meaning", action="store_true",
                         help="give the finder the search by meaning (meaning.py; needs model2vec)")
+    parser.add_argument("--only", default=None, metavar="LINK",
+                        help="run only the case with this link text; the other links are left out of the sample")
+    parser.add_argument("--trace", action="store_true",
+                        help="record, per case, each tool call of the finder (tool, words, what came back) and the reviewer's word")
     args = parser.parse_args()
     if args.meaning:
         meaning.ENABLED = True
@@ -281,10 +286,29 @@ def main():
     cases, build = (TEAM, team_payload) if args.team else (MOVED, moved_payload) if args.moved else (CASES, payload)
     if args.out.endswith("synonym-eval.json") and (args.moved or args.team):
         args.out = args.out.replace("synonym-eval.json", "synonym-team-eval.json" if args.team else "synonym-moved-eval.json")
+    if args.only:
+        name = "TEAM" if args.team else "MOVED" if args.moved else "CASES"
+        globals()[name] = cases = [c for c in cases if c[0].lower() == args.only.lower()]
+        if not cases:
+            raise SystemExit("No case has the link text %r" % args.only)
+        if args.out.endswith("-eval.json"):
+            args.out = args.out[:-len("-eval.json")] + "-only-eval.json"
+    traces = []
+    if args.trace:
+        finder = refheal.heal_one
+
+        def traced(repo, ref, *rest, **named):
+            result = finder(repo, ref, *rest, **named)
+            traces.append({"old": ref["value"], "steps": result.get("steps", []), "proposed": result.get("new_value") or "",
+                           "reason": result.get("reason", ""), "checks": result.get("checks", []),
+                           "reviewer": result.get("review")})
+            return result
+        refheal.heal_one = traced
     by_old = {old: case for case in cases for old in [case[1]]}
     runs = []
     for number in range(1, args.runs + 1):
         started, before = time.time(), len(usage._calls)
+        del traces[:]
         data = build()
         out = refplan.plan_files(json.loads(json.dumps(data)), backend=args.backend, model=args.model, log=lambda message: None, memory={})
         rows = []
@@ -294,6 +318,9 @@ def main():
                 continue
             rows.append({"link": case[0], "old": case[1], "proposed": repair.get("new") or "", "verdict": repair["verdict"],
                          "score": score(case, repair, data["files"]), "found_by": repair.get("stage")})
+            if args.trace:
+                rows[-1]["finder_runs"] = [t for t in traces if t["old"] == repair["old"] or t["old"].endswith(case[1])]
+                rows[-1]["tools_used"] = sorted({step["tool"] for t in rows[-1]["finder_runs"] for step in t["steps"]})
         counts = collections.Counter(row["score"] for row in rows)
         calls = usage._calls[before:]
         runs.append({"run": number, "seconds": round(time.time() - started), "references": len(rows), "scores": dict(counts),
@@ -308,9 +335,15 @@ def main():
         for row in rows:
             if row["score"] != "right":
                 print("   %-6s %-28s -> %s (%s)" % (row["score"], row["link"], row["proposed"][-44:] or "(nothing)", row["verdict"]))
+            for t in row.get("finder_runs", []) if (args.only or row["score"] != "right") else []:
+                for step in t["steps"]:
+                    print("      %-22s %-40s -> %s" % (step["tool"], json.dumps(step["args"], ensure_ascii=False)[:40], step["result"][:70]))
+                print("      finder: %s" % (t["proposed"] or "(nothing)"), "|", t["reason"][:160])
+                if t["reviewer"]:
+                    print("      reviewer: agree=%s %s" % (t["reviewer"].get("agree"), str(t["reviewer"].get("reason", ""))[:140]))
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w") as handle:
-        json.dump({"cases": len(cases), "set": "team" if args.team else "moved" if args.moved else "same file", "search_by_meaning": meaning.ENABLED, "team_search": teamsearch.available(), "backend": args.backend, "model": args.model or "the CLI's default", "runs": runs}, handle, indent=1)
+        json.dump({"cases": len(cases), "set": "team" if args.team else "moved" if args.moved else "same file", "search_by_meaning": meaning.ENABLED, "team_search": teamsearch.available(), "only": args.only, "backend": args.backend, "model": args.model or "the CLI's default", "runs": runs}, handle, indent=1)
     print("Wrote %s" % args.out)
 
 

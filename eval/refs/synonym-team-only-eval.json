@@ -1,0 +1,205 @@
+{
+ "cases": 1,
+ "set": "team",
+ "search_by_meaning": false,
+ "team_search": true,
+ "only": "Open a Bluebird ticket",
+ "backend": "cli",
+ "model": "the CLI's default",
+ "runs": [
+  {
+   "run": 1,
+   "seconds": 41,
+   "references": 1,
+   "scores": {
+    "right": 1
+   },
+   "applied_without_asking_and_wrong": 0,
+   "verdicts": {
+    "review": 1
+   },
+   "model_calls": 13,
+   "failed_calls": 0,
+   "input_tokens": 35008,
+   "output_tokens": 1285,
+   "cost_usd": 0.13,
+   "rows": [
+    {
+     "link": "Open a Bluebird ticket",
+     "old": "bluebird.dita#bluebird/open-ticket",
+     "proposed": "GUID-team-03.dita#help/ask-help-desk",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "bluebird.dita#bluebird/open-ticket",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "bluebird"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Bluebird"
+         },
+         "result": "1 files (1 more outside this map)",
+         "chars": 277
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/help.dita"
+         },
+         "result": "Getting help, 1 ids",
+         "chars": 300
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "ticket",
+          "tag": ""
+         },
+         "result": "0 elements",
+         "chars": 41
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "payment",
+          "tag": ""
+         },
+         "result": "1 elements",
+         "chars": 222
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "help desk",
+          "tag": ""
+         },
+         "result": "1 elements",
+         "chars": 226
+        }
+       ],
+       "proposed": "GUID-team-03.dita#help/ask-help-desk",
+       "reason": "bluebird.dita no longer exists, and no file is named after it. The team search links the name \"Bluebird\" to help.dita. Its only section, \"Ask the help desk\", tells you to describe the problem and attach the invoice number, which fits opening a ticket about a stuck payment.",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer does not agree"
+       ],
+       "reviewer": {
+        "agree": false,
+        "reason": "The sentence promises a link to opening a Bluebird ticket, but the proposed target is a generic 'Ask the help desk' section in a different topic that never mentions Bluebird or tickets, and no earlier-version evidence shows the old target said the same thing."
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
+    }
+   ]
+  },
+  {
+   "run": 2,
+   "seconds": 37,
+   "references": 1,
+   "scores": {
+    "right": 1
+   },
+   "applied_without_asking_and_wrong": 0,
+   "verdicts": {
+    "review": 1
+   },
+   "model_calls": 12,
+   "failed_calls": 0,
+   "input_tokens": 32149,
+   "output_tokens": 1259,
+   "cost_usd": 0.1,
+   "rows": [
+    {
+     "link": "Open a Bluebird ticket",
+     "old": "bluebird.dita#bluebird/open-ticket",
+     "proposed": "GUID-team-03.dita#help/ask-help-desk",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "bluebird.dita#bluebird/open-ticket",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "bluebird"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Bluebird ticket"
+         },
+         "result": "1 files (1 more outside this map); the whole phrase found nothing, these were found by \"Bluebird\"",
+         "chars": 373
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/help.dita"
+         },
+         "result": "Getting help, 1 ids",
+         "chars": 300
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "ticket",
+          "tag": ""
+         },
+         "result": "0 elements",
+         "chars": 41
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Bluebird"
+         },
+         "result": "1 files (1 more outside this map)",
+         "chars": 277
+        }
+       ],
+       "proposed": "GUID-team-03.dita#help/ask-help-desk",
+       "reason": "No file named bluebird exists anywhere in the repository. The team's own search links \"Bluebird\" to help.dita, whose only section, \"Ask the help desk\", says to attach the invoice number, which fits a stuck payment and opening a ticket.",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer does not agree"
+       ],
+       "reviewer": {
+        "agree": false,
+        "reason": "The sentence promises a link to opening a Bluebird ticket, but the proposed target is a generic 'Ask the help desk' section in 'Getting help' that doesn't mention Bluebird or tickets, and no earlier-version evidence shows it is the same content."
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
+    }
+   ]
+  }
+ ]
+}
