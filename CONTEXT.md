@@ -1,5 +1,7 @@
 # Context: what this project is, how it got here, and how to carry on
 
+The project is called **Content Health Agents** since 22 Nov 2026 (it was the AI Link, Reference and Key Healer): it now also handles repeated text, alt text and Schematron findings. The branch names (`garage/reference-healer`) and this folder's name (`link-healer`) were kept, so links and scripts keep working.
+
 Written on 14 Nov 2026 so that someone who clones this repository, or an AI assistant working in it, starts with what the people who built it knew. [README.md](README.md) says what the thing does and how to set it up. This file says why, what was decided, what was learned the hard way, and what is open.
 
 ## What it is for
