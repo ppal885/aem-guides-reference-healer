@@ -113,6 +113,30 @@ class TheListIsFoundOnceACheck(unittest.TestCase):
             self.assertEqual(found.call_count, 2)
         self.assertEqual(len(first["images"]), 1)
 
+    def test_a_request_during_the_search_waits_for_it(self):
+        import sidecar
+        import threading
+        import time
+        files = [topic("a", '<p><image href="i.png"/></p>')]
+        real = alttext.images
+
+        def slow(*args):
+            time.sleep(0.3)
+            return real(*args)
+        with mock.patch.dict(sidecar.LAST_FILES, {"/m.ditamap": files}), \
+                mock.patch.dict(sidecar.LAST_ASSETS, {"/m.ditamap": (None, None)}), \
+                mock.patch.dict(sidecar.ALT, {}, clear=True), \
+                mock.patch.object(alttext, "images", side_effect=slow) as found:
+            answers = []
+            asks = [threading.Thread(target=lambda: answers.append(sidecar.alt_of("/m.ditamap"))) for _ in range(3)]
+            for ask in asks:
+                ask.start()
+            for ask in asks:
+                ask.join()
+        self.assertEqual(found.call_count, 1)
+        self.assertEqual(len(answers), 3)
+        self.assertTrue(all(answer == answers[0] for answer in answers))
+
     def test_no_check_yet(self):
         import sidecar
         with mock.patch.dict(sidecar.LAST_FILES, {}, clear=True):

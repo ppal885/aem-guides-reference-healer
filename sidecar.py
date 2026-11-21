@@ -111,6 +111,10 @@ LAST_ASSETS = {}     # map path: (the assets that are not DITA, the paths dangli
 # map takes seconds (12 s for the 4,000 topics of the large sample), and the card and each alt text
 # suggestion ask for the list: it is found once a check and kept until the next check sends new files.
 ALT = {}
+# One lock a map: a request that comes while the list is being found waits for it instead of finding
+# it again (both at once took 36 s on the large sample, while the check was reading its files too).
+_ALT_LOCKS = {}
+_ALT_LOCKS_LOCK = __import__("threading").Lock()
 COPIES = {}          # map path: (fingerprint of its files, the groups found in them)
 DECISIONS = {}       # reuse.decision_key: the reuse agent's decision, kept for the next page and check
 
@@ -215,13 +219,16 @@ def _alt_images(map_path):
     if not files:
         return None
     assets, missing = LAST_ASSETS.get(map_path or "", (None, None))
-    kept = ALT.get(map_path or "")
-    # The same objects the check stored (held here, so they cannot be freed and their ids reused).
-    if kept and kept[0] is files and kept[1] is assets:
-        return kept[2]
-    found = alttext.images(files, assets, missing)
-    ALT[map_path or ""] = (files, assets, found)
-    return found
+    with _ALT_LOCKS_LOCK:
+        lock = _ALT_LOCKS.setdefault(map_path or "", __import__("threading").Lock())
+    with lock:
+        kept = ALT.get(map_path or "")
+        # The same objects the check stored (held here, so they cannot be freed and their ids reused).
+        if kept and kept[0] is files and kept[1] is assets:
+            return kept[2]
+        found = alttext.images(files, assets, missing)
+        ALT[map_path or ""] = (files, assets, found)
+        return found
 
 
 def alt_of(map_path):
