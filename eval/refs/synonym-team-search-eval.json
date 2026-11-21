@@ -3,27 +3,27 @@
  "set": "team",
  "search_by_meaning": false,
  "team_search": true,
+ "only": null,
  "backend": "cli",
  "model": "the CLI's default",
  "runs": [
   {
    "run": 1,
-   "seconds": 84,
+   "seconds": 66,
    "references": 12,
    "scores": {
-    "right": 11,
-    "missed": 1
+    "right": 12
    },
    "applied_without_asking_and_wrong": 0,
    "verdicts": {
-    "review": 9,
-    "none": 3
+    "review": 10,
+    "none": 2
    },
-   "model_calls": 92,
+   "model_calls": 83,
    "failed_calls": 0,
-   "input_tokens": 249855,
-   "output_tokens": 11123,
-   "cost_usd": 1.15,
+   "input_tokens": 225601,
+   "output_tokens": 10896,
+   "cost_usd": 0.9,
    "rows": [
     {
      "link": "Kestrel setup",
@@ -31,7 +31,64 @@
      "proposed": "GUID-team-01.dita#console_install/install-console",
      "verdict": "review",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "kestrel.dita#kestrel/setup",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "kestrel"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Kestrel setup"
+         },
+         "result": "1 files; the whole phrase found nothing, these were found by \"Kestrel\"",
+         "chars": 391
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/console_install.dita"
+         },
+         "result": "Putting the billing console in place, 1 ids",
+         "chars": 404
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "billing console setup",
+          "tag": ""
+         },
+         "result": "6 elements",
+         "chars": 1319
+        }
+       ],
+       "proposed": "GUID-team-01.dita#console_install/install-console",
+       "reason": "Team search maps 'Kestrel' to the billing console. The section 'Install the billing console' (download the installer, enter the licence, choose a database) is the setup to finish before a first invoice run, matching the old target kestrel/setup.",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer does not agree"
+       ],
+       "reviewer": {
+        "agree": false,
+        "reason": "The broken reference pointed to a 'Kestrel setup' section, but the proposed target is an unrelated billing console installation section, and there is no earlier-version evidence showing that it covers the same content, so it only loosely matches the sentence's promise."
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "the Q-close",
@@ -39,15 +96,129 @@
      "proposed": "GUID-team-02.dita#books/close-quarter",
      "verdict": "review",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "finance.dita#finance/q-close",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "finance"
+         },
+         "result": "1 files",
+         "chars": 189
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Q-close"
+         },
+         "result": "1 files",
+         "chars": 258
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/books.dita"
+         },
+         "result": "Closing the books, 1 ids",
+         "chars": 328
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "quarter close",
+          "tag": ""
+         },
+         "result": "2 elements",
+         "chars": 461
+        }
+       ],
+       "proposed": "GUID-team-02.dita#books/close-quarter",
+       "reason": "The team's search maps 'Q-close' to books.dita. Its section close-quarter ('Close the quarter's books: lock the ledger, reconcile the bank and export the totals') covers the quarter close the sentence refers to. finance.dita no longer exists anywhere in the repository.",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer agrees"
+       ],
+       "reviewer": {
+        "agree": true,
+        "reason": "The sentence warns against changing prices during the Q-close, and the proposed target is the section 'Close the quarter's books' (lock the ledger, reconcile, export totals) in 'Closing the books', which plausibly describes the quarter close, though there is no earlier-version evidence to confirm it"
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "Open a Bluebird ticket",
      "old": "bluebird.dita#bluebird/open-ticket",
-     "proposed": "",
-     "verdict": "none",
-     "score": "missed",
-     "found_by": "finder"
+     "proposed": "GUID-team-03.dita#help/ask-help-desk",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "bluebird.dita#bluebird/open-ticket",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "bluebird"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Bluebird ticket"
+         },
+         "result": "1 files (1 more outside this map); the whole phrase found nothing, these were found by \"Bluebird\"",
+         "chars": 373
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/help.dita"
+         },
+         "result": "Getting help, 1 ids",
+         "chars": 300
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "ticket",
+          "tag": ""
+         },
+         "result": "0 elements",
+         "chars": 41
+        }
+       ],
+       "proposed": "GUID-team-03.dita#help/ask-help-desk",
+       "reason": "No file named bluebird exists. The team search matched \"Bluebird\" to help.dita, whose only section, \"Ask the help desk\", asks for the invoice number. That fits a stuck payment and opening a ticket.",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer does not agree"
+       ],
+       "reviewer": {
+        "agree": false,
+        "reason": "The sentence promises a link to open a Bluebird ticket, but the proposed target is a generic 'Ask the help desk' section that says to describe the problem and attach the invoice number, with no mention of Bluebird or ticket creation, and no earlier-version evidence supports it as the same content."
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "the Atlas report",
@@ -55,7 +226,64 @@
      "proposed": "GUID-team-04.dita#usage/monthly-usage",
      "verdict": "review",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "atlas.dita#atlas/report",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "atlas"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Atlas report"
+         },
+         "result": "1 files",
+         "chars": 248
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/usage.dita"
+         },
+         "result": "Reports, 1 ids",
+         "chars": 289
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "seat",
+          "tag": ""
+         },
+         "result": "3 elements",
+         "chars": 645
+        }
+       ],
+       "proposed": "GUID-team-04.dita#usage/monthly-usage",
+       "reason": "No file named atlas exists. The team's search maps \"Atlas report\" to usage.dita, whose only section, \"Monthly usage report\", covers seats, storage and transfers. That fits \"Seat counts come from the Atlas report.\"",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer does not agree"
+       ],
+       "reviewer": {
+        "agree": false,
+        "reason": "The reference promises 'the Atlas report' as the source of seat counts, but the proposed target is a generic 'Monthly usage report' section in a different file; no earlier-version evidence links it to the Atlas report, and it only partly overlaps (seats) with storage and transfers, so the match is n"
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "the night batch",
@@ -63,7 +291,64 @@
      "proposed": "GUID-team-06.dita#schedules/two-am-transfers",
      "verdict": "review",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "batch.dita#batch/night",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "batch"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "the night batch"
+         },
+         "result": "1 files; the whole phrase found nothing, these were found by \"night batch\"",
+         "chars": 365
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/schedules.dita"
+         },
+         "result": "Scheduled work, 1 ids",
+         "chars": 340
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "large files moved",
+          "tag": ""
+         },
+         "result": "1 elements",
+         "chars": 257
+        }
+       ],
+       "proposed": "GUID-team-06.dita#schedules/two-am-transfers",
+       "reason": "batch.dita no longer exists. The team search maps \"night batch\" to schedules.dita, whose section two-am-transfers covers files over a gigabyte moved at 2 a.m. while offices are closed. That matches the sentence \"Large files are moved in the night batch.\"",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer agrees"
+       ],
+       "reviewer": {
+        "agree": true,
+        "reason": "The sentence says large files are moved in the night batch, and the proposed section describes scheduled 2 a.m. transfers of files over a gigabyte while offices are closed, which is the same night-time bulk file move; there is no earlier-version evidence to contradict this, so it plausibly lands on "
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "the gold path",
@@ -71,7 +356,81 @@
      "proposed": "GUID-team-08.dita#recommended/most-teams",
      "verdict": "review",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "paths.dita#paths/gold",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "paths"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "gold path"
+         },
+         "result": "1 files",
+         "chars": 270
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/recommended.dita"
+         },
+         "result": "Recommended setup, 1 ids",
+         "chars": 343
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "gold",
+          "tag": ""
+         },
+         "result": "0 elements",
+         "chars": 41
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "new customers",
+          "tag": ""
+         },
+         "result": "1 elements",
+         "chars": 249
+        },
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "gold"
+         },
+         "result": "0 files",
+         "chars": 35
+        }
+       ],
+       "proposed": "GUID-team-08.dita#recommended/most-teams",
+       "reason": "paths.dita no longer exists, and no file or element mentions 'gold'. The team's own search maps 'gold path' to recommended.dita. Its only section, 'Recommended setup for most teams', describes a default setup, which fits a path that new customers follow.",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer does not agree"
+       ],
+       "reviewer": {
+        "agree": false,
+        "reason": "The reference promises 'the gold path' for new customers, but the proposed target is a 'Recommended setup for most teams' section (one console, two administrators, weekly backups), which is a different subject, and there is no earlier-version evidence linking the two."
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "the red card procedure",
@@ -79,7 +438,73 @@
      "proposed": "GUID-team-09.dita#emergency/stop-all",
      "verdict": "review",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "safety.dita#safety/red-card",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "safety"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "red card procedure"
+         },
+         "result": "1 files",
+         "chars": 260
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/emergency.dita"
+         },
+         "result": "Emergencies, 1 ids",
+         "chars": 329
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "wrong customer",
+          "tag": ""
+         },
+         "result": "1 elements",
+         "chars": 249
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "red card",
+          "tag": ""
+         },
+         "result": "1 elements",
+         "chars": 222
+        }
+       ],
+       "proposed": "GUID-team-09.dita#emergency/stop-all",
+       "reason": "The team's search maps 'red card procedure' to emergency.dita. Its section 'Stop all transfers in an emergency' fits the sentence: when data goes to the wrong customer, all transfers are stopped. The section cards.dita#cards/red-card has the same id, but it is about red payment cards and is not a procedure.",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer does not agree"
+       ],
+       "reviewer": {
+        "agree": false,
+        "reason": "The sentence promises the red card procedure for data sent to the wrong customer, but the proposed target is a section about stopping all transfers in an emergency (Press Stop everything), which is a different procedure; no earlier-version evidence shows it replaced the red card content."
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "Harbor login",
@@ -87,7 +512,64 @@
      "proposed": "GUID-team-10.dita#partners/partner-logon",
      "verdict": "review",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "harbor.dita#harbor/login",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "harbor"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Harbor login"
+         },
+         "result": "1 files; the whole phrase found nothing, these were found by \"Harbor\"",
+         "chars": 352
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/partners.dita"
+         },
+         "result": "For resellers, 1 ids",
+         "chars": 329
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "login logon reseller",
+          "tag": ""
+         },
+         "result": "4 elements",
+         "chars": 874
+        }
+       ],
+       "proposed": "GUID-team-10.dita#partners/partner-logon",
+       "reason": "The team's search maps the name \"Harbor\" to partners.dita (\"For resellers\"). Its section partner-logon, \"Log on to the partner portal\", is about resellers logging on, which matches the link text \"Harbor login\" and the sentence \"Resellers use Harbor login.\"",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer does not agree"
+       ],
+       "reviewer": {
+        "agree": false,
+        "reason": "The reference promises a Harbor login, but the proposed target is a section about logging on to a 'partner portal' in a different file, with no evidence it is Harbor and no earlier version of the target to confirm it; the match rests only on 'resellers' and a loosely similar 'log on' idea."
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "Pinecone sync",
@@ -95,7 +577,72 @@
      "proposed": "GUID-team-11.dita#offices/keep-in-step",
      "verdict": "review",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "pinecone.dita#pinecone/sync",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "pinecone"
+         },
+         "result": "1 files",
+         "chars": 189
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Pinecone sync"
+         },
+         "result": "1 files",
+         "chars": 267
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/offices.dita"
+         },
+         "result": "Working across offices, 1 ids",
+         "chars": 345
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "sync",
+          "tag": ""
+         },
+         "result": "0 elements",
+         "chars": 41
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/console_install.dita"
+         },
+         "result": "Putting the billing console in place, 1 ids",
+         "chars": 404
+        }
+       ],
+       "proposed": "GUID-team-11.dita#offices/keep-in-step",
+       "reason": "The team search maps 'Pinecone sync' to offices.dita. Its section 'keep-in-step' ('Keep folders in step across offices: each office sees the same folders within a minute') describes syncing between offices, which fits the sentence about branch offices. No file or element named pinecone or sync remains.",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer does not agree"
+       ],
+       "reviewer": {
+        "agree": false,
+        "reason": "The sentence points to 'Pinecone sync', a named feature, but the proposed section only says folders stay in step across offices and never mentions Pinecone. There is no earlier-version evidence linking the two, so the match rests on a loose topical overlap and the reader may not land on Pinecone syn"
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "Falcon tiers",
@@ -103,7 +650,54 @@
      "proposed": "GUID-team-13.dita#plans_and_fees",
      "verdict": "review",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "falcon.dita",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "falcon"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Falcon tiers"
+         },
+         "result": "1 files (1 more outside this map)",
+         "chars": 299
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/plans_and_fees.dita"
+         },
+         "result": "Plans and fees, 1 ids",
+         "chars": 330
+        }
+       ],
+       "proposed": "GUID-team-13.dita#plans_and_fees",
+       "reason": "No file named falcon exists. The team search maps 'Falcon tiers' to 'Plans and fees', whose section 'tiers' describes the three pricing tiers (Starter, Team, Enterprise). That fits a sentence about sales quotes.",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer does not agree"
+       ],
+       "reviewer": {
+        "agree": false,
+        "reason": "No evidence shows that 'Plans and fees' covers the Falcon tiers; there is no earlier-version content, and the target title does not mention Falcon or tiers, so the repair looks like a guess rather than a confirmed match."
+       }
+      }
+     ],
+     "tools_used": [
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "the Juniper export",
@@ -111,7 +705,75 @@
      "proposed": "",
      "verdict": "none",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "juniper.dita#juniper/export",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "juniper"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Juniper export"
+         },
+         "result": "1 files; the whole phrase found nothing, these were found by \"export\"",
+         "chars": 350
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/books.dita"
+         },
+         "result": "Closing the books, 1 ids",
+         "chars": 328
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "juniper",
+          "tag": ""
+         },
+         "result": "0 elements",
+         "chars": 41
+        },
+        {
+         "tool": "find_keys",
+         "args": {
+          "query": "juniper"
+         },
+         "result": "0 keys",
+         "chars": 33
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "export",
+          "tag": ""
+         },
+         "result": "1 elements",
+         "chars": 243
+        }
+       ],
+       "proposed": "",
+       "reason": "No file, element or key named 'juniper' exists anywhere in the repository. The team search did not recognise 'Juniper' either: it only matched the generic word 'export', which found the quarter-close section in books.dita, and nothing ties that section to Juniper.",
+       "checks": [],
+       "reviewer": null
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "find_keys",
+      "outline"
+     ]
     },
     {
      "link": "Otter alerts",
@@ -119,28 +781,94 @@
      "proposed": "",
      "verdict": "none",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "otter.dita#otter/alerts",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "otter"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Otter alerts"
+         },
+         "result": "0 files; the whole phrase found nothing, nor did: \"Otter\", \"alerts\"",
+         "chars": 207
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "alerts subscribe on-call",
+          "tag": ""
+         },
+         "result": "7 elements",
+         "chars": 1482
+        },
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "alerts notifications on-call"
+         },
+         "result": "8 files",
+         "chars": 995
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "alert",
+          "tag": ""
+         },
+         "result": "0 elements",
+         "chars": 41
+        },
+        {
+         "tool": "find_keys",
+         "args": {
+          "query": "otter alerts notification"
+         },
+         "result": "0 keys",
+         "chars": 33
+        }
+       ],
+       "proposed": "",
+       "reason": "otter.dita no longer exists. No file, element or key mentions Otter or alerts, including in the team's own search. Nothing in the repository covers subscribing on-call staff to alerts, so the content appears to have been removed.",
+       "checks": [],
+       "reviewer": null
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "find_keys"
+     ]
     }
    ]
   },
   {
    "run": 2,
-   "seconds": 80,
+   "seconds": 63,
    "references": 12,
    "scores": {
-    "right": 11,
-    "missed": 1
+    "right": 12
    },
    "applied_without_asking_and_wrong": 0,
    "verdicts": {
-    "review": 9,
-    "none": 3
+    "review": 10,
+    "none": 2
    },
-   "model_calls": 95,
+   "model_calls": 86,
    "failed_calls": 0,
-   "input_tokens": 263216,
-   "output_tokens": 11428,
-   "cost_usd": 0.89,
+   "input_tokens": 232487,
+   "output_tokens": 10869,
+   "cost_usd": 0.76,
    "rows": [
     {
      "link": "Kestrel setup",
@@ -148,7 +876,62 @@
      "proposed": "GUID-team-01.dita#console_install/install-console",
      "verdict": "review",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "kestrel.dita#kestrel/setup",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "kestrel setup"
+         },
+         "result": "1 files",
+         "chars": 162
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Kestrel setup"
+         },
+         "result": "1 files; the whole phrase found nothing, these were found by \"Kestrel\"",
+         "chars": 391
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/console_install.dita"
+         },
+         "result": "Putting the billing console in place, 1 ids",
+         "chars": 404
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/recommended.dita"
+         },
+         "result": "Recommended setup, 1 ids",
+         "chars": 343
+        }
+       ],
+       "proposed": "GUID-team-01.dita#console_install/install-console",
+       "reason": "The team search maps \"Kestrel\" to the billing console, and console_install.dita has the section \"Install the billing console\" (installer, licence, database). That matches the old setup section that has to be finished before the first invoice run.",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer does not agree"
+       ],
+       "reviewer": {
+        "agree": false,
+        "reason": "The reference points to the Kestrel setup, but the proposed target is a section about installing the billing console, and nothing links it to Kestrel; there is no earlier-version evidence showing the old target covered the same content, so a reader would likely not land on the Kestrel setup the sent"
+       }
+      }
+     ],
+     "tools_used": [
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "the Q-close",
@@ -156,15 +939,138 @@
      "proposed": "GUID-team-02.dita#books/close-quarter",
      "verdict": "review",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "finance.dita#finance/q-close",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "finance"
+         },
+         "result": "1 files",
+         "chars": 189
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "the Q-close"
+         },
+         "result": "1 files",
+         "chars": 258
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/books.dita"
+         },
+         "result": "Closing the books, 1 ids",
+         "chars": 328
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "quarter close",
+          "tag": ""
+         },
+         "result": "2 elements",
+         "chars": 461
+        }
+       ],
+       "proposed": "GUID-team-02.dita#books/close-quarter",
+       "reason": "The old id q-close and the link text 'the Q-close' match the section 'Close the quarter's books' (close-quarter) in books.dita. The team's search maps 'Q-close' to this topic. No finance.dita exists any more.",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer agrees"
+       ],
+       "reviewer": {
+        "agree": true,
+        "reason": "The broken reference pointed to the Q-close (quarter close) section in finance, and the proposed target is a section 'Close the quarter's books' about closing the quarter, which plausibly matches what a reader expects, though there is no earlier-version evidence to confirm it."
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "Open a Bluebird ticket",
      "old": "bluebird.dita#bluebird/open-ticket",
-     "proposed": "",
-     "verdict": "none",
-     "score": "missed",
-     "found_by": "finder"
+     "proposed": "GUID-team-03.dita#help/ask-help-desk",
+     "verdict": "review",
+     "score": "right",
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "bluebird.dita#bluebird/open-ticket",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "bluebird"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Open a Bluebird ticket"
+         },
+         "result": "1 files (1 more outside this map); the whole phrase found nothing, these were found by \"Bluebird\"",
+         "chars": 373
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/help.dita"
+         },
+         "result": "Getting help, 1 ids",
+         "chars": 300
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "ticket",
+          "tag": ""
+         },
+         "result": "0 elements",
+         "chars": 41
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "help desk",
+          "tag": ""
+         },
+         "result": "1 elements",
+         "chars": 226
+        }
+       ],
+       "proposed": "GUID-team-03.dita#help/ask-help-desk",
+       "reason": "No bluebird.dita exists. The team's search links \"Bluebird\" to help.dita, and its only section, \"Ask the help desk\", says to describe the problem and attach the invoice number. That fits raising a ticket about a stuck payment.",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer does not agree"
+       ],
+       "reviewer": {
+        "agree": false,
+        "reason": "The sentence promises a link to opening a Bluebird ticket, but the proposed target is a generic 'Ask the help desk' section that does not mention Bluebird or tickets, and no earlier-version evidence shows it replaced the original target."
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "the Atlas report",
@@ -172,7 +1078,64 @@
      "proposed": "GUID-team-04.dita#usage/monthly-usage",
      "verdict": "review",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "atlas.dita#atlas/report",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "atlas"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Atlas report"
+         },
+         "result": "1 files",
+         "chars": 248
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/usage.dita"
+         },
+         "result": "Reports, 1 ids",
+         "chars": 289
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "seat",
+          "tag": ""
+         },
+         "result": "3 elements",
+         "chars": 645
+        }
+       ],
+       "proposed": "GUID-team-04.dita#usage/monthly-usage",
+       "reason": "The team search maps \"Atlas report\" to usage.dita. Its only section, \"Monthly usage report\", covers seats per month, which fits \"Seat counts come from the Atlas report\". No file named atlas exists any more.",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer does not agree"
+       ],
+       "reviewer": {
+        "agree": false,
+        "reason": "The original reference points to 'the Atlas report' (atlas.dita#atlas/report) as the source of seat counts, but the proposed target is a generic 'Monthly usage report' section in usage.dita covering seats, storage and transfers; there is no earlier-version evidence and nothing ties it to Atlas, so i"
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "the night batch",
@@ -180,7 +1143,64 @@
      "proposed": "GUID-team-06.dita#schedules/two-am-transfers",
      "verdict": "review",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "batch.dita#batch/night",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "batch"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "the night batch"
+         },
+         "result": "1 files; the whole phrase found nothing, these were found by \"night batch\"",
+         "chars": 365
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/schedules.dita"
+         },
+         "result": "Scheduled work, 1 ids",
+         "chars": 340
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "large files night transfer",
+          "tag": "section"
+         },
+         "result": "4 elements",
+         "chars": 817
+        }
+       ],
+       "proposed": "GUID-team-06.dita#schedules/two-am-transfers",
+       "reason": "The team's search maps \"night batch\" to schedules.dita. Its section \"Scheduled transfers at 2 a.m.\" says files over a gigabyte are moved while offices are closed, which matches \"Large files are moved in the night batch.\"",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer agrees"
+       ],
+       "reviewer": {
+        "agree": true,
+        "reason": "The sentence says large files are moved in the night batch, and the proposed section describes 2 a.m. transfers of files over a gigabyte while offices are closed, which matches the night batch of large files, though there is no earlier-version evidence to confirm it."
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "the gold path",
@@ -188,7 +1208,81 @@
      "proposed": "GUID-team-08.dita#recommended/most-teams",
      "verdict": "review",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "paths.dita#paths/gold",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "paths"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "the gold path"
+         },
+         "result": "1 files; the whole phrase found nothing, these were found by \"gold path\"",
+         "chars": 368
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/recommended.dita"
+         },
+         "result": "Recommended setup, 1 ids",
+         "chars": 343
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "gold",
+          "tag": ""
+         },
+         "result": "0 elements",
+         "chars": 41
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "new customers",
+          "tag": ""
+         },
+         "result": "1 elements",
+         "chars": 249
+        },
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "gold"
+         },
+         "result": "0 files",
+         "chars": 35
+        }
+       ],
+       "proposed": "GUID-team-08.dita#recommended/most-teams",
+       "reason": "paths.dita is gone and nothing in the repository is named or titled 'gold'. The team search maps the team's phrase 'gold path' to recommended.dita. Its only section, 'Recommended setup for most teams', describes a default setup that fits 'New customers follow the gold path.'",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer does not agree"
+       ],
+       "reviewer": {
+        "agree": false,
+        "reason": "The reference promises 'the gold path' for new customers, but the proposed target is a 'Recommended setup for most teams' section (one console, two administrators, weekly backups), which is a different topic with no evidence of being the gold path, and no earlier version of the target was provided t"
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "the red card procedure",
@@ -196,7 +1290,73 @@
      "proposed": "GUID-team-09.dita#emergency/stop-all",
      "verdict": "review",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "safety.dita#safety/red-card",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "safety"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "red card procedure"
+         },
+         "result": "1 files",
+         "chars": 260
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/emergency.dita"
+         },
+         "result": "Emergencies, 1 ids",
+         "chars": 329
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "wrong customer",
+          "tag": ""
+         },
+         "result": "1 elements",
+         "chars": 249
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "red card",
+          "tag": ""
+         },
+         "result": "1 elements",
+         "chars": 222
+        }
+       ],
+       "proposed": "GUID-team-09.dita#emergency/stop-all",
+       "reason": "The team's search links 'red card procedure' to emergency.dita, whose only section, 'Stop all transfers in an emergency', fits the sentence about data going to the wrong customer. The id red-card in cards.dita matches the old id but is about red payment cards, which is a different subject.",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer does not agree"
+       ],
+       "reviewer": {
+        "agree": false,
+        "reason": "The reference promises a 'red card procedure' for data sent to the wrong customer, but the proposed target is a 'Stop all transfers in an emergency' section (Press Stop everything), which is a different procedure; there is no earlier-version evidence linking them and only the general 'emergency' the"
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "Harbor login",
@@ -204,7 +1364,64 @@
      "proposed": "GUID-team-10.dita#partners/partner-logon",
      "verdict": "review",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "harbor.dita#harbor/login",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "harbor"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Harbor login"
+         },
+         "result": "1 files; the whole phrase found nothing, these were found by \"Harbor\"",
+         "chars": 352
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/partners.dita"
+         },
+         "result": "For resellers, 1 ids",
+         "chars": 329
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "login",
+          "tag": ""
+         },
+         "result": "4 elements",
+         "chars": 874
+        }
+       ],
+       "proposed": "GUID-team-10.dita#partners/partner-logon",
+       "reason": "harbor.dita no longer exists. The team search connects \"Harbor\" to partners.dita (\"For resellers\"). Its section partner-logon, \"Log on to the partner portal: Resellers use the address and code from their contract\", matches both the link text \"Harbor login\" and the sentence \"Resellers use Harbor login\".",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer does not agree"
+       ],
+       "reviewer": {
+        "agree": false,
+        "reason": "The reference points to Harbor login (harbor.dita#harbor/login), but the proposed target is a section about logging on to the partner portal, a different product with no evidence it is the same thing as Harbor; only the word 'Resellers' and a general login concept match, and there is no earlier-vers"
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "Pinecone sync",
@@ -212,7 +1429,64 @@
      "proposed": "GUID-team-11.dita#offices/keep-in-step",
      "verdict": "review",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "pinecone.dita#pinecone/sync",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "pinecone"
+         },
+         "result": "1 files",
+         "chars": 189
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Pinecone sync"
+         },
+         "result": "1 files",
+         "chars": 267
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/offices.dita"
+         },
+         "result": "Working across offices, 1 ids",
+         "chars": 345
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "sync",
+          "tag": ""
+         },
+         "result": "0 elements",
+         "chars": 41
+        }
+       ],
+       "proposed": "GUID-team-11.dita#offices/keep-in-step",
+       "reason": "The team's search links 'Pinecone sync' to offices.dita. Its section 'Keep folders in step across offices' (each office sees the same folders within a minute) describes syncing for branch offices, as the sentence does. The old link pointed at an element ('sync'), so the section is the closest match.",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer does not agree"
+       ],
+       "reviewer": {
+        "agree": false,
+        "reason": "The original reference pointed to a 'Pinecone sync' topic/element, but the proposed target is a generic section about keeping folders in step across offices that never mentions Pinecone, and there is no earlier-version evidence showing it is the same content, so it is likely a different thing sharin"
+       }
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "Falcon tiers",
@@ -220,7 +1494,62 @@
      "proposed": "GUID-team-13.dita#plans_and_fees",
      "verdict": "review",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "falcon.dita",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "falcon"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Falcon tiers"
+         },
+         "result": "1 files (1 more outside this map)",
+         "chars": 299
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/plans_and_fees.dita"
+         },
+         "result": "Plans and fees, 1 ids",
+         "chars": 330
+        },
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "tiers"
+         },
+         "result": "0 files",
+         "chars": 35
+        }
+       ],
+       "proposed": "GUID-team-13.dita#plans_and_fees",
+       "reason": "No file named falcon exists. The team search links \"Falcon tiers\" to 'Plans and fees', whose only section (id 'tiers') describes the three pricing tiers Starter, Team and Enterprise. That fits a sentence about sales quotes. The old link pointed at a whole file, so the repair points at the topic.",
+       "checks": [
+        "target was shown to the agent by a tool",
+        "rewritten reference resolves",
+        "reviewer does not agree"
+       ],
+       "reviewer": {
+        "agree": false,
+        "reason": "No evidence shows that 'Plans and fees' covers the Falcon tiers: there is no earlier-version content for the broken target, and the title names no Falcon product or tier, so the repair looks like a guess rather than a confirmed match."
+       }
+      }
+     ],
+     "tools_used": [
+      "find_files",
+      "find_in_team_search",
+      "outline"
+     ]
     },
     {
      "link": "the Juniper export",
@@ -228,7 +1557,75 @@
      "proposed": "",
      "verdict": "none",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "juniper.dita#juniper/export",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "juniper"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Juniper export"
+         },
+         "result": "1 files; the whole phrase found nothing, these were found by \"export\"",
+         "chars": 350
+        },
+        {
+         "tool": "outline",
+         "args": {
+          "path": "content/dam/team-demo/books.dita"
+         },
+         "result": "Closing the books, 1 ids",
+         "chars": 328
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "juniper",
+          "tag": ""
+         },
+         "result": "0 elements",
+         "chars": 41
+        },
+        {
+         "tool": "find_keys",
+         "args": {
+          "query": "juniper"
+         },
+         "result": "0 keys",
+         "chars": 33
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "export",
+          "tag": ""
+         },
+         "result": "1 elements",
+         "chars": 243
+        }
+       ],
+       "proposed": "",
+       "reason": "No file, element or key named Juniper exists in the repository, and the team search matched only the generic word \"export\", not \"Juniper\". The only hit, books.dita#books/close-quarter (closing the quarter's books, which includes exporting totals), shows no sign that it is the Juniper export. The sentence's past tense (\"used to ask\") also suggests the export was retired.",
+       "checks": [],
+       "reviewer": null
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "find_keys",
+      "outline"
+     ]
     },
     {
      "link": "Otter alerts",
@@ -236,7 +1633,92 @@
      "proposed": "",
      "verdict": "none",
      "score": "right",
-     "found_by": "finder"
+     "found_by": "finder",
+     "finder_runs": [
+      {
+       "old": "otter.dita#otter/alerts",
+       "steps": [
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "otter"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_in_team_search",
+         "args": {
+          "query": "Otter alerts"
+         },
+         "result": "0 files; the whole phrase found nothing, nor did: \"Otter\", \"alerts\"",
+         "chars": 207
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "alerts",
+          "tag": ""
+         },
+         "result": "0 elements",
+         "chars": 41
+        },
+        {
+         "tool": "find_keys",
+         "args": {
+          "query": "otter"
+         },
+         "result": "0 keys",
+         "chars": 33
+        },
+        {
+         "tool": "find_files",
+         "args": {
+          "query": "alert"
+         },
+         "result": "0 files",
+         "chars": 35
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "on-call",
+          "tag": ""
+         },
+         "result": "7 elements",
+         "chars": 1482
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "notification",
+          "tag": ""
+         },
+         "result": "2 elements",
+         "chars": 467
+        },
+        {
+         "tool": "find_elements",
+         "args": {
+          "query": "subscribe",
+          "tag": ""
+         },
+         "result": "0 elements",
+         "chars": 41
+        }
+       ],
+       "proposed": "",
+       "reason": "No file, element, key or team-vocabulary entry for 'Otter' or alerts exists in the repository; searches for on-call, notification and subscribe found only unrelated sections (partner logon, console install, emergency stop, schedules).",
+       "checks": [],
+       "reviewer": null
+      }
+     ],
+     "tools_used": [
+      "find_elements",
+      "find_files",
+      "find_in_team_search",
+      "find_keys"
+     ]
     }
    ]
   }
