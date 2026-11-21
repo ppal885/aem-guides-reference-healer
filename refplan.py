@@ -236,9 +236,11 @@ FINDER_TOKENS_KEY = "finder-tokens"     # in the findings cache: what a finder s
 # What the planner is guessed to spend after its finder agents are done (deciding, checking again), kept
 # out of the limit for finders so the check ends near the limit, not past it. On a customer export
 # (21 Nov 2026) it was about 72,000 in cost terms and the check ended at 338,860 against 300,000; in the
-# next check, where the planner read its overview pages before the finders, it was 18,309.
+# next check, where the planner read its overview pages before the finders, it was 18,309, then 10,256
+# and 28,257. Since its overview leaves out the groups already decided, the planner's whole share of a
+# finder check was about 14,000 tokens in, so 20,000 is the guess for a content's first check.
 # After a check the planner's own figure is kept in the findings cache and used instead.
-PLANNER_CLOSING_TOKENS = int(os.environ.get("REFHEAL_PLANNER_CLOSING_TOKENS", "72000"))
+PLANNER_CLOSING_TOKENS = int(os.environ.get("REFHEAL_PLANNER_CLOSING_TOKENS", "20000"))
 PLANNER_CLOSING_KEY = "planner-closing-tokens"
 OVERVIEW_PAGE_CHARS = 14000   # one overview page, under agentloop.MAX_RESULT_CHARS (16,000)
 # decide and apply_and_recheck name at most this many group ids and give the full count. Every
@@ -263,7 +265,7 @@ PLANNER_SYSTEM = """You are in charge of repairing the broken references of one 
 A clean-up of shared content broke many references: ids and keys were renamed, content was reworded, moved, merged or removed. Your job is to get as many references as possible pointing at the right thing again with as few and as safe edits as possible, and to hand the author a short, clear list of what only a person can decide.
 
 You work with tools:
-- overview: the broken references of the current round, grouped by what they point at, a page at a time. A group may already carry a repair that code proved from the file's version history. Targets that nothing in the files names are counted apart (nothing_names_them): code already listed them for the author; they are not unreviewed. Groups already decided, and groups waiting for the next check, are counted apart too (already_decided, waiting_for_the_next_check) and are not on the pages.
+- overview: the broken references of the current round, grouped by what they point at, a page at a time. A group may already carry a repair that code proved from the file's version history. Targets that nothing in the files names are counted apart (nothing_names_them): code already listed them for the author; they are not unreviewed. Groups already decided, and groups waiting for the next check, are counted apart too (already_decided, waiting_for_the_next_check) and are not on the pages. The next check looks at the waiting ones by itself: they are not for the author to review, so do not send the author to them in your summary.
 - investigate: give groups without a repair to finder agents. Each answer is checked by a reviewer agent. Send all such groups in one call; they run in parallel.
 - decide: choose what to do with one or more groups, with your reason.
 - apply_and_recheck: apply your decisions to a working copy and scan again. References that are still broken, or newly broken, come back as the next round.
@@ -831,7 +833,8 @@ class Session:
         if waits:
             out["waiting_for_the_next_check"] = {
                 "groups": len(waits), "references": sum(len(g["refs"]) for g in waits),
-                "note": "Not looked at in this check (limit reached or the model did not answer); they get the safe default."}
+                "note": "Not looked at in this check (its limit, the most it takes a check, or the model did not answer); the next "
+                        "check looks at them by itself. They are not for the author to review: do not send the author to them."}
         if unnamed:
             out["nothing_names_them"] = {
                 "groups": len(unnamed), "references": sum(len(g["refs"]) for g in unnamed),
@@ -877,20 +880,42 @@ class Session:
         reserve = min(self.planner_closing(), self.token_budget // 2)
 
         def projected_unlocked():
-            """Tokens of this check so far, plus what the finders still running will likely spend. Each
-            running finder counts as the largest of: what it has spent itself so far (its own calls,
-            counted by thread), the average of the finders done in this check, and first_guess. Without
-            the running ones, 8 finders at a time took a 300,000 limit to 638,663 on a customer export.
-            The finders that end first are the cheap ones (21 Nov 2026: the first three about 24,000, the
-            last three about 34,500), so the average of the finished alone took a check to 357,422.
+            """Tokens of this check so far, plus what the finders still running will likely spend still.
+            Each running finder counts in all as the larger of what it has spent itself so far (its own
+            calls, counted by thread) and the average of the finders done in this check or first_guess.
+            What it has spent is already in the tokens so far, so only the rest is added: counting it
+            twice stopped a customer check at 152,700 of 300,000 with 8 finders (21 Nov 2026: 108,104
+            spent, of it 93,501 by 7 running finders, counted again on top). Without the running ones,
+            8 finders at a time took a 300,000 limit to 638,663 on a customer export. The finders that
+            end first are the cheap ones (21 Nov 2026: the first three about 24,000, the last three
+            about 34,500), so the average of the finished alone took a check to 357,422.
             Called with count_lock held."""
-            average = max(running["spent"] / running["done"], first_guess) if running["done"] else first_guess
+            average = finder_guess()
             return usage.cost_since(self.token_mark) + sum(
-                max(usage.cost_since(mark, thread=thread), average) for thread, mark in started_at.items())
+                max(average - usage.cost_since(mark, thread=thread), 0) for thread, mark in started_at.items())
+
+        def finder_guess():
+            """What one finder will likely spend in all: the average of the finders done in this check,
+            and never less than first_guess. Called with count_lock held."""
+            return max(running["spent"] / running["done"], first_guess) if running["done"] else first_guess
 
         def run(group):
             with self.count_lock:
-                over = bool(self.token_budget) and projected_unlocked() >= self.token_budget - reserve
+                projected = projected_unlocked() if self.token_budget else 0
+                # The finder about to start counts too: without it the last one started just under the
+                # limit and took a customer check to 316,935 of 300,000 (21 Nov 2026), about one finder over.
+                over = bool(self.token_budget) and projected + finder_guess() > self.token_budget - reserve
+                if over and not running.get("held"):
+                    # The first finder held back: what the limit was made of, to see which part stops it.
+                    running["held"] = True
+                    spent_so_far = usage.cost_since(self.token_mark)
+                    self.log("finder limit reached: spent so far %s, %d finders running counted as %s more "
+                             "(their own spend so far %s), kept for the planner %s, limit %s" % (
+                                 format(round(spent_so_far), ","), len(started_at),
+                                 format(round(projected - spent_so_far), ","),
+                                 format(round(sum(usage.cost_since(mark, thread=thread)
+                                                  for thread, mark in started_at.items())), ","),
+                                 format(reserve, ","), format(self.token_budget, ",")))
                 if not over:
                     running["now"] += 1
                     started_at[threading.get_ident()] = usage.position()

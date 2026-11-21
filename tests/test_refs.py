@@ -1109,9 +1109,9 @@ class TokenLimitCountsRunningFinders(unittest.TestCase):
             timer = threading.Timer(0.3, gate.set)
             timer.start()
             session.tool_investigate({"group_ids": list(session.current["groups"])})
-        # 0, 7,000 and 14,000 projected let three start; a fourth would make 21,000.
-        self.assertEqual(len(started), 3)
-        self.assertIn("Limit for this check: 20,000 in cost terms (cached input a tenth, output five times), counting the finders still running; 3 finder agents started.",
+        # The finder about to start counts too: 7,000 and 14,000 let two start; a third would make 21,000.
+        self.assertEqual(len(started), 2)
+        self.assertIn("Limit for this check: 20,000 in cost terms (cached input a tenth, output five times), counting the finders still running; 2 finder agents started.",
                       " ".join(session.plan))
 
 
@@ -1182,23 +1182,24 @@ class TokenLimitKeepsRoomForThePlanner(unittest.TestCase):
         self.assertEqual(cache[refplan.PLANNER_CLOSING_KEY]["spent"], 4500)
 
 
-class TokenLimitCountsACostlyRunningFinderAtItsOwnSpend(unittest.TestCase):
-    """A finder still running that has already spent more than the guess counts at what it spent: the
-    finders that end late are the costly ones, and the guess alone let a check go past its limit."""
+class TokenLimitCountsARunningFinderOnce(unittest.TestCase):
+    """A finder still running counts in all at the larger of what it has spent and the guess, and what
+    it has spent is counted once: it is already in the check's tokens. Counted twice, a customer check
+    stopped at 152,700 of 300,000; counted at the guess alone, the costly late finders took one past it."""
 
-    def test_no_finder_starts_while_a_running_one_has_used_up_the_room(self):
+    def started(self, budget, guess, first_spends):
         lib = '<topic id="lib"><title>Lib</title><body><note id="kept">Kept.</note></body></topic>'
         refs = "".join('<ph conref="GUID-lib.dita#lib/gone%d"/>' % i for i in range(2))
         files = [{"id": "GUID-lib", "path": "/d/lib.dita", "xml": lib, "previous": []},
                  {"id": "GUID-t1", "path": "/d/t1.dita", "previous": [],
                   "xml": '<topic id="t1"><title>T1</title><body><p>%s</p></body></topic>' % refs}]
-        session = refplan.Session(files, log=lambda message: None, token_budget=40000)
+        session = refplan.Session(files, log=lambda message: None, token_budget=budget)
         started, spent, gate = [], threading.Event(), threading.Event()
 
         def finder(*args, **kwargs):
             started.append(args[1]["value"])
             if len(started) == 1:
-                usage.note(True, 30000, 0)       # the first one has spent 30,000 and is still running
+                usage.note(True, first_spends, 0)   # the first one has spent this and is still running
                 spent.set()
                 gate.wait(2)
             return {"new_value": None, "verdict": "none", "candidates": [], "reason": "x", "caveat": "", "review": None}
@@ -1219,12 +1220,22 @@ class TokenLimitCountsACostlyRunningFinderAtItsOwnSpend(unittest.TestCase):
                 gate.set()
                 first.join()
                 return results
-        with mock.patch.object(refplan, "FINDER_TOKENS", 5000), mock.patch.object(refplan, "PLANNER_CLOSING_TOKENS", 0), \
+        with mock.patch.object(refplan, "FINDER_TOKENS", guess), mock.patch.object(refplan, "PLANNER_CLOSING_TOKENS", 0), \
                 mock.patch.object(refplan.refheal, "heal_one", side_effect=finder), \
                 mock.patch.object(refplan.concurrent.futures, "ThreadPoolExecutor", lambda max_workers: SecondStartsWhileFirstRuns()):
             session.tool_investigate({"group_ids": list(session.current["groups"])})
-        # 30,000 spent and the running finder counted at its 30,000, not at the 5,000 guess: 60,000.
-        self.assertEqual(len(started), 1)
+        return len(started)
+
+    def test_a_cheap_running_finder_adds_only_the_rest_of_the_guess(self):
+        # 10,000 spent by the running finder, guess 25,000: 10,000 + 15,000 still to come = 25,000, and
+        # 25,000 for the second one = 50,000, under 55,000. Counting the 10,000 twice made it 60,000.
+        self.assertEqual(self.started(55000, 25000, 10000), 2)
+
+    def test_a_costly_running_finder_counts_at_its_own_spend(self):
+        # 30,000 spent, guess 5,000: it counts at its 30,000, not 30,000 + 30,000; with 5,000 for the
+        # second one that is 35,000.
+        self.assertEqual(self.started(34000, 5000, 30000), 1)
+        self.assertEqual(self.started(36000, 5000, 30000), 2)
 
 
 class _OneAtATime:
@@ -1314,7 +1325,7 @@ class OverviewInPages(unittest.TestCase):
         with mock.patch.object(refplan, "PLANNER_CLOSING_TOKENS", 0), mock.patch.object(refplan.refheal, "heal_one", side_effect=finder):
             threading.Timer(0.3, gate.set).start()
             session.tool_investigate({"group_ids": ["all"]})
-        self.assertEqual(len(started), 4)         # 0, 30,000, 60,000, 90,000 projected; a fifth would make 120,000
+        self.assertEqual(len(started), 3)         # each start counts itself: 30,000, 60,000, 90,000; a fourth would make 120,000
         self.assertEqual(cache[refplan.FINDER_TOKENS_KEY]["average"], 30000)
 
 
