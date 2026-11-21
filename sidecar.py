@@ -225,8 +225,24 @@ def _alt_images(map_path):
         if kept and kept[0] is files and kept[1] is assets:
             return kept[2]
         found = alttext.images(files, assets, missing)
-        ALT[map_path or ""] = (files, assets, found)
+        ALT[map_path or ""] = (files, assets, found, None)
         return found
+
+
+def _alt_vocabulary(map_path):
+    """The map's own names and alt texts (alttext.vocabulary), found once a check, when an author
+    first asks for a suggestion: the list of images does not wait for it."""
+    import alttext
+    if _alt_images(map_path) is None:
+        return None
+    with _alt_lock(map_path):
+        files, assets, found, vocab = ALT[map_path or ""]
+        if vocab is None:
+            vocab = alttext.vocabulary(files)
+            ALT[map_path or ""] = (files, assets, found, vocab)
+            _log("alt names: %d names, %d keys, alt texts in %d topics"
+                 % (len(vocab["names"]), len(vocab["keys"]), len(vocab["alts"])))
+        return vocab
 
 
 def _alt_lock(map_path):
@@ -303,13 +319,15 @@ def suggest_alt(body, model=None):
     data = base64.b64decode(body.get("image_base64") or "", validate=True)
     if not data or len(data) > 5 * 1024 * 1024:
         raise ValueError("the image is empty or larger than 5 MB")
+    vocab = _alt_vocabulary(body.get("map"))
+    prompt = alttext.prompt_for(group, vocab)
     mark = usage.start()
     try:
         with usage.as_agent("alt"):
-            answer = call_model(alttext.SYSTEM, alttext.prompt_for(group), model, image=(data, media))
+            answer = call_model(alttext.SYSTEM, prompt, model, image=(data, media))
     finally:
         cost = usage.finish(mark)
-    return dict(alttext.clean(answer, group["image"]), id=group["id"], image=group["image"],
+    return dict(alttext.clean(answer, group["image"], vocab, prompt), id=group["id"], image=group["image"],
                 model_calls=cost["model_calls"], input_tokens=cost["input_tokens"],
                 output_tokens=cost["output_tokens"], cost_usd=cost["cost_usd"])
 

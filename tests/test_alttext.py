@@ -113,6 +113,81 @@ class SuggestingAnAlt(unittest.TestCase):
             sidecar.LAST_FILES.clear()
 
 
+MAP = {"path": "/d/guide.ditamap", "xml": '<map><keydef keys="product prod"><topicmeta><keywords><keyword>LX4400'
+       '</keyword></keywords></topicmeta></keydef><keydef keys="nameless" href="x.dita"/></map>'}
+
+
+class TheDocumentationsOwnNames(unittest.TestCase):
+    """The names and alt texts a suggestion is given, so it writes them as this documentation does."""
+
+    def files(self):
+        return [MAP,
+                topic("a", '<p>Open <uicontrol>Service Menus</uicontrol> on the <keyword>4410-RCX</keyword> '
+                           '<tm trademark="Ledgerline">Ledgerline</tm> server.</p>'
+                           '<image href="a.png"><alt>Rear of the 4410-RCX cache drawer</alt></image>'),
+                topic("b", '<p>The <keyword>4410-RCX</keyword> and <wintitle>Cluster Summary</wintitle>.</p>'
+                           '<image href="b.png"><alt>b.png</alt></image>'
+                           '<image href="c.png"><alt>Cluster Summary page of the LX4400</alt></image>')]
+
+    def test_names_keys_and_written_alts_are_found(self):
+        vocab = alttext.vocabulary(self.files())
+        self.assertEqual(vocab["keys"], {"product": "LX4400", "prod": "LX4400"})
+        self.assertEqual(vocab["names"], {"4410-RCX": 2, "Ledgerline": 1})        # <uicontrol>, <wintitle>: only per topic
+        self.assertEqual(vocab["by_file"]["/d/a.dita"], ["Service Menus", "4410-RCX", "Ledgerline"])
+        self.assertEqual(vocab["alts"], {"/d/a.dita": ["Rear of the 4410-RCX cache drawer"],
+                                         "/d/b.dita": ["Cluster Summary page of the LX4400"]})
+
+    def test_the_prompt_gives_the_topics_names_the_keys_and_examples(self):
+        vocab = alttext.vocabulary(self.files())
+        group = {"image": "/d/z.png", "uses": [{"file": "/d/b.dita", "topic_title": "T b", "figure_title": "", "context": "x"}]}
+        text = alttext.prompt_for(group, vocab)
+        self.assertIn("Names this documentation uses: 4410-RCX; Cluster Summary; Ledgerline", text)
+        self.assertIn("Names with a key: prod = LX4400; product = LX4400", text)
+        self.assertIn("- Cluster Summary page of the LX4400\n- Rear of the 4410-RCX cache drawer", text)
+        self.assertNotIn("Names", alttext.prompt_for(group))
+        self.assertIn("keyword keyref", alttext.SYSTEM)
+
+    def test_a_key_the_map_has_is_kept_and_the_reader_hears_its_name(self):
+        vocab = alttext.vocabulary(self.files())
+        out = alttext.clean({"alt": 'Front of the <keyword keyref="product"/> cache & drawer', "confident": True}, "z.png", vocab)
+        self.assertEqual(out["alt"], 'Front of the <keyword keyref="product"/> cache &amp; drawer')
+        self.assertEqual(out["caveat"], "")
+
+    def test_what_an_alt_cannot_hold_is_left_out_with_a_word_why(self):
+        vocab = alttext.vocabulary(self.files())
+        out = alttext.clean({"alt": 'The <b>cache</b> of the <keyword keyref="nope"/> <ph>LX4400</ph>'}, "z.png", vocab)
+        self.assertEqual(out["alt"], "The cache of the <ph>LX4400</ph>")
+        self.assertIn('left out what an alt cannot hold here: <b>, <keyword keyref="nope">', out["caveat"])
+        broken = alttext.clean({"alt": "The <ph>cache drawer"}, "z.png", vocab)
+        self.assertEqual((broken["alt"], "not well formed" in broken["caveat"]), ("The cache drawer", True))
+
+    def test_a_model_number_not_in_the_documentation_is_pointed_out(self):
+        vocab = alttext.vocabulary(self.files())
+        out = alttext.clean({"alt": "Rear of the 4410-RCY and 4410-RCX drawers in a LX4490"}, "z.png", vocab, "Image: z.png")
+        self.assertEqual(out["caveat"], "not found in this documentation, check it: 4410-RCY, LX4490")
+        given = alttext.clean({"alt": "Rear of the 4410-RCY drawer"}, "z.png", vocab, "Around it: the 4410-RCY drawer")
+        self.assertEqual(given["caveat"], "")
+        plain = alttext.clean({"alt": "Rear of the 4410-RCY drawer & cable"}, "z.png")
+        self.assertEqual((plain["alt"], plain["caveat"]), ("Rear of the 4410-RCY drawer & cable", ""))
+
+    def test_the_sidecar_sends_the_names_with_the_image(self):
+        import sidecar
+        files = self.files() + [topic("c", '<p>Cable it.</p><image href="d.png"/>')]
+        seen = {}
+
+        def model(system, user, model=None, image=None):
+            seen["user"] = user
+            return {"alt": 'Cabling of the <keyword keyref="product"/>', "confident": True, "reason": "r"}
+        with mock.patch.dict(sidecar.LAST_FILES, {"/m.ditamap": files}), \
+                mock.patch.dict(sidecar.LAST_ASSETS, {"/m.ditamap": (None, None)}), \
+                mock.patch.dict(sidecar.ALT, {}, clear=True), mock.patch.object(sidecar, "call_model", side_effect=model):
+            group = next(g for g in sidecar.alt_of("/m.ditamap")["images"] if g["image"].endswith("d.png"))
+            out = sidecar.suggest_alt({"map": "/m.ditamap", "id": group["id"], "media_type": "image/png",
+                                       "image_base64": base64.b64encode(b"\x89PNG").decode()})
+        self.assertIn("Names with a key: prod = LX4400; product = LX4400", seen["user"])
+        self.assertEqual(out["alt"], 'Cabling of the <keyword keyref="product"/>')
+
+
 class TheListIsFoundOnceACheck(unittest.TestCase):
     """Reading every topic of a large map takes seconds: the card and each suggestion use the list
     found for the check, and a new check finds it again."""
