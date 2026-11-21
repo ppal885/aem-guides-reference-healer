@@ -169,7 +169,7 @@ Read the "Measured" table and the limits in the README. The short version, to ke
 4. **Scale.** The budget of 40 targets per check is unit-tested only. References to files a build generates count as broken when content comes as plain files.
 5. **Condition presets, `ditavalref`, flagging and baselines** are not evaluated for the per-output counts.
 6. **The live list and the memory go through a local sidecar.** In the product they belong to the report job and the Guides AI service.
-8. **The branch name**: done on 15 Nov 2026, the work is on `garage/reference-healer` in both repositories. Not pushed.
+8. **Where the work is** (21 Nov 2026): this repository is on `main`, pushed to the public repository; the editor work is on `garage/reference-healer` in the internal fork, pushed.
 9. The small sample `ref-demo` was uploaded to AEM by hand; there is no loader for it.
 
 ## Where things are
