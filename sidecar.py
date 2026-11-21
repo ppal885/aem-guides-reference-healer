@@ -219,9 +219,7 @@ def _alt_images(map_path):
     if not files:
         return None
     assets, missing = LAST_ASSETS.get(map_path or "", (None, None))
-    with _ALT_LOCKS_LOCK:
-        lock = _ALT_LOCKS.setdefault(map_path or "", __import__("threading").Lock())
-    with lock:
+    with _alt_lock(map_path):
         kept = ALT.get(map_path or "")
         # The same objects the check stored (held here, so they cannot be freed and their ids reused).
         if kept and kept[0] is files and kept[1] is assets:
@@ -229,6 +227,42 @@ def _alt_images(map_path):
         found = alttext.images(files, assets, missing)
         ALT[map_path or ""] = (files, assets, found)
         return found
+
+
+def _alt_lock(map_path):
+    with _ALT_LOCKS_LOCK:
+        return _ALT_LOCKS.setdefault(map_path or "", __import__("threading").Lock())
+
+
+def alt_written(map_path, entries):
+    """An author wrote alt texts (the audit entries of an Apply): the kept list says so at once, as
+    the next check would, so a card opened again does not list them. The check's files are not
+    changed; the next check finds the list again from the files it sends. Returns the places marked."""
+    import html
+    written = [e for e in entries if isinstance(e, dict) and e.get("attribute") == "alt"] if isinstance(entries, list) else []
+    if not written:
+        return 0
+    marked = 0
+    with _alt_lock(map_path):
+        kept = ALT.get(map_path or "")
+        if not kept:
+            return 0
+        found = kept[2]
+        for entry in written:
+            now = str(entry.get("now") or "")
+            for group in found:
+                for use in group["uses"]:
+                    if use["file"] == entry.get("file") and use["location"] == entry.get("location"):
+                        use.update(alt=" ".join(html.unescape(re.sub(r"<[^>]+>", " ", now)).split()), why=None,
+                                   alt_xml=now if re.search(r"<\w", now) else "")
+                        marked += 1
+        for group in list(found):
+            weak = [u for u in group["uses"] if u["why"]]
+            if weak:
+                group.update(weak_uses=len(weak), why=weak[0]["why"])
+            else:
+                found.remove(group)     # the other images keep their ids
+    return marked
 
 
 def alt_of(map_path):
@@ -405,6 +439,8 @@ def serve(port, model=None):
                     body = json.loads(self.rfile.read(length).decode("utf-8"))
                     stored = audit.record(body.get("map"), body.get("accepted_by"), body.get("entries"))
                     _log("audit record: %d references added" % stored)
+                    if alt_written(body.get("map"), body.get("entries")):
+                        _log("alt list: written alt texts taken off")
                     self.send_json(200, {"recorded": stored})
                 except (ValueError, AttributeError, TypeError) as exc:
                     self.send_json(400, {"error": str(exc)})

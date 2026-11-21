@@ -13,6 +13,7 @@ distinct images; none of them had an alt written in another place to reuse.
 """
 import os
 import re
+from xml.sax.saxutils import escape as xml_escape
 import urllib.parse
 import xml.etree.ElementTree as ET
 
@@ -31,6 +32,26 @@ def _local(tag):
 
 def _text(el):
     return re.sub(r"\s+", " ", "".join(el.itertext())).strip() if el is not None else ""
+
+
+# Inline elements that say something by reference: <keyword keyref="product"/> is the product's name
+# when the topic is published, though the alt has no words of its own here.
+_REFERENCES = ("keyref", "conref", "conkeyref")
+
+
+def _says_by_reference(alt_el):
+    return alt_el is not None and any(el.get(a) for el in alt_el.iter() if el is not alt_el for a in _REFERENCES)
+
+
+def _inner_xml(alt_el):
+    """The alt's own markup when it holds elements (<keyword>, <ph>, <text>), '' when it is plain text:
+    the editor shows it so an edit keeps them. Namespaces are dropped (DITA has none here)."""
+    if alt_el is None or len(alt_el) == 0:
+        return ""
+    out = xml_escape(alt_el.text or "")
+    for child in alt_el:
+        out += re.sub(r' xmlns(:\w+)?="[^"]*"', "", ET.tostring(child, encoding="unicode"))
+    return out
 
 
 def why_weak(alt, image_path):
@@ -150,10 +171,11 @@ def images(files, assets=None, missing=None):
                 continue
             alt_el = next((c for c in el if _local(c.tag) == "alt"), None)
             alt = _text(alt_el) if alt_el is not None else el.get("alt")
-            why = why_weak(alt, image)
+            why = None if _says_by_reference(alt_el) else why_weak(alt, image)
             figure_title, around = _context(el, parents)
             use = {"file": "/" + path, "location": _where(path, root, el, parents), "topic_title": title,
-                   "figure_title": figure_title, "context": around, "alt": alt or "", "why": why}
+                   "figure_title": figure_title, "context": around, "alt": alt or "", "why": why,
+                   "alt_xml": _inner_xml(alt_el)}
             found.setdefault(image, []).append(use)
     out = []
     for image, uses in found.items():
