@@ -18,3 +18,5 @@ python3 -m unittest discover -s tests
 ```
 
 For a change in how repairs are decided, also run `python3 planeval.py --runs 3` and `python3 rankeval.py --runs 2` (they call the model and take minutes) and update the "Measured" table in the README with what came out. For a change in a system prompt, also run `python3 injecteval.py --runs 2`.
+
+For a change in what a Fix or a Share writes (editor `fix_all.ts`, `copy_apply.ts`, `copy_bulk.ts`, `copy_keys.ts`), run it on a sample in local AEM and then `python3 aftercheck.py --map <the map>`: it runs the map's check in AEM and fails when AEM's own report calls something the Fix wrote broken. On 19 Nov 2026 a Fix that looked right in the editor left 360 references AEM called broken, unseen for three days.
