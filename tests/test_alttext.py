@@ -51,6 +51,25 @@ class FindingImagesWithoutAlt(unittest.TestCase):
         self.assertEqual(alttext.images(files), [])
 
 
+class AltWithInlineElements(unittest.TestCase):
+    """<keyword>, <ph> and <text> inside <alt>: kept for the editor, and a reference says something."""
+
+    def test_the_markup_goes_to_the_editor_and_plain_text_does_not(self):
+        files = [topic("a", '<p><image href="i.png"><alt>The <keyword keyref="prod"/> console &amp; '
+                            '<ph conref="w.dita#w/esd"/> sign</alt></image></p>'
+                            '<p><image href="i.png"><alt>i.png</alt></image></p>')]
+        uses = alttext.images(files)[0]["uses"]
+        self.assertEqual(uses[0]["alt_xml"], 'The <keyword keyref="prod" /> console &amp; <ph conref="w.dita#w/esd" /> sign')
+        self.assertEqual(uses[0]["alt"], "The console & sign")
+        self.assertIsNone(uses[0]["why"])
+        self.assertEqual(uses[1]["alt_xml"], "")
+
+    def test_an_alt_that_is_only_a_reference_says_something(self):
+        files = [topic("a", '<p><image href="i.png"><alt><keyword keyref="prod-diagram"/></alt></image></p>'
+                            '<p><image href="j.png"><alt><ph conkeyref="img/rear"/></alt></image></p>')]
+        self.assertEqual(alttext.images(files), [])
+
+
 class SuggestingAnAlt(unittest.TestCase):
     def test_a_leading_image_of_is_dropped_and_a_long_text_shortened(self):
         out = alttext.clean({"alt": "Screenshot of the Close period dialog", "confident": True}, "x.png")
@@ -136,6 +155,46 @@ class TheListIsFoundOnceACheck(unittest.TestCase):
         self.assertEqual(found.call_count, 1)
         self.assertEqual(len(answers), 3)
         self.assertTrue(all(answer == answers[0] for answer in answers))
+
+    def kept(self, files):
+        import sidecar
+        return mock.patch.dict(sidecar.LAST_FILES, {"/m.ditamap": files}), \
+            mock.patch.dict(sidecar.LAST_ASSETS, {"/m.ditamap": (None, None)}), mock.patch.dict(sidecar.ALT, {}, clear=True)
+
+    def test_an_alt_written_is_taken_off_the_list_until_the_next_check(self):
+        import sidecar
+        files = [topic("a", '<p><image href="i.png"/></p><p><image href="i.png"/></p>'),
+                 topic("b", '<p><image href="j.png"/></p>')]
+        one, two, three = self.kept(files)
+        with one, two, three:
+            before = sidecar.alt_of("/m.ditamap")["images"]
+            ids = {g["image"]: g["id"] for g in before}
+            first = before[0]["uses"][0]
+            written = {"file": first["file"], "location": first["location"], "attribute": "alt", "was": "(no alt text)",
+                       "now": 'Rear of the <keyword keyref="prod"/> server &amp; fans'}
+            self.assertEqual(sidecar.alt_written("/m.ditamap", [written]), 1)
+            after = sidecar.alt_of("/m.ditamap")["images"]
+            self.assertEqual(after[0]["weak_uses"], 1)
+            self.assertEqual(after[0]["uses"][0]["why"], None)
+            self.assertEqual(after[0]["uses"][0]["alt"], "Rear of the server & fans")
+            self.assertEqual(after[0]["uses"][0]["alt_xml"], 'Rear of the <keyword keyref="prod"/> server &amp; fans')
+            rest = dict(written, location=after[0]["uses"][1]["location"], now="Rear of the server")
+            sidecar.alt_written("/m.ditamap", [rest])
+            left = sidecar.alt_of("/m.ditamap")["images"]
+            self.assertEqual([g["image"] for g in left], ["/d/j.png"])
+            self.assertEqual(left[0]["id"], ids["/d/j.png"])
+
+    def test_other_repairs_and_unknown_maps_leave_the_list_alone(self):
+        import sidecar
+        one, two, three = self.kept([topic("a", '<p><image href="i.png"/></p>')])
+        with one, two, three:
+            before = sidecar.alt_of("/m.ditamap")["images"]
+            use = before[0]["uses"][0]
+            conref = {"file": use["file"], "location": use["location"], "attribute": "conref", "was": "a", "now": "b"}
+            self.assertEqual(sidecar.alt_written("/m.ditamap", [conref]), 0)
+            self.assertEqual(sidecar.alt_written("/other.ditamap", [dict(conref, attribute="alt")]), 0)
+            self.assertEqual(sidecar.alt_written("/m.ditamap", "not a list"), 0)
+            self.assertEqual(sidecar.alt_of("/m.ditamap")["images"], before)
 
     def test_no_check_yet(self):
         import sidecar
