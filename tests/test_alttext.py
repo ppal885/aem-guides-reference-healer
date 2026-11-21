@@ -167,6 +167,11 @@ class TheDocumentationsOwnNames(unittest.TestCase):
         self.assertEqual(out["caveat"], "not found in this documentation, check it: 4410-RCY, LX4490")
         given = alttext.clean({"alt": "Rear of the 4410-RCY drawer"}, "z.png", vocab, "Around it: the 4410-RCY drawer")
         self.assertEqual(given["caveat"], "")
+        read = alttext.clean({"alt": "Cords from drawers DRW-1 to DRW-15 and 4410-RCY", "read_in_image": ["DRW-1", "DRW-15"]},
+                             "z.png", vocab, "Image: z.png")
+        self.assertEqual(read["caveat"], "not found in this documentation, check it: 4410-RCY")
+        odd = alttext.clean({"alt": "Drawer DRW-1", "read_in_image": "DRW-1"}, "z.png", vocab, "Image: z.png")
+        self.assertEqual(odd["caveat"], "not found in this documentation, check it: DRW-1")
         plain = alttext.clean({"alt": "Rear of the 4410-RCY drawer & cable"}, "z.png")
         self.assertEqual((plain["alt"], plain["caveat"]), ("Rear of the 4410-RCY drawer & cable", ""))
 

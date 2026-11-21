@@ -282,8 +282,8 @@ You may also get the names this documentation uses and alt texts already written
 
 When the image adds nothing a reader needs (a spacer, a decorative line), say so with "decorative": true and an empty alt.
 
-Answer with one JSON object only:
-{"alt": "<the text>", "decorative": false, "confident": true, "reason": "<one sentence: what you saw that the text is based on>"}"""
+Answer with one JSON object only. In "read_in_image" list each model number, part number or label in your alt that you read in the image itself (printed on a part, a callout, a screen), as written there; leave out what came from the text you were given:
+{"alt": "<the text>", "decorative": false, "confident": true, "reason": "<one sentence: what you saw that the text is based on>", "read_in_image": []}"""
 
 
 def prompt_for(group, vocab=None):
@@ -351,7 +351,8 @@ def clean(answer, image_path="", vocab=None, given=""):
     """The model's answer as the author sees it: the alt without a leading "Image of", within
     MAX_CHARS, only the markup an <alt> may hold, and a caveat when it is still weak, when the model
     was not sure, or when it names a model number found neither in this documentation nor in what
-    it was given (`given`: the prompt's text)."""
+    it was given (`given`: the prompt's text) nor, by the model's word, read in the image itself:
+    a drawer label printed in a drawing is a real name the documentation may not have."""
     keys = (vocab or {}).get("keys") or {}
     alt = " ".join(str(answer.get("alt") or "").split())
     alt = _PREFIX.sub("", alt)
@@ -371,7 +372,9 @@ def clean(answer, image_path="", vocab=None, given=""):
     if not decorative and why_weak(read, image_path):
         caveat.append("the text says nothing about the image: write one yourself")
     if vocab is not None and not decorative:
-        known = " ".join(list((vocab.get("names") or {})) + list(keys.values())
+        seen = answer.get("read_in_image")
+        seen = [str(x) for x in seen] if isinstance(seen, list) else []
+        known = " ".join(list((vocab.get("names") or {})) + list(keys.values()) + seen
                          + [n for names in (vocab.get("by_file") or {}).values() for n in names]) + " " + given
         unknown = sorted({code for code in _CODE.findall(read) if code not in known})
         if unknown:

@@ -14,7 +14,7 @@ Without --yes nothing is sent to a model: it lists the images it would send and 
 The images and the text around them go to the model, so run it only with the owner's word on the
 content it reads.
 
-    python3 altterms.py FOLDER [--images 30] [--yes] [--backend cli|sdk] [--out out/altterms-eval.json]
+    python3 altterms.py FOLDER [--images 30] [--yes] [--new-only] [--backend cli|sdk] [--out out/altterms-eval.json]
 """
 import argparse
 import json
@@ -82,6 +82,7 @@ def main():
     parser.add_argument("folder")
     parser.add_argument("--images", type=int, default=30)
     parser.add_argument("--yes", action="store_true", help="send the images to the model")
+    parser.add_argument("--new-only", action="store_true", help="ask with the new prompt only (half the calls)")
     parser.add_argument("--backend", default="cli", choices=["cli", "sdk"])
     # Not eval/refs: the rows hold the documentation's own alt texts, which stay out of the repository.
     parser.add_argument("--out", default=os.path.join("out", "altterms-eval.json"))
@@ -94,7 +95,8 @@ def main():
     if not args.yes:
         for case in chosen:
             print("  %s  %s" % (os.path.basename(case["image"]), case["names"]))
-        print("Nothing sent. With --yes: %d model calls (old and new prompt for each image)." % (2 * len(chosen)))
+        calls = len(chosen) * (1 if args.new_only else 2)
+        print("Nothing sent. With --yes: %d model calls." % calls)
         return
     import sidecar
     import usage
@@ -106,20 +108,21 @@ def main():
         media = mimetypes.guess_type(case["image"])[0] or "image/png"
         group = {"image": case["image"], "uses": [dict(case, alt="", why="none")]}
         row = {"image": os.path.basename(case["image"]), "hidden_alt": case["alt"], "names": case["names"]}
-        for kind, vocab_used in (("old", None), ("new", without(vocab, case))):
+        kinds = (("new", without(vocab, case)),) if args.new_only else (("old", None), ("new", without(vocab, case)))
+        for kind, vocab_used in kinds:
             prompt = alttext.prompt_for(group, vocab_used)
             with usage.as_agent("alt"):
                 answer = sidecar.call_model(alttext.SYSTEM, prompt, image=(data, media))
             out = alttext.clean(answer, case["image"], vocab_used, prompt)
             row[kind] = dict(alt=out["alt"], caveat=out["caveat"], **score(case, out))
         rows.append(row)
-        print("%-24s old: %-60s new: %s" % (row["image"], row["old"]["alt"][:60], row["new"]["alt"][:80]), flush=True)
+        print("%-24s %s" % (row["image"], row["new"]["alt"][:100]), flush=True)
     totals = usage.finish(mark)
     names = sum(len(r["names"]) for r in rows)
     summary = {kind: {"names_right": sum(r[kind]["names_right"] for r in rows), "of_names": names,
                       "names_changed": sum(len(r[kind]["names_changed"]) for r in rows),
                       "unknown_numbers": sum(r[kind]["unknown_numbers"] for r in rows),
-                      "figure_title_repeated": sum(r[kind]["figure_title_repeated"] for r in rows)} for kind in ("old", "new")}
+                      "figure_title_repeated": sum(r[kind]["figure_title_repeated"] for r in rows)} for kind in ("old", "new") if rows and kind in rows[0]}
     for kind, s in summary.items():
         print("%s prompt: %d of %d names right, %d changed, %d with unknown numbers, %d figure titles repeated"
               % (kind, s["names_right"], s["of_names"], s["names_changed"], s["unknown_numbers"], s["figure_title_repeated"]))
