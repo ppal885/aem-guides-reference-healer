@@ -837,6 +837,26 @@ class Learning(unittest.TestCase):
         only = [r for r in session.result()["repairs"] if r["stage"] == "planner"]
         self.assertEqual([(r["file"], r["verdict"]) for r in only], [("/d/t3.dita", "none")])
 
+    def test_other_references_of_a_file_just_saved_wait_while_aem_has_not_indexed_it(self):
+        files = self.files('<note conref="GUID-lib.dita#lib/support"/><note conref="GUID-lib.dita#lib/other"/>',
+                           '<note conref="GUID-lib.dita#lib/other"/>')
+        # t1 was saved by the Fix (its first note); AEM still lists that repair and t1's untouched note.
+        # t2 was not saved: what AEM lists there stays a finding.
+        reported = [{"file": "/d/t1.dita", "attribute": "conref", "value": "GUID-lib.dita#lib/support"},
+                    {"file": "/d/t1.dita", "attribute": "conref", "value": "GUID-lib.dita#lib/other"},
+                    {"file": "/d/t2.dita", "attribute": "conref", "value": "GUID-lib.dita#lib/other"}]
+        applied = {"when": 1000, "checks": 0, "edits": [
+            {"file": "/d/t1.dita", "attribute": "conref", "old": "GUID-lib.dita#lib/help", "new": "GUID-lib.dita#lib/support"}]}
+        session = self.session(files, reported=reported)
+        lines, failed, finished = session.look_back(applied, now=1010)
+        self.assertEqual((failed, finished), ([], False))
+        self.assertIn("AEM also lists 1 other reference of the files just saved", " ".join(lines))
+        self.assertIn("AEM also reports 1 reference as broken that resolve", lines[-1])
+        verdicts = sorted((r["file"], r["old"].split("/")[-1], r["verdict"]) for r in session.result()["repairs"]
+                          if r["stage"] in ("planner", "rule"))
+        self.assertEqual(verdicts, [("/d/t1.dita", "other", "pending"), ("/d/t1.dita", "support", "pending"),
+                                    ("/d/t2.dita", "other", "none")])
+
     def test_an_edit_at_the_source_that_the_repository_does_not_honour_is_not_chosen_again(self):
         files = self.files('<ph keyref="old-name"/>') + [
             {"id": "GUID-m", "path": "/d/m.ditamap", "xml": '<map><keydef keys="old-name"/></map>', "previous": []}]

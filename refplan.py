@@ -1383,6 +1383,7 @@ class Session:
                 lines.append("%s from the last Fix all did not reach the repository (%s); they are in this list again."
                              % (_count(len(unsaved), "repair"), _count(len({k[0] for k in unsaved}), "file")))
             settled = applied.get("checks", 0) >= 1 and (now or time.time()) - applied.get("when", 0) >= SETTLE_SECONDS
+            lagging = set()
             if still and settled:
                 failed = sorted({(k[1], k[2], k[3]) for k in still})
                 lines.append("AEM still reports %s I repaired as broken, in a second check. My check and AEM's disagree "
@@ -1391,12 +1392,22 @@ class Session:
                 self.waiting |= {(k[0], k[1], k[3]) for k in still}
                 lines.append("AEM still lists %s just repaired. It has not indexed the change yet; counted as "
                              "waiting, not as findings." % _count(len(still), "reference"))
+                # While AEM has not indexed the saved files, it may list their other references too, ones this
+                # Fix did not touch. Seen once on 22 Nov 2026: 95 such rows right after a Fix all, gone in the
+                # next check; most likely the same indexing. They wait too; the next check, made after AEM has
+                # caught up, lists any that are really broken.
+                saved = {k[0] for k in keys}
+                lagging = {key for key in self.aem_only if key[0] in saved and key not in self.waiting}
+                self.waiting |= lagging
+                if lagging:
+                    lines.append("AEM also lists %s of the files just saved that resolve here; counted as waiting "
+                                 "until it has indexed them." % _count(len(lagging), "other reference"))
             # An edit at the source (a key or an id put back) changes no reference, so whether it held
             # shows only in what the repository still reports for references that resolve here.
             kinds = {"keys" if key[1] in ("keyref", "conkeyref") else "id" for key in self.aem_only
                      if (key[0], key[1]) not in {(k[0], k[1]) for k in still}}
             source = {e["attribute"] for e in edits if e["attribute"] in ("keys", "id")} & kinds
-            other = len(self.aem_only) - len(still)
+            other = len(self.aem_only) - len(still) - len(lagging)
             if source and settled:
                 self.distrust = sorted(source)
                 lines.append("AEM still reports %s as broken after the edit at the source that should have repaired "
