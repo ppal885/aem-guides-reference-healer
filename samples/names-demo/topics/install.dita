@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="install"><title>Install the HX 200 Gateway</title><body><p>Mount the HX 200 Gateway on the rack. The HX 200
+Gateway needs two power cords.</p><codeblock>hx-setup --model "HX 200 Gateway"</codeblock><!-- HX 200 Gateway: old name --></body></topic>

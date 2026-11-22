@@ -72,3 +72,95 @@ class RepeatedTextAsReadersSeeIt(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def topic(n, body):
+    return {"path": "d/s%d.dita" % n, "xml": '<topic id="s%d"><title>S%d</title><body>%s</body></topic>' % (n, n, body)}
+
+
+class Spellings(unittest.TestCase):
+    """One name, one spelling: the names the topics write more than one way."""
+
+    def test_a_name_written_with_a_space_and_with_a_dash_is_found_most_used_first(self):
+        found = names.spellings([
+            topic(1, '<p>The <keyword>HX-200</keyword> holds the cache. Each HX-200 has two.</p>'),
+            topic(2, '<p>Install the HX 200 first.</p>'),
+            topic(3, '<p>Then the HX-200 again.</p>')])
+        self.assertEqual(len(found), 1)
+        one = found[0]
+        self.assertEqual((one["main"], one["case_only"], one["places"], one["topics"]), ("HX-200", False, 1, 1))
+        self.assertEqual([(f["form"], f["count"], f["files"]) for f in one["forms"]],
+                         [("HX-200", 3, ["/d/s1.dita", "/d/s3.dita"]), ("HX 200", 1, ["/d/s2.dita"])])
+
+    def test_names_that_differ_only_in_capitals_come_after_and_say_so(self):
+        found = names.spellings([
+            topic(1, '<p><keyword>HX-200</keyword> and HX 200.</p>'),
+            topic(2, '<p><wintitle>System Console</wintitle>, System Console, System Console.</p>'),
+            topic(3, '<p>Open the system console.</p><p><tm>System console</tm></p>')])
+        self.assertEqual([(s["main"], s["case_only"]) for s in found], [("HX-200", False), ("System Console", True)])
+        self.assertEqual([s["id"] for s in found], ["s0", "s1"])
+
+    def test_code_comments_attributes_and_keys_to_press_are_not_prose(self):
+        found = names.spellings([
+            topic(1, '<p><keyword>HX-200</keyword></p>'),
+            topic(2, '<codeblock>HX 200</codeblock><!-- HX 200 --><p outputclass="HX 200">x</p>'),
+            topic(3, '<p><uicontrol>Enter</uicontrol> or <uicontrol>ENTER</uicontrol></p>')])
+        self.assertEqual(found, [])
+
+    def test_a_short_word_or_one_without_a_digit_or_capital_inside_is_not_a_name(self):
+        found = names.spellings([topic(1, '<p><keyword>Log in</keyword> or <keyword>Login</keyword>, '
+                                          '<keyword>V06</keyword> or <keyword>v06</keyword></p>')])
+        self.assertEqual(found, [])
+
+    def test_a_spelling_inside_a_longer_name_is_not_counted(self):
+        found = names.spellings([topic(1, '<p><keyword>HX-200</keyword> and <keyword>HX 200</keyword></p>'),
+                                 topic(2, '<p>The HX-200X and HX 200-B are other machines.</p>')])
+        self.assertEqual([(f["form"], f["count"]) for f in found[0]["forms"]], [("HX 200", 1), ("HX-200", 1)])
+
+    def test_placeholders_and_names_in_code_are_not_spellings(self):
+        found = names.spellings([
+            topic(1, '<p><keyword>1xxx-xxxx</keyword> and 1xxx xxxx</p>'),
+            topic(2, '<p><wintitle>Modify Group</wintitle>; Modify Group; call modifyGroup or modify_group.</p>')])
+        self.assertEqual(found, [])
+
+    def test_a_one_letter_prefix_like_pseries_is_still_a_name(self):
+        found = names.spellings([topic(1, '<p><keyword>pSeries</keyword> pSeries</p>'), topic(2, '<p>P-Series</p>')])
+        self.assertEqual([f["form"] for f in found[0]["forms"]], ["pSeries", "P-Series"])
+
+
+class SpellingsLine(unittest.TestCase):
+    """The plan's line, which the editor counts from."""
+
+    def test_the_line_names_the_count_the_worst_name_and_the_capitals(self):
+        import refplan
+        spelled = names.spellings([topic(1, '<p><keyword>HX-200</keyword> HX-200</p>'),
+                                   topic(2, '<p>HX 200</p><p><wintitle>System Console</wintitle> <tm>System console</tm></p>')])
+        self.assertEqual(refplan.spellings_line(spelled),
+                         'Names written two ways: 2 names are written more than one way: 1 in 1 place, such as "HX 200" '
+                         'for "HX-200" (1 place in 1 topic), and 1 only in capital letters. Open "Names written two ways" '
+                         'to make each one spelling.')
+
+    def test_the_sidecar_lists_the_names_with_the_titles_of_their_topics(self):
+        sidecar.LAST_FILES["/m.ditamap"] = [topic(1, '<p><keyword>HX-200</keyword> HX-200</p>'), topic(2, '<p>HX 200</p>')]
+        try:
+            answer = sidecar.spellings_of("/m.ditamap")
+        finally:
+            del sidecar.LAST_FILES["/m.ditamap"]
+        self.assertEqual(answer["names"][0]["main"], "HX-200")
+        self.assertEqual(answer["titles"], {"/d/s1.dita": "S1", "/d/s2.dita": "S2"})
+        self.assertEqual(sidecar.spellings_of("/other.ditamap")["names"], [])
+
+    def test_spellings_written_over_leave_the_list(self):
+        sidecar.LAST_FILES["/m.ditamap"] = [topic(1, '<p><keyword>HX-200</keyword> HX-200</p>'),
+                                            topic(2, '<p>HX 200 and HX 200</p>'), topic(3, '<p>HX200</p>')]
+        try:
+            self.assertEqual(sidecar.spellings_of("/m.ditamap")["names"][0]["places"], 3)
+            sidecar.spellings_written("/m.ditamap", [{"file": "/d/s2.dita", "attribute": "name", "was": "HX 200"},
+                                                     {"file": "/d/s9.dita", "attribute": "alt", "was": "HX200"}])
+            left = sidecar.spellings_of("/m.ditamap")["names"][0]
+            self.assertEqual((left["places"], [f["form"] for f in left["forms"]]), (1, ["HX-200", "HX200"]))
+            sidecar.spellings_written("/m.ditamap", [{"file": "/d/s3.dita", "attribute": "name", "was": "HX200"}])
+            self.assertEqual(sidecar.spellings_of("/m.ditamap")["names"], [])
+        finally:
+            del sidecar.LAST_FILES["/m.ditamap"]
+            sidecar.SPELLED.pop("/m.ditamap", None)

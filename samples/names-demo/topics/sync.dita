@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="sync"><title>Turn on Cloud Sync</title><body><p>Cloud Sync copies the readings every minute. If Cloud Sync stops, the HX-200 Gateway keeps the readings.</p><p outputclass="Cloud Sync">The HX200 Gateway shows a green light.</p></body></topic>

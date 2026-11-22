@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE map PUBLIC "-//OASIS//DTD DITA Map//EN" "map.dtd">
+<map id="names_guide">
+  <title>Harbor gateway guide (names demo)</title>
+  <topicref href="topics/overview.dita"/>
+  <topicref href="topics/install.dita"/>
+  <topicref href="topics/sync.dita"/>
+  <topicref href="topics/console.dita"/>
+  <topicref href="topics/upgrade.dita"/>
+</map>

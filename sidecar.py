@@ -16,6 +16,7 @@
     GET  /copies      ?map=<path>[&judge=<n>][&ids=g1,g7]: the text copied across the map's topics (most
                       removable copies first; n more groups judged, none when not given), and what the reuse
                       agent says about each group (asked on request, kept until the files change)
+    GET  /spellings   ?map=<path>: the names the map's topics write more than one way ("HX-200", "HX 200")
     POST /copies-keep {map, mode | keep | unkeep}: "Keep copies" for a map, or one group kept as it is
     GET  /alt         ?map=<path>: the images of the map's last check whose alt text says nothing (no model)
     POST /alt-suggest {map, id, image_base64, media_type}: one alt text from a model that sees the image
@@ -216,6 +217,39 @@ def copies_of(map_path, model=None, judge=None, ids=None):
             "copies": sum(len(g["copies"]) for g in full), "removable": sum(max(0, len(g["copies"]) - 1) for g in full)}
 
 
+# "Names written two ways" of a map's last check: (its files, names.spellings of them, the (file, form)
+# an author has made say the main spelling since, as the audit record says).
+SPELLED = {}
+
+
+def spellings_written(map_path, entries):
+    """Takes the spellings an author just wrote over (audit entries with attribute "name") off the
+    map's list; how many."""
+    kept = SPELLED.get(map_path or "")
+    if not kept:
+        return 0
+    written = [(e.get("file"), e.get("was")) for e in entries or [] if isinstance(e, dict) and e.get("attribute") == "name"]
+    kept[2].update(written)
+    return len(written)
+
+
+def spellings_of(map_path):
+    """The names the topics of a map's last check write more than one way (names.spellings), with
+    the title of each topic they are in, for "Names written two ways"."""
+    import names
+    import reuse
+    files = LAST_FILES.get(map_path or "")
+    if not files:
+        return {"names": [], "titles": {}, "note": "Run the health check first: the agents have not seen this map's files."}
+    kept = SPELLED.get(map_path or "")
+    if not (kept and kept[0] is files):
+        kept = SPELLED[map_path or ""] = (files, names.spellings(files), set())
+    found = names.without(kept[1], kept[2])
+    titles = reuse._titles(files)
+    paths = {path for entry in found for form in entry["forms"] for path in form["files"]}
+    return {"names": found, "titles": {path: titles.get(path.lstrip("/"), "") for path in sorted(paths)}}
+
+
 def _alt_images(map_path):
     """The images found in the map's last check, found once a check (ALT)."""
     import alttext
@@ -412,6 +446,13 @@ def serve(port, model=None):
                 except Exception as exc:
                     _log("copies failed: %s" % exc)
                     self.send_json(500, {"error": str(exc)})
+            elif self.path.split("?")[0] == "/spellings":
+                query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+                try:
+                    self.send_json(200, spellings_of((query.get("map") or [""])[0]))
+                except Exception as exc:
+                    _log("spellings failed: %s" % exc)
+                    self.send_json(500, {"error": str(exc)})
             elif self.path.split("?")[0] == "/alt":
                 query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
                 try:
@@ -467,6 +508,7 @@ def serve(port, model=None):
                     body = json.loads(self.rfile.read(length).decode("utf-8"))
                     stored = audit.record(body.get("map"), body.get("accepted_by"), body.get("entries"))
                     _log("audit record: %d references added" % stored)
+                    spellings_written(body.get("map"), body.get("entries"))
                     if alt_written(body.get("map"), body.get("entries")):
                         _log("alt list: written alt texts taken off")
                     self.send_json(200, {"recorded": stored})

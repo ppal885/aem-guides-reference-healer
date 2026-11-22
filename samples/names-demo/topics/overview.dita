@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">
+<topic id="overview"><title>Overview</title><body><p>The <keyword>HX-200 Gateway</keyword> connects the harbor sensors. Each HX-200 Gateway runs <keyword>CloudSync</keyword>.</p><p>Open the <wintitle>Admin Console</wintitle> to see every HX-200 Gateway.</p></body></topic>

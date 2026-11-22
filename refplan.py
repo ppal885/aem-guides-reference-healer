@@ -30,6 +30,7 @@ import time
 import agentloop
 import alttext
 import duplicates
+import names
 import refcheck
 import refheal
 import subjectscheme
@@ -1725,6 +1726,25 @@ def _ask_planner(session, backend, model, log, progress):
     return steps
 
 
+def spellings_line(spelled):
+    """The plan's line for names.spellings, in the words of the tab the author opens; the editor
+    counts from "Names written two ways: N"."""
+    def count(n, one, many=None):
+        return "%s %s" % (format(n, ","), one if n == 1 else (many or one + "s"))
+    spelling = [s for s in spelled if not s["case_only"]]
+    capitals = len(spelled) - len(spelling)
+    parts = []
+    if spelling:
+        first = spelling[0]
+        parts.append("%s in %s, such as \"%s\" for \"%s\" (%s in %s)" % (
+            format(len(spelling), ","), count(sum(s["places"] for s in spelling), "place"), first["forms"][1]["form"],
+            first["main"], count(first["places"], "place"), count(first["topics"], "topic")))
+    if capitals:
+        parts.append("%s only in capital letters" % format(capitals, ","))
+    return ("Names written two ways: %s %s written more than one way: %s. Open \"Names written two ways\" to make "
+            "each one spelling." % (count(len(spelled), "name"), "is" if len(spelled) == 1 else "are", ", and ".join(parts)))
+
+
 def plan_files(payload, backend="cli", model=None, log=print, progress=None, memory=None, timeline=None):
     """_plan_files, plus what the check cost and whether the model answered: both go into the
     plan the author reads, into "usage" of the answer and, for a stored check, into the usage log."""
@@ -1761,6 +1781,12 @@ def plan_files(payload, backend="cli", model=None, log=print, progress=None, mem
                                                          format(places, ","), "place" if places == 1 else "places",
                                                          "says" if len(weak_alts) == 1 else "say")]
         out.setdefault("stats", {}).update(images_without_alt=len(weak_alts))
+    # Names the topics write more than one way ("HX-200" and "HX 200"): found by code on every check,
+    # in about 2 s for 57,782 files; "Names written two ways" shows each and makes the topics say one.
+    spelled = names.spellings(payload.get("files") or [])
+    if spelled:
+        out["plan"] = list(out.get("plan") or []) + [spellings_line(spelled)]
+        out.setdefault("stats", {}).update(names_written_two_ways=len(spelled))
     # Attribute values a subject scheme no longer allows: found and, where the scheme's previous
     # version proves a rename, repaired by code. They are not references, so AEM's report does not
     # list them and the planner's groups do not hold them.
