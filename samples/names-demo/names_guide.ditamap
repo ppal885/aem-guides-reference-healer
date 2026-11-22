@@ -7,4 +7,6 @@
   <topicref href="topics/sync.dita"/>
   <topicref href="topics/console.dita"/>
   <topicref href="topics/upgrade.dita"/>
+  <topicref href="topics/relay.dita"/>
+  <topicref href="topics/downloads.dita"/>
 </map>
