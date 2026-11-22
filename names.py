@@ -221,9 +221,10 @@ MAX_PARTS = 6
 
 def _joined_before(text, at):
     """A name does not start right after a dash ("A-HX 200"), nor inside a file name, path or address:
-    after "_", "." or "/" that follows a letter or digit ("setup_HX200", "example.com/HX200")."""
+    after "_", ".", "/", "=" or "#" that follows a letter or digit ("setup_HX200", "example.com/HX200",
+    "?model=HX200", "page.html#HX200")."""
     before = text[at - 1:at]
-    return before == "-" or (before in ("_", ".", "/") and text[at - 2:at - 1].isalnum())
+    return before == "-" or (before in ("_", ".", "/", "=", "#") and text[at - 2:at - 1].isalnum())
 
 
 def _joined_after(text, at):
@@ -330,35 +331,34 @@ def _longer(forms, seen):
     return sorted(text for text in seen if text not in forms and any(p.search(text) for p in patterns))
 
 
-def _last(written, path, form):
-    """What form in the topic at path says now, after every write since (an author may write A over B,
-    then B over A); None when it was not written over."""
-    now, seen = written.get((path, form)), {form}
-    while now and (path, now) in written and now not in seen:
-        seen.add(now)
-        now = written[(path, now)]
-    return None if now == form else now
-
-
 def without(spelled, written):
-    """spelled (from spellings) after what authors wrote since: written is {(file, form): now} for each
-    topic where an author made form say now. Those places count for now, which becomes the name's
-    main spelling, as the author chose it; a name left with one spelling is no longer listed."""
+    """spelled (from spellings) after what authors wrote since: written is [(file, form, now)], in the
+    order written, for each topic where an author made form say now (an author may write A over B,
+    then B over A). Each topic's places count for what it says now; the spelling authors wrote most
+    places with becomes the main one, as they chose it. A name left with one spelling is not listed."""
+    by_file = {}
+    for path, was, now in written:
+        by_file.setdefault(path, []).append((was, now))
     out = []
     for entry in spelled:
-        forms, moved = {}, {}
+        forms, moved = {}, collections.Counter()
+        topics = {}
         for form in entry["forms"]:
             for path, n in form["per_topic"].items():
-                now = _last(written, path, form["form"])
-                target = forms.setdefault(now or form["form"], collections.Counter())
-                target[path] += n
-                if now:
-                    moved[now] = moved.get(now, 0) + n
-        forms = {name: per for name, per in forms.items() if per}
+                topics.setdefault(path, collections.Counter())[form["form"]] += n
+        for path, says in topics.items():
+            for was, now in by_file.get(path, []):
+                if says.get(was) and was != now:
+                    moved[now] += says[was]
+                    says[now] += says.pop(was)
+            for name, n in says.items():
+                if n:
+                    forms.setdefault(name, {})[path] = n
         if len(forms) < 2:
             continue
-        # The spelling authors wrote most places with first; else the main spelling, then the most used.
-        main = max(moved, key=moved.get) if moved else entry["main"]
+        main = moved.most_common(1)[0][0] if moved else entry["main"]
+        if main not in forms:
+            main = max(forms, key=lambda name: sum(forms[name].values()))
         order = sorted(forms, key=lambda name: (name != main, -sum(forms[name].values()), name))
         listed = [{"form": name, "count": sum(forms[name].values()), "files": sorted(forms[name]),
                    "per_topic": dict(forms[name])} for name in order]

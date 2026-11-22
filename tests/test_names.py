@@ -199,19 +199,25 @@ class AfterAWrite(unittest.TestCase):
         {"form": "HX 200", "count": 6, "files": ["/f", "/g", "/h"], "per_topic": {"/f": 2, "/g": 2, "/h": 2}}]}]
 
     def test_the_less_used_spelling_an_author_chose_becomes_the_main_one_with_the_places_written(self):
-        written = {(path, "HX-200"): "HX 200" for path in ("/a", "/b", "/c", "/d")}
+        written = [(path, "HX-200", "HX 200") for path in ("/a", "/b", "/c", "/d")]
         left = names.without(self.SPELLED, written)[0]
         self.assertEqual((left["main"], [(f["form"], f["count"]) for f in left["forms"]], left["places"], left["topics"]),
                          ("HX 200", [("HX 200", 14), ("HX-200", 2)], 2, 1))
 
     def test_a_spelling_written_back_counts_where_it_is_now(self):
-        written = {("/a", "HX-200"): "HX 200", ("/a", "HX 200"): "HX-200", ("/f", "HX 200"): "HX-200"}
+        written = [("/a", "HX-200", "HX 200"), ("/a", "HX 200", "HX-200"), ("/f", "HX 200", "HX-200")]
         left = names.without(self.SPELLED, written)[0]
         self.assertEqual([(f["form"], f["count"]) for f in left["forms"]], [("HX-200", 12), ("HX 200", 4)])
 
+    def test_an_author_who_writes_a_topic_one_way_then_back_leaves_it_saying_the_last(self):
+        spelled = [dict(self.SPELLED[0], forms=[
+            {"form": "HX-200", "count": 3, "files": ["/t", "/v"], "per_topic": {"/t": 2, "/v": 1}},
+            {"form": "HX 200", "count": 1, "files": ["/t"], "per_topic": {"/t": 1}}])]
+        self.assertEqual(names.without(spelled, [("/t", "HX-200", "HX 200"), ("/t", "HX 200", "HX-200")]), [])
+
     def test_file_names_paths_addresses_and_code_words_are_not_names(self):
         found = names.spellings([topic(1, '<p><keyword>HX-200</keyword> HX-200. Run HX200_setup.exe from '
-                                          'https://example.com/HX200/ or open HX200.pdf, setup_HX200 or '
+                                          'https://example.com/HX200/ or https://x.com/?model=HX200 or page.html#HX200 or open HX200.pdf, setup_HX200 or '
                                           '<option>HX200</option><apiname>HX200</apiname>. Then HX200, and HX200/CX9.</p>')])
         self.assertEqual([(f["form"], f["count"]) for f in found[0]["forms"]], [("HX-200", 2), ("HX200", 2)])
 
