@@ -219,7 +219,7 @@ def vocabulary(files):
     for entry in files:
         path = "/" + (entry.get("path") or "").lstrip("/")
         xml = entry.get("xml") or ""
-        if path.endswith(".ditamap"):
+        if path.endswith((".ditamap", ".bookmap")):
             for found in _KEYDEF.finditer(xml):
                 word = re.search(r"<keyword\b[^>]*>(.*?)</keyword>", found.group(2), re.S)
                 name = _plain(word.group(1)) if word else ""

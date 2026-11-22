@@ -46,6 +46,15 @@ class SharedPiecesPulledByKey(unittest.TestCase):
         files = self.files() + [entry("d/sub.ditamap", '<map><keydef keys="common" href="reuse/shared-content.dita"/></map>')]
         self.assertEqual(reuse.key_plan(files, "/d/guide.ditamap")["keys"]["/d/reuse/shared-content.dita"], "common")
 
+    def test_a_bookmap_is_a_map_of_the_check_and_its_keys_are_read(self):
+        book = [entry("d/guide.bookmap", '<bookmap><frontmatter><keydef keys="shared-content" href="elsewhere.dita"/>'
+                                         '</frontmatter><chapter href="a.dita"/></bookmap>')] + self.files()[1:]
+        plan = reuse.key_plan(book, "/d/guide.bookmap")
+        self.assertTrue(plan["use"])
+        self.assertEqual(plan["maps"], ["/d/guide.bookmap"])
+        # Its key names are taken: the new key does not reuse one the bookmap gives another file.
+        self.assertEqual(plan["keys"]["/d/reuse/shared-content.dita"], "shared-content-2")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -137,6 +137,10 @@ class TheDocumentationsOwnNames(unittest.TestCase):
         self.assertEqual(vocab["alts"], {"/d/a.dita": ["Rear of the 4410-RCX cache drawer"],
                                          "/d/b.dita": ["Cluster Summary page of the LX4400"]})
 
+    def test_a_bookmaps_keys_are_names_too(self):
+        book = dict(MAP, path="/d/guide.bookmap", xml=MAP["xml"].replace("<map>", "<bookmap>").replace("</map>", "</bookmap>"))
+        self.assertEqual(alttext.vocabulary([book] + self.files()[1:])["keys"], {"product": "LX4400", "prod": "LX4400"})
+
     def test_the_prompt_gives_the_topics_names_the_keys_and_examples(self):
         vocab = alttext.vocabulary(self.files())
         group = {"image": "/d/z.png", "uses": [{"file": "/d/b.dita", "topic_title": "T b", "figure_title": "", "context": "x"}]}

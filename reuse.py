@@ -80,6 +80,8 @@ def _root_id(xml):
 
 # The shared topics the editor makes, beside the map: what a key for each is named when none exists.
 SHARED_TOPICS = {"reuse/shared-content.dita": "shared-content", "reuse/shared-steps.dita": "shared-steps"}
+# A bookmap defines keys and holds topics as a map does.
+MAP_ENDINGS = (".ditamap", ".bookmap")
 _KEY_DEF = re.compile(r'<(?:keydef|topicref|mapref|topichead|chapter|appendix|part)\b[^>]*>')
 
 
@@ -99,10 +101,10 @@ def key_plan(files, map_path):
     of the check uses for anything else."""
     folder = os.path.dirname("/" + (map_path or "").lstrip("/"))
     use = any(re.search(r'\sconkeyref\s*=\s*"', entry.get("xml") or "") for entry in files)
-    maps = sorted("/" + (e.get("path") or "").lstrip("/") for e in files if (e.get("path") or "").endswith(".ditamap"))
+    maps = sorted("/" + (e.get("path") or "").lstrip("/") for e in files if (e.get("path") or "").endswith(MAP_ENDINGS))
     defined, outside = {}, {}         # key name -> href: every map of the check; and outside key scopes
     for entry in files:
-        if not (entry.get("path") or "").endswith(".ditamap"):
+        if not (entry.get("path") or "").endswith(MAP_ENDINGS):
             continue
         xml = entry.get("xml") or ""
         for found, text in ((defined, xml), (outside, _without_scopes(xml))):
