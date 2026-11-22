@@ -70,6 +70,16 @@ class AfterAFix(unittest.TestCase):
         out = aftercheck.check(aem, MAP, rows=ROWS, wait={"every": 180, "up_to": 360}, sleep=lambda s: None, log=lambda m: None)
         self.assertEqual((out["code"], aem.checks), (1, 3))
 
+    def test_a_map_never_checked_has_no_last_result(self):
+        import io
+        import urllib.error
+        aem = aftercheck.Aem(url="http://aem.test")
+
+        def never_checked(*args, **kwargs):
+            raise urllib.error.HTTPError("http://aem.test", 400, "Bad Request", {}, io.BytesIO(b""))
+        aem._call = never_checked
+        self.assertEqual(aem.last_result("/d/new.ditamap"), {})
+
     def test_no_fix_for_the_map(self):
         out = aftercheck.check(FakeAem([]), "/none.ditamap", rows=ROWS)
         self.assertEqual(out["code"], 2)

@@ -25,6 +25,7 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -57,7 +58,13 @@ class Aem:
         return self._call(url_path, json.dumps(data).encode("utf-8"), {"Content-Type": "application/json", "CSRF-Token": token})
 
     def last_result(self, map_path):
-        return self.get("/bin/guides/v1/contenthealth/report/result", profileId=PROFILE, path=map_path) or {}
+        """The map's last check; {} when it has none yet (AEM answers 400 for a map never checked)."""
+        try:
+            return self.get("/bin/guides/v1/contenthealth/report/result", profileId=PROFILE, path=map_path) or {}
+        except urllib.error.HTTPError as error:
+            if error.code == 400:
+                return {}
+            raise
 
     def run_check(self, map_path, preset=None):
         """Starts the map's check with its last preset (or `preset`) and waits for a newer result."""
