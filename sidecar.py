@@ -594,6 +594,7 @@ def serve(port, model=None):
                     return
                 import refplan
                 LAST_FILES[payload.get("map") or ""] = payload.get("files") or []
+                SPELLED.pop(payload.get("map") or "", None)   # it holds the previous check's files
                 LAST_ASSETS[payload.get("map") or ""] = (payload.get("assets"), payload.get("missing_paths"))
                 # The images without alt text are found while the agents work, so the card opens at once.
                 __import__("threading").Thread(target=_alt_images, args=(payload.get("map"),), daemon=True).start()

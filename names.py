@@ -178,8 +178,9 @@ def shown(text, names, links=None):
 
 NAME_TAGS = ("keyword", "tm", "wintitle")
 _NAMED = re.compile(r"<(%s)\b[^>]*>(.*?)</\1>" % "|".join(NAME_TAGS), re.S)
-# Text a reader does not read as prose: code, commands, screens; and comments.
-_NOT_PROSE = re.compile(r"<!--.*?-->|<(codeblock|codeph|pre|screen|msgblock|cmdname|filepath|varname|userinput|systemoutput)\b[^>]*>.*?</\1>", re.S)
+# Text a reader does not read as prose: code, commands, screens; comments, CDATA and processing
+# instructions. The editor's writer leaves out the same (names_apply.ts NOT_PROSE).
+_NOT_PROSE = re.compile(r"<!--.*?-->|<!\[CDATA\[.*?\]\]>|<\?.*?\?>|<(codeblock|codeph|pre|screen|msgblock|cmdname|filepath|varname|userinput|systemoutput)\b[^>]*>.*?</\1>", re.S)
 MIN_SAME = 5            # a name shorter than this, once spaces and dashes are taken out, is not compared
 
 
@@ -188,8 +189,13 @@ def _same(name):
     return re.sub(r"[\s\-_./]+", "", name.lower())
 
 
-def _prose(xml):
-    return _plain(_NOT_PROSE.sub(" ", xml or ""))
+def _pieces(xml):
+    """The prose of a topic, one piece for each run of text between two tags: a name is counted only
+    where it is whole in one piece, as the editor can write it there ("<tm>POWER</tm> 8" is not)."""
+    for piece in re.split(r"<[^>]*>", _NOT_PROSE.sub("<x>", xml or "")):
+        text = _plain(piece)
+        if text:
+            yield text
 
 
 # The parts of a name, and what may stand between two parts of one name: a space, a dash, a dot, a
@@ -201,22 +207,29 @@ MAX_PARTS = 6
 
 def _spans(text, wanted, starts):
     """Each run of parts in text that, without its separators and in lower case, is in wanted;
-    starts holds every beginning of a wanted name, so a run stops as soon as it cannot become one."""
+    starts holds every beginning of a wanted name, so a run stops as soon as it cannot become one.
+    The longest name wins: in "HX 200 Gateway" only "HX 200 Gateway" is found, not "HX 200" too."""
     parts = list(_PART.finditer(text))
     lower = [part.group(0).lower() for part in parts]
-    for i, first in enumerate(parts):
-        if lower[i] not in starts or (first.start() and text[first.start() - 1] == "-"):
+    i = 0
+    while i < len(parts):
+        first, best = parts[i], None
+        if lower[i] in starts and not (first.start() and text[first.start() - 1] == "-"):
+            joined = ""
+            for j in range(i, min(i + MAX_PARTS, len(parts))):
+                if j > i and not _JOIN.fullmatch(text[parts[j - 1].end():parts[j].start()]):
+                    break
+                joined += lower[j]
+                if joined not in starts:
+                    break
+                end = parts[j].end()
+                if joined in wanted and not (text[end:end + 1] == "-" and text[end + 1:end + 2].isalnum()):
+                    best = j
+        if best is None:
+            i += 1
             continue
-        joined = ""
-        for j in range(i, min(i + MAX_PARTS, len(parts))):
-            if j > i and not _JOIN.fullmatch(text[parts[j - 1].end():parts[j].start()]):
-                break
-            joined += lower[j]
-            if joined not in starts:
-                break
-            end = parts[j].end()
-            if joined in wanted and not (text[end:end + 1] == "-" and text[end + 1:end + 2].isalnum()):
-                yield text[first.start():end]
+        yield text[first.start():parts[best].end()]
+        i = best + 1
 
 
 # Not a name: a placeholder ("1xxx-xxxx"), or a name in code ("modifyGroup", "add_user") that a
@@ -247,7 +260,7 @@ def spellings(files):
     counts, where = {}, {}
     for entry in topics:
         path = "/" + (entry.get("path") or "").lstrip("/")
-        for name in _spans(_prose(entry.get("xml")), tagged, starts):
+        for name in (found for piece in _pieces(entry.get("xml")) for found in _spans(piece, tagged, starts)):
             same = _same(name)
             known = tagged.get(same)
             # Not a name the topics mark up, or the same letters in other capitals not marked up anywhere.

@@ -164,3 +164,19 @@ class SpellingsLine(unittest.TestCase):
         finally:
             del sidecar.LAST_FILES["/m.ditamap"]
             sidecar.SPELLED.pop("/m.ditamap", None)
+
+
+class SpellingsWhereTheyCanBeWritten(unittest.TestCase):
+    """What is counted is what the editor can write: whole in one text, and once."""
+
+    def test_a_name_split_by_markup_is_not_counted(self):
+        found = names.spellings([topic(1, '<p><keyword>HX-200</keyword> and HX-200</p>'),
+                                 topic(2, '<p><tm>HX</tm> 200 and <?pi HX 200?><![CDATA[HX 200]]></p>')])
+        self.assertEqual(found, [])
+
+    def test_the_longest_name_wins_at_one_place(self):
+        found = names.spellings([
+            topic(1, '<p><keyword>HX-200</keyword> and <keyword>HX-200 Gateway</keyword>. HX-200.</p>'),
+            topic(2, '<p>HX 200 Gateway, and HX 200 alone.</p>')])
+        self.assertEqual([(s["main"], [(f["form"], f["count"]) for f in s["forms"]]) for s in found],
+                         [("HX-200", [("HX-200", 2), ("HX 200", 1)]), ("HX-200 Gateway", [("HX-200 Gateway", 1), ("HX 200 Gateway", 1)])])
