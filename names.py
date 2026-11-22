@@ -172,8 +172,8 @@ def shown(text, names, links=None):
 # it marks up as names (keyword, tm, wintitle; not uicontrol, which is mostly keys to press, "Enter",
 # and verbs, "Log in"); each is looked for in the text of every topic, outside
 # code, and the spellings of one name are grouped. Measured on a customer export of 57,323 topics
-# (23 Nov 2026), in about 2 s: 17 names written with other separators (a model number with a dash 251
-# times and with a space 43 times in 4 topics), 6 more only in capitals.
+# (23 Nov 2026), in about 2.5 s: 16 names written with other separators (a model number with a dash 223
+# times and with a space 43 times in 4 topics), 4 more only in capitals.
 # Counting uicontrol as well gave 17 names, nearly all keys and verbs: "Enter" and "ENTER", "Log in" and "Login".
 
 NAME_TAGS = ("keyword", "tm", "wintitle")
@@ -185,17 +185,31 @@ MIN_SAME = 5            # a name shorter than this, once spaces and dashes are t
 
 
 def _same(name):
-    """The form two spellings of one name share: lower case, no spaces, dashes, dots or underscores."""
-    return re.sub(r"[\s\-_./]+", "", name.lower())
+    """The form two spellings of one name share: lower case, no spaces, dashes, dots or underscores,
+    except between two digits: "Atlas 1.10" and "Atlas 11.0" are two versions, not one name."""
+    return re.sub(r"[\s\-_./]+", lambda m: _between(name.lower(), m), name.lower())
+
+
+def _between(text, separator):
+    """What a separator leaves in the shared form: itself (any space as one) between two digits, else nothing."""
+    before, after = text[separator.start() - 1:separator.start()], text[separator.end():separator.end() + 1]
+    return _kept(separator.group(0)) if before.isdigit() and after.isdigit() else ""
+
+
+def _kept(separator):
+    return " " if separator.isspace() else separator
+
+
+_TAG = re.compile(r"<[^>]*>")
 
 
 def _pieces(xml):
     """The prose of a topic, one piece for each run of text between two tags: a name is counted only
     where it is whole in one piece, as the editor can write it there ("<tm>POWER</tm> 8" is not)."""
-    for piece in re.split(r"<[^>]*>", _NOT_PROSE.sub("<x>", xml or "")):
-        text = _plain(piece)
-        if text:
-            yield text
+    for piece in _TAG.split(_NOT_PROSE.sub("<x>", xml or "")):
+        # Most pieces are white space between tags, and most hold no entity: _plain only where needed.
+        if not piece.isspace() and piece:
+            yield _plain(piece) if "&" in piece else " ".join(piece.split())
 
 
 # The parts of a name, and what may stand between two parts of one name: a space, a dash, a dot, a
@@ -219,6 +233,8 @@ def _spans(text, wanted, starts):
             for j in range(i, min(i + MAX_PARTS, len(parts))):
                 if j > i and not _JOIN.fullmatch(text[parts[j - 1].end():parts[j].start()]):
                     break
+                if j > i and lower[j - 1][-1:].isdigit() and lower[j][:1].isdigit():
+                    joined += _kept(text[parts[j - 1].end():parts[j].start()])
                 joined += lower[j]
                 if joined not in starts:
                     break

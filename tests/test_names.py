@@ -180,3 +180,11 @@ class SpellingsWhereTheyCanBeWritten(unittest.TestCase):
             topic(2, '<p>HX 200 Gateway, and HX 200 alone.</p>')])
         self.assertEqual([(s["main"], [(f["form"], f["count"]) for f in s["forms"]]) for s in found],
                          [("HX-200", [("HX-200", 2), ("HX 200", 1)]), ("HX-200 Gateway", [("HX-200 Gateway", 1), ("HX 200 Gateway", 1)])])
+
+    def test_numbers_split_another_way_are_other_names_not_other_spellings(self):
+        found = names.spellings([
+            topic(1, '<p><keyword>Atlas 1.10</keyword> ships. Atlas 1.10 again. <keyword>Port 8080</keyword></p>'),
+            topic(2, '<p><keyword>Atlas 11.0</keyword> is next, on Port 80-80. Atlas 1-10 is a typo.</p>')])
+        self.assertEqual([(s["main"], [f["form"] for f in s["forms"]]) for s in found], [])
+        found = names.spellings([topic(1, '<p><keyword>HX-200 R4.2</keyword></p>'), topic(2, '<p>HX 200 R4.2</p>')])
+        self.assertEqual([f["form"] for f in found[0]["forms"]], ["HX-200 R4.2", "HX 200 R4.2"])

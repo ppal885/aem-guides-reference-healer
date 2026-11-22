@@ -1782,7 +1782,7 @@ def plan_files(payload, backend="cli", model=None, log=print, progress=None, mem
                                                          "says" if len(weak_alts) == 1 else "say")]
         out.setdefault("stats", {}).update(images_without_alt=len(weak_alts))
     # Names the topics write more than one way ("HX-200" and "HX 200"): found by code on every check,
-    # in about 2 s for 57,782 files; "Names written two ways" shows each and makes the topics say one.
+    # in about 2.5 s for 57,782 files; "Names written two ways" shows each and makes the topics say one.
     spelled = names.spellings(payload.get("files") or [])
     if spelled:
         out["plan"] = list(out.get("plan") or []) + [spellings_line(spelled)]
