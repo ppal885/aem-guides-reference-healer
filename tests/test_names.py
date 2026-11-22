@@ -155,11 +155,11 @@ class SpellingsLine(unittest.TestCase):
                                             topic(2, '<p>HX 200 and HX 200</p>'), topic(3, '<p>HX200</p>')]
         try:
             self.assertEqual(sidecar.spellings_of("/m.ditamap")["names"][0]["places"], 3)
-            sidecar.spellings_written("/m.ditamap", [{"file": "/d/s2.dita", "attribute": "name", "was": "HX 200"},
-                                                     {"file": "/d/s9.dita", "attribute": "alt", "was": "HX200"}])
+            sidecar.spellings_written("/m.ditamap", [{"file": "/d/s2.dita", "attribute": "name", "was": "HX 200", "now": "HX-200"},
+                                                     {"file": "/d/s9.dita", "attribute": "alt", "was": "HX200", "now": "x"}])
             left = sidecar.spellings_of("/m.ditamap")["names"][0]
             self.assertEqual((left["places"], [f["form"] for f in left["forms"]]), (1, ["HX-200", "HX200"]))
-            sidecar.spellings_written("/m.ditamap", [{"file": "/d/s3.dita", "attribute": "name", "was": "HX200"}])
+            sidecar.spellings_written("/m.ditamap", [{"file": "/d/s3.dita", "attribute": "name", "was": "HX200", "now": "HX-200"}])
             self.assertEqual(sidecar.spellings_of("/m.ditamap")["names"], [])
         finally:
             del sidecar.LAST_FILES["/m.ditamap"]
@@ -188,3 +188,34 @@ class SpellingsWhereTheyCanBeWritten(unittest.TestCase):
         self.assertEqual([(s["main"], [f["form"] for f in s["forms"]]) for s in found], [])
         found = names.spellings([topic(1, '<p><keyword>HX-200 R4.2</keyword></p>'), topic(2, '<p>HX 200 R4.2</p>')])
         self.assertEqual([f["form"] for f in found[0]["forms"]], ["HX-200 R4.2", "HX 200 R4.2"])
+
+
+class AfterAWrite(unittest.TestCase):
+    """What the list says after an author wrote some topics: the author's choice is the name now."""
+
+    SPELLED = [{"id": "s0", "main": "HX-200", "case_only": False, "places": 6, "topics": 3, "inside": [], "forms": [
+        {"form": "HX-200", "count": 10, "files": ["/a", "/b", "/c", "/d", "/e"],
+         "per_topic": {"/a": 2, "/b": 2, "/c": 2, "/d": 2, "/e": 2}},
+        {"form": "HX 200", "count": 6, "files": ["/f", "/g", "/h"], "per_topic": {"/f": 2, "/g": 2, "/h": 2}}]}]
+
+    def test_the_less_used_spelling_an_author_chose_becomes_the_main_one_with_the_places_written(self):
+        written = {(path, "HX-200"): "HX 200" for path in ("/a", "/b", "/c", "/d")}
+        left = names.without(self.SPELLED, written)[0]
+        self.assertEqual((left["main"], [(f["form"], f["count"]) for f in left["forms"]], left["places"], left["topics"]),
+                         ("HX 200", [("HX 200", 14), ("HX-200", 2)], 2, 1))
+
+    def test_a_spelling_written_back_counts_where_it_is_now(self):
+        written = {("/a", "HX-200"): "HX 200", ("/a", "HX 200"): "HX-200", ("/f", "HX 200"): "HX-200"}
+        left = names.without(self.SPELLED, written)[0]
+        self.assertEqual([(f["form"], f["count"]) for f in left["forms"]], [("HX-200", 12), ("HX 200", 4)])
+
+    def test_file_names_paths_addresses_and_code_words_are_not_names(self):
+        found = names.spellings([topic(1, '<p><keyword>HX-200</keyword> HX-200. Run HX200_setup.exe from '
+                                          'https://example.com/HX200/ or open HX200.pdf, setup_HX200 or '
+                                          '<option>HX200</option><apiname>HX200</apiname>. Then HX200, and HX200/CX9.</p>')])
+        self.assertEqual([(f["form"], f["count"]) for f in found[0]["forms"]], [("HX-200", 2), ("HX200", 2)])
+
+    def test_each_name_lists_the_longer_names_found_around_its_spellings_as_written(self):
+        found = names.spellings([topic(1, '<p><keyword>HX-200</keyword> and <keyword>HX 200 Gateway</keyword>. '
+                                          'The HX 200 Gateway runs HX 200. HX-200, the HX 200 GATEWAY.</p>')])
+        self.assertEqual((found[0]["main"], found[0]["inside"]), ("HX-200", ["HX 200 GATEWAY", "HX 200 Gateway"]))

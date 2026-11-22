@@ -180,7 +180,7 @@ NAME_TAGS = ("keyword", "tm", "wintitle")
 _NAMED = re.compile(r"<(%s)\b[^>]*>(.*?)</\1>" % "|".join(NAME_TAGS), re.S)
 # Text a reader does not read as prose: code, commands, screens; comments, CDATA and processing
 # instructions. The editor's writer leaves out the same (names_apply.ts NOT_PROSE).
-_NOT_PROSE = re.compile(r"<!--.*?-->|<!\[CDATA\[.*?\]\]>|<\?.*?\?>|<(codeblock|codeph|pre|screen|msgblock|cmdname|filepath|varname|userinput|systemoutput)\b[^>]*>.*?</\1>", re.S)
+_NOT_PROSE = re.compile(r"<!--.*?-->|<!\[CDATA\[.*?\]\]>|<\?.*?\?>|<(codeblock|codeph|pre|screen|msgblock|cmdname|filepath|varname|userinput|systemoutput|apiname|parmname|option|synph|kwd|msgph|msgnum)\b[^>]*>.*?</\1>", re.S)
 MIN_SAME = 5            # a name shorter than this, once spaces and dashes are taken out, is not compared
 
 
@@ -219,6 +219,20 @@ _JOIN = re.compile(r"\s+|[\-_./]")
 MAX_PARTS = 6
 
 
+def _joined_before(text, at):
+    """A name does not start right after a dash ("A-HX 200"), nor inside a file name, path or address:
+    after "_", "." or "/" that follows a letter or digit ("setup_HX200", "example.com/HX200")."""
+    before = text[at - 1:at]
+    return before == "-" or (before in ("_", ".", "/") and text[at - 2:at - 1].isalnum())
+
+
+def _joined_after(text, at):
+    """A name does not end where a dash, "_" or "." joins it to more letters or digits ("HX-200X",
+    "HX200_setup.exe", "HX200.pdf"): a longer name or a file name. "HX200." ends a sentence, and
+    "HX 200/CX9" is a list of models (an address is caught by its start: "example.com/HX200")."""
+    return text[at:at + 1] in ("-", "_", ".") and text[at + 1:at + 2].isalnum()
+
+
 def _spans(text, wanted, starts):
     """Each run of parts in text that, without its separators and in lower case, is in wanted;
     starts holds every beginning of a wanted name, so a run stops as soon as it cannot become one.
@@ -228,7 +242,7 @@ def _spans(text, wanted, starts):
     i = 0
     while i < len(parts):
         first, best = parts[i], None
-        if lower[i] in starts and not (first.start() and text[first.start() - 1] == "-"):
+        if lower[i] in starts and not _joined_before(text, first.start()):
             joined = ""
             for j in range(i, min(i + MAX_PARTS, len(parts))):
                 if j > i and not _JOIN.fullmatch(text[parts[j - 1].end():parts[j].start()]):
@@ -239,7 +253,7 @@ def _spans(text, wanted, starts):
                 if joined not in starts:
                     break
                 end = parts[j].end()
-                if joined in wanted and not (text[end:end + 1] == "-" and text[end + 1:end + 2].isalnum()):
+                if joined in wanted and not _joined_after(text, end):
                     best = j
         if best is None:
             i += 1
@@ -255,12 +269,13 @@ _CODE_NAME = re.compile(r"[a-z]{2,}[A-Z]\w*|\w+_\w+")
 
 
 def spellings(files):
-    """[{"id", "main", "forms": [{"form", "count", "files", "per_topic"}], "case_only", "places", "topics"}]: the names
+    """[{"id", "main", "forms": [{"form", "count", "files", "per_topic"}], "case_only", "places", "topics", "inside"}]: the names
     written more than one way, the most used spelling first; places and topics count the other
     spellings. A name the topics mark up is looked for in their text with other separators too; a
     spelling that differs only in capitals counts when it is marked up as a name as well, since in
     plain text it is often the ordinary words ("the system console"). case_only: the spellings differ
-    only in capital letters ("POWER", "Power"), which may be meant."""
+    only in capital letters ("POWER", "Power"), which may be meant. inside: the longer names found
+    that hold one of the spellings (_longer), which a write of this name must leave alone."""
     topics = [entry for entry in files if not (entry.get("path") or "").endswith(MAP_ENDINGS)]
     tagged = {}
     for entry in topics:
@@ -273,10 +288,11 @@ def spellings(files):
     if not tagged:
         return []
     starts = {same[:n] for same in tagged for n in range(1, len(same) + 1)}
-    counts, where = {}, {}
+    counts, where, seen = {}, {}, set()
     for entry in topics:
         path = "/" + (entry.get("path") or "").lstrip("/")
         for name in (found for piece in _pieces(entry.get("xml")) for found in _spans(piece, tagged, starts)):
+            seen.add(name)
             same = _same(name)
             known = tagged.get(same)
             # Not a name the topics mark up, or the same letters in other capitals not marked up anywhere.
@@ -299,31 +315,55 @@ def spellings(files):
                               for n in used],
                     "case_only": len({n.lower() for n in used}) == 1,
                     "places": sum(counts[n] for n in others),
-                    "topics": len(set().union(*(set(where[n]) for n in others)))})
+                    "topics": len(set().union(*(set(where[n]) for n in others))),
+                    "inside": _longer(used, seen)})
     out.sort(key=lambda s: (s["case_only"], -s["places"], s["main"]))
     for index, entry in enumerate(out):
         entry["id"] = "s%d" % index
     return out
 
 
+def _longer(forms, seen):
+    """The longer names found in the text that hold one of forms ("HX 200 Gateway" for "HX 200"), as
+    they are written: the place is theirs, so the editor's writer leaves them as they are."""
+    patterns = [re.compile(r"(?<![^\W_])%s(?![^\W_])" % re.escape(form)) for form in forms]
+    return sorted(text for text in seen if text not in forms and any(p.search(text) for p in patterns))
+
+
+def _last(written, path, form):
+    """What form in the topic at path says now, after every write since (an author may write A over B,
+    then B over A); None when it was not written over."""
+    now, seen = written.get((path, form)), {form}
+    while now and (path, now) in written and now not in seen:
+        seen.add(now)
+        now = written[(path, now)]
+    return None if now == form else now
+
+
 def without(spelled, written):
-    """spelled (from spellings) less the spellings already written over: written holds (file, form)
-    for each topic where an author made form say the name's main spelling. A name left with one
-    spelling is no longer listed."""
+    """spelled (from spellings) after what authors wrote since: written is {(file, form): now} for each
+    topic where an author made form say now. Those places count for now, which becomes the name's
+    main spelling, as the author chose it; a name left with one spelling is no longer listed."""
     out = []
     for entry in spelled:
-        forms = []
+        forms, moved = {}, {}
         for form in entry["forms"]:
-            per_topic = {path: n for path, n in form["per_topic"].items() if (path, form["form"]) not in written}
-            if per_topic:
-                forms.append(dict(form, per_topic=per_topic, files=sorted(per_topic), count=sum(per_topic.values())))
+            for path, n in form["per_topic"].items():
+                now = _last(written, path, form["form"])
+                target = forms.setdefault(now or form["form"], collections.Counter())
+                target[path] += n
+                if now:
+                    moved[now] = moved.get(now, 0) + n
+        forms = {name: per for name, per in forms.items() if per}
         if len(forms) < 2:
             continue
-        # The main spelling stays first; when it was itself written over, the most used one left is.
-        if forms[0]["form"] != entry["main"]:
-            forms.sort(key=lambda f: -f["count"])
-        others = forms[1:]
-        out.append(dict(entry, main=forms[0]["form"], forms=forms, places=sum(f["count"] for f in others),
+        # The spelling authors wrote most places with first; else the main spelling, then the most used.
+        main = max(moved, key=moved.get) if moved else entry["main"]
+        order = sorted(forms, key=lambda name: (name != main, -sum(forms[name].values()), name))
+        listed = [{"form": name, "count": sum(forms[name].values()), "files": sorted(forms[name]),
+                   "per_topic": dict(forms[name])} for name in order]
+        others = listed[1:]
+        out.append(dict(entry, main=order[0], forms=listed, places=sum(f["count"] for f in others),
                         topics=len(set().union(*(set(f["files"]) for f in others)))))
     for index, entry in enumerate(out):
         entry["id"] = "s%d" % index

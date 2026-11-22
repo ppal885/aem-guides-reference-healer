@@ -217,8 +217,8 @@ def copies_of(map_path, model=None, judge=None, ids=None):
             "copies": sum(len(g["copies"]) for g in full), "removable": sum(max(0, len(g["copies"]) - 1) for g in full)}
 
 
-# "Names written two ways" of a map's last check: (its files, names.spellings of them, the (file, form)
-# an author has made say the main spelling since, as the audit record says).
+# "Names written two ways" of a map's last check: (its files, names.spellings of them, {(file, form): the
+# spelling an author made it say since}, as the audit record says).
 SPELLED = {}
 
 
@@ -228,7 +228,8 @@ def spellings_written(map_path, entries):
     kept = SPELLED.get(map_path or "")
     if not kept:
         return 0
-    written = [(e.get("file"), e.get("was")) for e in entries or [] if isinstance(e, dict) and e.get("attribute") == "name"]
+    written = {(e.get("file"), e.get("was")): str(e.get("now") or "") for e in entries or []
+               if isinstance(e, dict) and e.get("attribute") == "name" and e.get("now")}
     kept[2].update(written)
     return len(written)
 
@@ -243,7 +244,7 @@ def spellings_of(map_path):
         return {"names": [], "titles": {}, "note": "Run the health check first: the agents have not seen this map's files."}
     kept = SPELLED.get(map_path or "")
     if not (kept and kept[0] is files):
-        kept = SPELLED[map_path or ""] = (files, names.spellings(files), set())
+        kept = SPELLED[map_path or ""] = (files, names.spellings(files), {})
     found = names.without(kept[1], kept[2])
     titles = reuse._titles(files)
     paths = {path for entry in found for form in entry["forms"] for path in form["files"]}
