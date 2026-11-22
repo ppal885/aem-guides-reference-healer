@@ -186,7 +186,9 @@ def copies_of(map_path, model=None, judge=None, ids=None):
     if not (cached and cached[0] == fingerprint and judge == 0):
         groups = reuse.decide(files, lambda system, user: call_model(system, user, model), _log, judge=judge, cache=DECISIONS)
         titles = reuse._titles(files)
-        cached = (fingerprint, [dict(_compact(g), topics=[{"file": "/" + f.lstrip("/"), "title": titles.get(f.lstrip("/"), "")}
+        import names
+        key_names, links = names.key_names(files), names.link_titles(files)
+        cached = (fingerprint, [dict(_compact(g, key_names, links), topics=[{"file": "/" + f.lstrip("/"), "title": titles.get(f.lstrip("/"), "")}
                                                           for f in g["files"]]) for g in groups])
         COPIES[map_path] = cached
     full = cached[1]
@@ -337,12 +339,12 @@ def suggest_alt(body, model=None):
 def _summary(group):
     """A group without its copies: what the list of groups shows."""
     out = {k: v for k, v in group.items() if k not in ("copies", "files", "topics", "variants")}
-    out.update(text=group["text"][:300], summary=True, topic_count=len(group["files"]), copy_count=len(group["copies"]),
+    out.update(text=group["text"][:300], shown=group.get("shown", group["text"])[:300], summary=True, topic_count=len(group["files"]), copy_count=len(group["copies"]),
                wordings=len(group["variants"]))
     return out
 
 
-def _compact(group):
+def _compact(group, key_names=None, links=None):
     """A group as the editor reads it. Each copy names its wording by index into "variants" (the full
     text, which the editor compares before it replaces a copy) instead of repeating it."""
     slash = lambda path: "/" + path.lstrip("/")
@@ -357,14 +359,20 @@ def _compact(group):
         else:
             copy["text"] = c["text"]
         copies.append(copy)
+    import names
     import reuse
+    text = group.get("variant_text") or group["text"]
+    # What a reader sees: the text with the names of the keys it says (names.py); the editor shows
+    # this and compares copies by "text".
+    shows = {v["text"]: names.shown(v.get("shown") or v["text"], key_names or {}, links) for v in group["variants"]}
     return {"id": group["id"], "key": reuse.decision_key(group), "kind": group["kind"], "tag": group["tag"],
             "decision": group["decision"],
-            "text": group.get("variant_text") or group["text"], "differs": group.get("differs", ""),
+            "text": text, "shown": shows.get(text) or names.shown(group.get("shown") or text, key_names or {}, links),
+            "differs": group.get("differs", ""),
             "reason": group.get("reason", ""), "decided_by": group.get("decided_by", ""),
             "existing": dict(group["existing"], path=slash(group["existing"]["path"])) if group.get("existing") else None,
             "files": [slash(f) for f in group["files"]], "copies": copies,
-            "variants": [{"text": v["text"], "count": v["count"]} for v in group["variants"]],
+            "variants": [{"text": v["text"], "count": v["count"], "shown": shows[v["text"]]} for v in group["variants"]],
             "navtitle": group.get("navtitle", ""), "refs": group.get("refs", 0),
             # A maybe group: "other words" put for others, or "says more" (one copy with words added).
             "why": group.get("why", ""),

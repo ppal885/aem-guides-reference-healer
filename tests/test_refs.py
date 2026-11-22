@@ -881,6 +881,18 @@ class Learning(unittest.TestCase):
             memory={"no_source_edit": ["keys"]})
         self.assertNotIn("source_option", learned.tool_overview({})["groups"][0])
 
+    def test_a_broken_key_says_what_it_showed_from_the_maps_earlier_version(self):
+        r = RepairsWithoutAModel
+        session = refplan.Session([
+            {"id": "GUID-lib", "path": "/d/lib.dita", "xml": r.LIB_NEW, "previous": [r.LIB_OLD]},
+            {"id": "GUID-m", "path": "/d/m.ditamap", "xml": r.MAP_NEW, "previous": [r.MAP_OLD]},
+            {"id": "GUID-t1", "path": "/d/t1.dita", "xml": TOPIC % '<ph keyref="app"/>'}], log=lambda message: None)
+        group = next(g for g in session.current["groups"].values() if g["refs"][0]["value"] == "app")
+        self.assertEqual(session._detail(group)["key_name"], "Admin")
+        conref = next((g for g in session.current["groups"].values() if g["refs"][0]["attribute"] == "conref"), None)
+        if conref:
+            self.assertEqual(session._detail(conref)["key_name"], "")
+
     def test_files_outside_the_map_that_use_the_target_are_named(self):
         session = self.session(self.files('<note conref="GUID-lib.dita#lib/help"/>'), outside={"/d/lib.dita": ["/x/a.dita", "/x/b.dita"]})
         group = session.tool_overview({})["groups"][0]

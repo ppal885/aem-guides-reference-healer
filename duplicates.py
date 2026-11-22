@@ -59,6 +59,34 @@ def _text(el):
     return re.sub(r"\s+", " ", "".join(el.itertext())).strip()
 
 
+def _shown(el, path=""):
+    """The text a reader sees, with a mark where an element says a key and holds no text of its own
+    (<keyword keyref="product-name"/>): names.shown puts the key's name there. _text drops those, so
+    the copies still compare as before; this is only for showing."""
+    parts = []
+
+    def go(node, top):
+        key = None if top else (node.get("keyref") or "").split("/")[0]
+        href = None if top or key else node.get("href")
+        empty = not "".join(node.itertext()).strip()
+        if key and empty:
+            parts.append(" \u27e6%s\u27e7 " % key)
+        elif href and empty and _local(node.tag) == "xref":
+            # A link that shows its target's title: the mark names the target, resolved from this file.
+            parts.append(" \u27e6@%s\u27e7 " % _resolved_href(path, href))
+        else:
+            parts.append(node.text or "")
+            for child in node:
+                go(child, False)
+        if not top:
+            parts.append(node.tail or "")
+    go(el, True)
+    return re.sub(r"\s+", " ", "".join(parts)).strip()
+
+
+_MARK = re.compile(r"\u27e6[^\u27e7]+\u27e7")
+
+
 def _parse(raw):
     try:
         return ET.fromstring(re.sub(r"<!DOCTYPE[^>\[]*(\[[^\]]*\])?[^>]*>", "", raw or "", count=1))
@@ -140,6 +168,7 @@ def blocks_of(path, raw):
                 text = _text(child)
                 if len(text) >= MIN_CHARS:
                     found.append({"file": path, "location": here, "tag": name, "text": text, "id": child.get("id") or "",
+                                  "shown": _shown(child, path),
                                   "markup": markup_of(path, child), "own": own_attributes(child), "whole": True,
                                   "inner_ids": sorted({d.get("id") for d in child.iter() if d is not child and d.get("id")})})
             holds_block = any(_local(d.tag) in BLOCK_TAGS for d in child.iter() if d is not child)
@@ -147,7 +176,7 @@ def blocks_of(path, raw):
                 text = _text(child)
                 if len(text) >= MIN_CHARS:
                     found.append({"file": path, "location": here, "tag": name, "text": text, "id": child.get("id") or "",
-                                  "markup": markup_of(path, child), "own": own_attributes(child)})
+                                  "shown": _shown(child, path), "markup": markup_of(path, child), "own": own_attributes(child)})
             else:
                 walk(child, here)
 
@@ -498,9 +527,20 @@ def _whole(files, blocks):
 
 def _group(kind, tag, members):
     counts = collections.Counter(b["text"] for b in members)
-    return {"kind": kind, "tag": tag, "text": counts.most_common(1)[0][0],
+    # What each wording shows a reader, with its keys marked (from its first copy).
+    shows, differ = {}, set()
+    for b in members:
+        shown = b.get("shown") or b["text"]
+        if shows.setdefault(b["text"], shown) != shown:
+            differ.add(b["text"])
+    # Copies with the same words that say different keys or links (markup_of keeps them apart when
+    # they are shared): the name a reader sees varies, and the wording says so.
+    for t in differ:
+        shows[t] = _MARK.sub(" \u27e6*\u27e7 ", shows[t])
+    text = counts.most_common(1)[0][0]
+    return {"kind": kind, "tag": tag, "text": text, "shown": shows[text],
             "files": sorted({b["file"] for b in members}), "copies": members,
-            "variants": [{"text": text, "count": count} for text, count in counts.most_common()]}
+            "variants": [{"text": t, "count": count, "shown": shows[t]} for t, count in counts.most_common()]}
 
 
 # ---- maps -----------------------------------------------------------------------------------

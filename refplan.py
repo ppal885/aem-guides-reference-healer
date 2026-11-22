@@ -457,6 +457,9 @@ class Session:
         self.progress = progress or (lambda text: None)   # one line on what is happening now, for a live view
         self.original = [dict(f) for f in files]
         self.files = [dict(f) for f in files]
+        # The names the maps give their keys (names.py), so a card says "key cli-name (atlasctl)".
+        import names
+        self.key_names = names.key_names(self.original)
         self.assets = assets   # the files that are not DITA and exist, when the server told us
         self.missing = missing  # {stored name: path} of targets that are gone, when the server told us
         self.rounds = []          # [{"repo", "groups": {id: group}}], the last one is open
@@ -1653,6 +1656,9 @@ class Session:
                 # For a key that was never defined: what is the case and what to add. The box then
                 # says this instead of "before it broke" and "no candidate", which are not true of it.
                 "missing_definition": known["reason"] if known.get("never_defined") else "",
+                # What a key showed, for a reference by key: from the map, or its earlier version.
+                "key_name": self.key_names.get(first["value"].split("/")[0], "")
+                if first["attribute"] in ("keyref", "conkeyref") else "",
                 "references": len(group["refs"]), "files": len(files), "file_names": files[:6],
                 "published_under": self._published_under(repo, group),
                 "outside": [os.path.basename(f) for f in self._used_outside(repo, group)[:6]],
