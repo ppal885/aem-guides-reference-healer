@@ -313,14 +313,27 @@ ALT_ATTRIBUTES = ("keyref", "conref", "conkeyref")
 _CODE = re.compile(r"\b(?:(?=[A-Z0-9-]*\d)[A-Z0-9]+(?:-[A-Z0-9]+)+|[A-Z]{2,}\d{2,}[A-Z0-9]*)\b")
 
 
+def _parsed(alt):
+    try:
+        return ET.fromstring("<alt>%s</alt>" % re.sub(r"&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)", "&amp;", alt))
+    except ET.ParseError:
+        return None
+
+
+def _as_text(alt):
+    """A "<" that starts no tag an alt may hold is text: "Speed < 5 and > 2", "Press <Enter>"."""
+    allowed = "|".join(ALT_ELEMENTS)
+    alt = re.sub(r"<(?![A-Za-z/])", "&lt;", alt)
+    return re.sub(r"<(?!/?(?:%s)\b)([^<>]*)>" % allowed, r"&lt;\1&gt;", alt)
+
+
 def _markup(alt, keys):
     """The alt with only what an <alt> may hold here, and what was left out: unknown elements and
     attributes, and keys the map does not have, become their text (a key: its name, when known)."""
     if "<" not in alt:
         return xml_escape(html.unescape(alt)), []
-    try:
-        root = ET.fromstring("<alt>%s</alt>" % re.sub(r"&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)", "&amp;", alt))
-    except ET.ParseError:
+    root = _parsed(alt) or _parsed(_as_text(alt))
+    if root is None:
         return xml_escape(_plain(alt)), ["markup that is not well formed"]
     left_out = []
 

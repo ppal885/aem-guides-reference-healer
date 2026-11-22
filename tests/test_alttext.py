@@ -165,6 +165,14 @@ class TheDocumentationsOwnNames(unittest.TestCase):
         broken = alttext.clean({"alt": "The <ph>cache drawer"}, "z.png", vocab)
         self.assertEqual((broken["alt"], "not well formed" in broken["caveat"]), ("The cache drawer", True))
 
+    def test_a_less_than_sign_or_a_key_name_in_brackets_stays_in_the_alt(self):
+        vocab = alttext.vocabulary(self.files())
+        chart = alttext.clean({"alt": "Chart of drawer speed: < 5 at night and > 2 by day", "confident": True}, "z.png", vocab)
+        self.assertEqual(chart["alt"], "Chart of drawer speed: < 5 at night and > 2 by day")   # plain text: the editor escapes it
+        keys = alttext.clean({"alt": 'Press <Enter> to restart the <keyword keyref="product"/>', "confident": True}, "z.png", vocab)
+        self.assertEqual(keys["alt"], 'Press &lt;Enter&gt; to restart the <keyword keyref="product"/>')
+        self.assertNotIn("not well formed", keys["caveat"])
+
     def test_a_model_number_not_in_the_documentation_is_pointed_out(self):
         vocab = alttext.vocabulary(self.files())
         out = alttext.clean({"alt": "Rear of the 4410-RCY and 4410-RCX drawers in a LX4490"}, "z.png", vocab, "Image: z.png")
