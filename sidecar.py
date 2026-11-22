@@ -104,7 +104,7 @@ IDLE = {"running": False, "lines": [], "timeline": []}
 
 
 # The files of the last check of each map, for the reuse agent to read when the author opens
-# "Copied content" (GET /copies), and what it decided, kept until the files change.
+# "Repeated text" (GET /copies), and what it decided, kept until the files change.
 LAST_FILES = {}
 LAST_ASSETS = {}     # map path: (the assets that are not DITA, the paths dangling names stood for)
 # map path: (the check's files, its assets, the images found in them). Reading every topic of a large
@@ -172,7 +172,7 @@ def set_keep(body):
 def copies_of(map_path, model=None, judge=None, ids=None):
     """The copied text of a map's last check, most removable copies first, and the reuse agent's
     word on each group judged so far: `judge` more groups are asked this time, none when not given.
-    Opening "Copied content" sends nothing to the model; the author asks for it ("Judge next 100"):
+    Opening "Repeated text" sends nothing to the model; the author asks for it ("Judge next 100"):
     on 19 Nov 2026 a default of 100 sent 800 groups of customer content to the model unasked. A map with more than FULL_UP_TO groups gets a summary of each (17.6 MB in
     full on the customer sample); `ids` ("g1,g7") names the groups to send with their copies."""
     import hashlib

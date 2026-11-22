@@ -2304,6 +2304,15 @@ class CopiedText(unittest.TestCase):
         groups = duplicates.find(files)
         self.assertEqual([(g["kind"], g["files"]) for g in groups], [("same", ["d/a.dita", "d/b.dita"])])
 
+    def test_the_plan_says_it_in_the_words_of_the_tab_the_author_opens(self):
+        files = [self.topic("a", "<p>%s</p>" % self.WARN), self.topic("b", "<p>%s</p>" % self.WARN)]
+        out = refplan.plan_files({"files": files}, log=lambda message: None, memory={})
+        line = next(step for step in out["plan"] if "repeated" in step)
+        self.assertTrue(line.startswith("Repeated text: 1 text is repeated in several topics or maps: 2 copies, 1 could be "
+                                        "reused instead."), line)
+        self.assertIn('Open "Repeated text"', line)
+        self.assertNotIn("conref", line)
+
     def test_numbers_that_differ_are_reported_with_each_variant(self):
         files = [self.topic(n, "<note>Backups are kept for %d days and then deleted for good.</note>" % d)
                  for n, d in (("a", 30), ("b", 30), ("c", 60))]

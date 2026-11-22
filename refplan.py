@@ -1719,17 +1719,18 @@ def plan_files(payload, backend="cli", model=None, log=print, progress=None, mem
         raise
     totals = usage.finish(mark)
     # Text copied across topics, and groups of references copied across maps: counted by code on
-    # every check; the reuse agent is asked only when the author opens "Copied content" (GET /copies).
+    # every check; the reuse agent is asked only when the author opens "Repeated text" (GET /copies).
     copied = duplicates.find(payload.get("files") or [])
     copied_maps = duplicates.find_maps(payload.get("files") or [])
     if copied or copied_maps:
         everything = copied + copied_maps
         copies = sum(len(g["copies"]) for g in everything)
         maps = " (%s of them groups of references in maps)" % format(len(copied_maps), ",") if copied_maps else ""
-        out["plan"] = list(out.get("plan") or []) + ["Copied text: %s %s copied into several topics or maps%s: %s copies, "
-                                                     "%s of them could become conrefs. Open \"Copied content\" to see which "
-                                                     "could be one shared piece." % (
-                                                         format(len(everything), ","), "piece is" if len(everything) == 1 else "pieces are",
+        # Said in the words of the tab the author opens; the editor counts from "Repeated text: N".
+        out["plan"] = list(out.get("plan") or []) + ["Repeated text: %s %s repeated in several topics or maps%s: %s copies, "
+                                                     "%s could be reused instead. Open \"Repeated text\" "
+                                                     "to see which." % (
+                                                         format(len(everything), ","), "text is" if len(everything) == 1 else "texts are",
                                                          maps, format(copies, ","), format(copies - len(everything), ","))]
         out.setdefault("stats", {}).update(copied_groups=len(copied), copied_map_groups=len(copied_maps))
     # Images whose alt text says nothing to a screen reader: found by code on every check; a model
