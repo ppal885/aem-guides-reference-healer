@@ -15,4 +15,4 @@ curl -s -o /dev/null -u $AUTH -X DELETE $A$ROOT; sleep 5
 curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sling:Folder" -F "jcr:title=Ledgerline posting rules (Fix all timing)" $A$ROOT
 curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sling:Folder" $A$ROOT/rules
 for f in $(ls rules/*.dita) bulk_guide.ditamap; do up $f; done
-echo "done. Open $ROOT/bulk_guide.ditamap in the editor and run Health check with Broken links."
+echo "done. Open $ROOT/bulk_guide.ditamap in the editor and run Health check with the Broken references demo preset (Broken links)."

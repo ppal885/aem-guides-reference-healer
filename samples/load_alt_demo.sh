@@ -18,4 +18,4 @@ for d in images topics; do curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sli
 for f in images/*.png; do up $f image/png; sleep 1; done
 sleep 10   # the images must exist before the topics, so that AEM stores their references by GUID
 for f in topics/*.dita alt_guide.ditamap; do up $f application/xml; sleep 2; done
-echo "done. Open $ROOT/alt_guide.ditamap in the editor and run Health check with Broken links."
+echo "done. Open $ROOT/alt_guide.ditamap in the editor and run Health check with the Broken references demo preset (Broken links)."

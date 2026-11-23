@@ -2,7 +2,7 @@
 # Puts samples/schematron-ai-demo into the local demo AEM: a Schematron without quick fixes and the topics it checks, to
 # check the Content Health "Ask AI for a fix" on Schematron findings. Local author on 127.0.0.1 with its default login only.
 # Run again to reset.
-#   ./samples/load_dupes_blocks.sh
+#   ./samples/load_schematron_ai_demo.sh
 set -e
 A=http://127.0.0.1:4502
 AUTH=admin:admin
@@ -16,4 +16,4 @@ curl -s -o /dev/null -u $AUTH -X DELETE $A$ROOT; sleep 5
 curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sling:Folder" -F "jcr:title=Ledgerline periods (AI fix demo)" $A$ROOT
 for d in topics; do curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sling:Folder" $A$ROOT/$d; done
 for f in rules.sch $(ls topics/*.dita) ai_periods.ditamap; do up $f; sleep 2; done
-echo "done. Open $ROOT/ai_periods.ditamap; in a Content Health preset select $ROOT/rules.sch for Schematron."
+echo "done. Open $ROOT/ai_periods.ditamap and run Health check with the AI fix demo preset (a preset with $ROOT/rules.sch)."

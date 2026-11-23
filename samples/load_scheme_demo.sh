@@ -25,4 +25,4 @@ sleep 10
 echo "2/2 the scheme's clean-up (v2): linux -> gnu-linux, admin -> administrator, mac -> macos, bsd removed"
 up v2 console_values.ditamap
 sleep 10
-echo "done. Open $ROOT/agent_guide.ditamap in the editor and run Health check with Broken links."
+echo "done. Open $ROOT/agent_guide.ditamap in the editor and run Health check with the Broken references demo preset (Broken links)."

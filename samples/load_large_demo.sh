@@ -70,6 +70,6 @@ rm -f /tmp/partner_onboarding.$$.dita
 curl -s -o /dev/null -u $AUTH -F "file=@customer.ditaval;type=application/xml" -F "fileName=customer.ditaval" "$A$ROOT.createasset.html"
 python3 ../set_output_filter.py $ROOT/atlas_guide.ditamap aemsites $ROOT/customer.ditaval
 
-echo "3/3 done. Open $ROOT/atlas_guide.ditamap in the editor and run Health check with Broken links."
+echo "3/3 done. Open $ROOT/atlas_guide.ditamap in the editor and run Health check with the Broken references demo preset (Broken links)."
 echo "Reload any editor tab that was open: every file of the sample has a new id now, and a tab from"
 echo "before answers clicks with \"Given asset id or path are invalid\"."

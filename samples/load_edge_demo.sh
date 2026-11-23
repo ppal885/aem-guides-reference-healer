@@ -2,7 +2,7 @@
 # Puts samples/edge-demo into the local demo AEM: table cells copied and an SVG without alt, edge cases of
 # eval/cases.json. Local author on 127.0.0.1 with its default login only.
 # Run again to reset.
-#   ./samples/load_alt_demo.sh
+#   ./samples/load_edge_demo.sh
 set -e
 A=http://127.0.0.1:4502
 AUTH=admin:admin

@@ -17,4 +17,4 @@ curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sling:Folder" $A$ROOT/topics
 # The checklist first: a link is stored by the GUID of a file that exists when it is uploaded.
 up topics/checklist.dita; sleep 3
 for f in $(ls topics/*.dita | grep -v checklist) drift_guide.ditamap; do up $f; sleep 2; done
-echo "done. Open $ROOT/drift_guide.ditamap in the editor, run Health check, and open Copied content."
+echo "done. Open $ROOT/drift_guide.ditamap in the editor, run Health check, and open Repeated text."

@@ -2,7 +2,7 @@
 # Puts samples/dupes-cond into the local demo AEM: copies with the same words for other readers, to
 # check that a Fix keeps them apart and keeps their conditions. Local author on 127.0.0.1 with its default login only.
 # Run again to reset.
-#   ./samples/load_dupes_blocks.sh
+#   ./samples/load_dupes_cond.sh
 set -e
 A=http://127.0.0.1:4502
 AUTH=admin:admin

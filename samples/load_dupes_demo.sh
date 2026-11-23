@@ -16,4 +16,4 @@ curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sling:Folder" -F "jcr:title=Le
 for d in reuse tasks release guides; do curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sling:Folder" $A$ROOT/$d; done
 # The library first: a conref is stored by the GUID of a file that exists when it is uploaded.
 for f in reuse/library.dita $(ls tasks/*.dita release/*.dita) $(ls guides/*.ditamap) ledger_guide.ditamap; do up $f; sleep 3; done
-echo "done. Open $ROOT/ledger_guide.ditamap in the editor and run Health check with Broken links."
+echo "done. Open $ROOT/ledger_guide.ditamap in the editor and run Health check with the Broken references demo preset (Broken links)."

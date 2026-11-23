@@ -16,4 +16,4 @@ curl -s -o /dev/null -u $AUTH -X DELETE $A$ROOT; sleep 5
 curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sling:Folder" -F "jcr:title=Harbor gateway (names demo)" $A$ROOT
 for d in topics; do curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sling:Folder" $A$ROOT/$d; done
 for f in topics/*.dita names_guide.ditamap; do up $f application/xml; sleep 2; done
-echo "done. Open $ROOT/names_guide.ditamap in the editor and run Health check with Broken links."
+echo "done. Open $ROOT/names_guide.ditamap in the editor and run Health check with the Broken references demo preset (Broken links)."

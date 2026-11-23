@@ -16,4 +16,4 @@ curl -s -o /dev/null -u $AUTH -X DELETE $A$ROOT; sleep 5
 curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sling:Folder" -F "jcr:title=Ledgerline closing steps (markup demo)" $A$ROOT
 for d in tasks concepts reference; do curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sling:Folder" $A$ROOT/$d; done
 for f in reference/limits.dita $(ls tasks/*.dita concepts/*.dita) steps_guide.ditamap; do up $f; sleep 2; done
-echo "done. Open $ROOT/steps_guide.ditamap in the editor and run Health check with Broken links."
+echo "done. Open $ROOT/steps_guide.ditamap in the editor and run Health check with the Broken references demo preset (Broken links)."

@@ -16,4 +16,4 @@ curl -s -o /dev/null -u $AUTH -X DELETE $A$ROOT; sleep 5
 curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sling:Folder" -F "jcr:title=Ledgerline ledgers (Schematron fixes that ask or reach outside)" $A$ROOT
 for d in topics; do curl -s -o /dev/null -u $AUTH -F "jcr:primaryType=sling:Folder" $A$ROOT/$d; done
 for f in rules.sch $(ls topics/*.dita) ledger.ditamap; do up $f; sleep 2; done
-echo "done. Open $ROOT/ledger.ditamap; in a Content Health preset select $ROOT/rules.sch for Schematron."
+echo "done. Open $ROOT/ledger.ditamap and run Health check with a preset that has $ROOT/rules.sch for Schematron."
