@@ -931,6 +931,8 @@ class WaysOut(unittest.TestCase):
         self.assertEqual(ways["restore"]["anchor"], {"after": "keep"})
         self.assertEqual(ways["restore"]["xml"], '<note id="notice" type="note">The old page stays until <b>the end of the year</b>.</note>')
         self.assertEqual(ways["inline"]["xml"], '<note type="note">The old page stays until <b>the end of the year</b>.</note>')
+        # Where the piece was: its links are written again from each topic's folder.
+        self.assertEqual(ways["inline"]["file"], ways["restore"]["file"])
 
     def test_a_removed_warning_is_never_offered_for_removal(self):
         session = self.session('<note conref="GUID-lib.dita#lib/hot"/>')

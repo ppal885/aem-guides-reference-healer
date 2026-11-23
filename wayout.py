@@ -123,7 +123,8 @@ def ways_out(repo, refs, previous_xml):
             "label": "Put it back in %s: one edit, and all %d references work again" % (target.rsplit("/", 1)[-1], len(refs))})
     if first["attribute"] in ("conref", "conkeyref"):
         found["options"].append({
-            "kind": "inline", "xml": without_id(piece),
+            # file: where the piece was, so the editor writes its links (href) from each topic's folder.
+            "kind": "inline", "xml": without_id(piece), "file": "/" + target,
             "label": "Keep the text in the %d topics as their own content, without the reference" % files})
         if not found["safety"]:
             found["options"].append({
