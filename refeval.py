@@ -24,6 +24,7 @@ import shutil
 
 import refcheck
 import refheal
+import usage
 
 
 def copy_repo(source, target):
@@ -200,6 +201,7 @@ def main():
     seeds = seed_breaks(args.work, args.per_kind, random.Random(args.seed))
     print("Seeded %d breaks: %s" % (len(seeds), ", ".join("%s %s" % (s["kind"], s["old"]) for s in seeds)), flush=True)
 
+    mark = usage.position()
     if args.mode == "planner":
         repo, items, extra = plan(args, before)
     else:
@@ -225,6 +227,7 @@ def main():
         cell["by_rule"] += repair["stage"] == "rule"
         cell["wrong_marked_fix"] += (outcome == "wrong" and repair["verdict"] == "fix")
 
+    usage.refuse_unanswered(*usage.failed_since(mark), "the seeded eval")
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "eval.json"), "w") as handle:
         json.dump(dict(extra, seeds=seeds, rows=rows, table=table, backend=args.backend, mode=args.mode), handle,

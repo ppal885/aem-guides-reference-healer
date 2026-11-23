@@ -23,6 +23,7 @@ import os
 import time
 
 import refplan
+import usage
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -64,7 +65,7 @@ def main():
     args = parser.parse_args()
     with open(os.path.join(args.sample, "expected.json"), encoding="utf-8") as handle:
         cases = json.load(handle)
-    runs = []
+    runs, mark = [], usage.position()
     for number in range(1, args.runs + 1):
         started = time.time()
         out = refplan.plan_files(payload(args.sample), backend=args.backend, log=lambda message: None, memory={})
@@ -85,6 +86,7 @@ def main():
         for row in rows:
             print("   %-13s %-8s %d candidates %-14s %s" % (row["outcome"], row["verdict"], row["candidates"],
                                                              row["likelihoods"], row["file"]))
+    usage.refuse_unanswered(*usage.failed_since(mark), "the ranking eval")
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w") as handle:
         json.dump({"sample": os.path.relpath(args.sample, HERE), "backend": args.backend, "cases": len(cases), "runs": runs},

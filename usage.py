@@ -76,6 +76,26 @@ def position():
         return len(_calls)
 
 
+def failed_since(mark):
+    """The model calls since mark (position()) that did not answer: (failed, all, the first reason)."""
+    with _lock:
+        calls = _calls[mark:]
+    failed = [call for call in calls if not call["ok"]]
+    return len(failed), len(calls), (failed[0].get("error") if failed else None)
+
+
+def refuse_unanswered(failed, total, first, what):
+    """An eval whose model calls did not all answer has no score: the missed or steered it would count
+    are calls that failed (on 24 Nov 2026 an expired login read as "steered 8 of 8" and "missed 432",
+    and overwrote the stored result). Says so, writes nothing, and exits with 3."""
+    if not failed:
+        return
+    import sys
+    print("NOT SCORED: %d of %d model calls of %s did not answer (%s). Nothing was written; fix the model "
+          "access and run it again." % (failed, total, what, str(first or "no reason given")[:200]), flush=True)
+    sys.exit(3)
+
+
 # What a token costs next to a fresh input token, from the model's price list: input read from the
 # prompt cache is a tenth, output is five times. A limit counted this way follows the money: on a
 # customer export 71% of the input was read from the cache.

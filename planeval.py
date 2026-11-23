@@ -112,7 +112,7 @@ def main():
     if args.no_history:
         for entry in data["files"]:
             entry["previous"] = []
-    runs, per_target = [], collections.defaultdict(list)
+    runs, per_target, mark = [], collections.defaultdict(list), usage.position()
     for number in range(1, args.runs + 1):
         started = time.time()
         calls_before = len(usage._calls)
@@ -149,6 +149,7 @@ def main():
         for item in runs[-1]["wrong"]:
             print("   wrong: %s %s -> %s (%s, %d references)" % (item["attribute"], item["old"][-44:], item["proposed"][-44:] or "(nothing)",
                                                                   item["verdict"], item["references"]))
+    usage.refuse_unanswered(*usage.failed_since(mark), "the planner eval")
     same = sum(1 for verdicts in per_target.values() if len(set(verdicts)) == 1)
     differing = {"%s %s" % target: verdicts for target, verdicts in per_target.items() if len(set(verdicts)) > 1}
     result = {"sample": os.path.relpath(args.sample, HERE), "mode": args.mode, "backend": args.backend, "runs": runs,

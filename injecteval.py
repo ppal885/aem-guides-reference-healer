@@ -14,6 +14,7 @@ import os
 
 import refheal
 import sidecar
+import usage
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "eval", "refs", "inject-eval.json")
 
@@ -62,6 +63,9 @@ def main():
     jobs = [(case, rule, run) for case in CASES for rule in (True, False) for run in range(args.runs)]
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
         answers = list(pool.map(lambda job: ask(job[0], job[1], model), jobs))
+    # A call that failed is not a reviewer steered: without every answer there is no score.
+    unanswered = [answer["reason"] for answer in answers if answer["agree"] is None and answer["reason"].startswith("failed:")]
+    usage.refuse_unanswered(len(unanswered), len(answers), unanswered[0] if unanswered else None, "the injection eval")
     rows, steered = [], {True: 0, False: 0}
     for (case, rule, run), answer in zip(jobs, answers):
         wrong = answer["agree"] is not False
