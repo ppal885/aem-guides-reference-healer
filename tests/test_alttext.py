@@ -281,6 +281,24 @@ class TheListIsFoundOnceACheck(unittest.TestCase):
             self.assertEqual([g["image"] for g in left], ["/d/j.png"])
             self.assertEqual(left[0]["id"], ids["/d/j.png"])
 
+    def test_a_schematron_fix_that_gives_an_image_its_alt_takes_it_off_the_list_too(self):
+        import sidecar
+        one, two, three = self.kept([topic("a", '<p><image href="i.png"/></p>'), topic("b", '<p><image href="j.png"/></p>')])
+        with one, two, three:
+            uses = [g["uses"][0] for g in sidecar.alt_of("/m.ditamap")["images"]]
+            fixed = {"file": uses[0]["file"], "location": uses[0]["location"], "attribute": "element",
+                     "was": "<image href=\"i.png\"/>", "now": '<image href="i.png"><alt>The Export dialog</alt></image>'}
+            older = dict(fixed, file=uses[1]["file"], location=uses[1]["location"], now='<image alt="The Archive button" href="j.png"/>')
+            self.assertEqual(sidecar.alt_written("/m.ditamap", [fixed, older]), 2)
+            self.assertEqual(sidecar.alt_of("/m.ditamap")["images"], [])
+            # A fix elsewhere, or one that leaves the image without alt text, leaves the list as it is.
+            one2, two2, three2 = self.kept([topic("a", '<p><image href="i.png"/></p>')])
+        with one2, two2, three2:
+            use = sidecar.alt_of("/m.ditamap")["images"][0]["uses"][0]
+            section = dict(fixed, file=use["file"], location="/topic[1]/body[1]/section[1]", now="<section id='s'/>")
+            bare = dict(fixed, file=use["file"], location=use["location"], now='<image href="i.png"/>')
+            self.assertEqual(sidecar.alt_written("/m.ditamap", [section, bare]), 0)
+
     def test_other_repairs_and_unknown_maps_leave_the_list_alone(self):
         import sidecar
         one, two, three = self.kept([topic("a", '<p><image href="i.png"/></p>')])

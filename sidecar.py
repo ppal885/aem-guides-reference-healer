@@ -289,12 +289,32 @@ def _alt_lock(map_path):
         return _ALT_LOCKS.setdefault(map_path or "", __import__("threading").Lock())
 
 
+_IMAGE_AT = re.compile(r"/image\[\d+\]$")
+
+
+def _as_alt(entry):
+    """An audit entry as an alt text written: one of the alt card ("alt"), or a fix that rewrote an
+    image (a Schematron fix, "element"), whose new markup gives the alt as an <alt> element or, the
+    older way, an alt attribute. None for anything else, and for an image the fix left without one."""
+    if not isinstance(entry, dict):
+        return None
+    if entry.get("attribute") == "alt":
+        return entry
+    if entry.get("attribute") != "element" or not _IMAGE_AT.search(str(entry.get("location") or "")):
+        return None
+    now = str(entry.get("now") or "")
+    inside = re.search(r"<alt\b[^>]*>(.*?)</alt>", now, re.S)
+    attribute = re.search(r"<image\b[^>]*\salt\s*=\s*\"([^\"]*)\"", now)
+    alt = inside.group(1) if inside else attribute.group(1) if attribute else ""
+    return dict(entry, attribute="alt", now=alt) if alt.strip() else None
+
+
 def alt_written(map_path, entries):
     """An author wrote alt texts (the audit entries of an Apply): the kept list says so at once, as
     the next check would, so a card opened again does not list them. The check's files are not
     changed; the next check finds the list again from the files it sends. Returns the places marked."""
     import html
-    written = [e for e in entries if isinstance(e, dict) and e.get("attribute") == "alt"] if isinstance(entries, list) else []
+    written = [w for w in (_as_alt(e) for e in entries) if w] if isinstance(entries, list) else []
     if not written:
         return 0
     marked = 0
