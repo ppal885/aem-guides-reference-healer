@@ -903,6 +903,12 @@ class Session:
             and never less than first_guess. Called with count_lock held."""
             return max(running["spent"] / running["done"], first_guess) if running["done"] else first_guess
 
+        def at_limit():
+            """Whether the check has spent its limit, the planner's part kept: a finder still running then
+            finishes with what it found (agentloop should_stop). Starting a finder looks ahead; this does
+            not, so a running finder is stopped only at the limit itself."""
+            return bool(self.token_budget) and usage.cost_since(self.token_mark) >= self.token_budget - reserve
+
         def run(group):
             with self.count_lock:
                 projected = projected_unlocked() if self.token_budget else 0
@@ -937,7 +943,7 @@ class Session:
             outcome = None
             try:
                 outcome = refheal.heal_one(repo, group["refs"][0], self.backend, FINDER_MODEL or self.model, False, self.log,
-                                           declined=self._declined(group["refs"][0]))
+                                           declined=self._declined(group["refs"][0]), should_stop=at_limit)
             finally:
                 spent = usage.cost_since(own, thread=threading.get_ident())
                 with self.count_lock:
@@ -956,6 +962,15 @@ class Session:
             searched = _searched(outcome.get("steps") or [])
             with self.count_lock:
                 self.tool_uses.update(step["tool"] for step in searched)
+            if outcome.get("over_limit"):
+                # Stopped at the check's limit before it answered: like a finder that did not start.
+                group["known"] = {"new_value": None, "verdict": "none", "how": "planner", "caveat": "", "reason":
+                                  "Not looked at in this check: it reached its limit of %s in cost terms. Run the check "
+                                  "again to continue." % format(self.token_budget, ",")}
+                with self.count_lock:
+                    self.over_budget.append(group)
+                self.step(group["id"], "done", "Finder agent", "%s: stopped at the token limit" % self._short(group))
+                return group
             if outcome.get("failed"):
                 # The model did not answer: not a finding, so not "not found"; it waits for the next check.
                 group["known"] = {"new_value": None, "verdict": "none", "how": "planner", "caveat": "", "failed": True,

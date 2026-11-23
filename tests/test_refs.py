@@ -1153,6 +1153,34 @@ class TokenLimitCountsRunningFinders(unittest.TestCase):
                       " ".join(session.plan))
 
 
+class RunningFindersStopAtTheLimit(unittest.TestCase):
+    """A finder already running is told when the check reaches its limit, and one that stops there
+    without an answer waits for the next check (24 Nov 2026: 8 running finders took 300,000 to 474,000)."""
+
+    def test_a_running_finder_sees_the_limit_and_one_stopped_there_waits(self):
+        lib = '<topic id="lib"><title>Lib</title><body><note id="kept">Kept.</note></body></topic>'
+        files = [{"id": "GUID-lib", "path": "/d/lib.dita", "xml": lib, "previous": []},
+                 {"id": "GUID-t1", "path": "/d/t1.dita", "previous": [],
+                  "xml": '<topic id="t1"><title>T1</title><body><p><ph conref="GUID-lib.dita#lib/gone"/></p></body></topic>'}]
+        session = refplan.Session(files, log=lambda message: None, token_budget=20000)
+        seen = []
+
+        def finder(*args, **kwargs):
+            seen.append(kwargs["should_stop"]())
+            usage.note(True, 25000, 0)        # it spends past the limit while it runs
+            seen.append(kwargs["should_stop"]())
+            return {"new_value": None, "verdict": "none", "candidates": [], "reason": "Stopped at the check's limit before an answer.",
+                    "caveat": "", "review": None, "failed": True, "over_limit": True, "steps": []}
+        with mock.patch.object(refplan, "FINDER_TOKENS", 7000), mock.patch.object(refplan, "PLANNER_CLOSING_TOKENS", 0), \
+                mock.patch.object(refplan.refheal, "heal_one", side_effect=finder):
+            session.tool_investigate({"group_ids": list(session.current["groups"])})
+        self.assertEqual(seen, [False, True])
+        group = next(iter(session.current["groups"].values()))
+        self.assertIn("reached its limit of 20,000", group["known"]["reason"])
+        self.assertIn(group, session.over_budget)
+        self.assertNotIn(group, session.unanswered)
+
+
 class TokenLimitAverageOfFinishedFinders(unittest.TestCase):
     """The estimate for a running finder is what finished finders spent themselves: the half-done calls
     of the others are not divided by the finished ones (that stopped 6 of 15 finders on the large sample)."""

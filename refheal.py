@@ -625,7 +625,7 @@ def closest_piece(repo, ref, answer, tools, declined=()):
 DECLINED_CAVEAT = "An author said another target was not what this reference meant; this is what a new search found."
 
 
-def heal_one(repo, ref, backend, model, with_history, log, declined=()):
+def heal_one(repo, ref, backend, model, with_history, log, declined=(), should_stop=None):
     """Stages 2 to 4 for one broken reference. declined: targets (new values) an author looked at
     and said are not it. They are not proposed again, the finder is told so, and whatever it finds
     instead is shown to the author, not applied."""
@@ -657,10 +657,12 @@ def heal_one(repo, ref, backend, model, with_history, log, declined=()):
             "%s [%s]" % (target_label(repo, ref, value), value) for value in sorted(declined))] if declined else []))
     with usage.as_agent("finder"):
         answer, steps, problem = agentloop.run(FINDER_SYSTEM, task, tool_specs(tools, with_history), FINISH,
-                                               backend=backend, model=model, max_calls=MAX_TOOL_CALLS, log=log)
+                                               backend=backend, model=model, max_calls=MAX_TOOL_CALLS, log=log,
+                                               should_stop=should_stop)
     result.update(stage="finder", steps=steps)
     if problem:
-        result.update(reason=problem, failed=True)   # the search broke down; this is not a finding
+        # the search broke down, or stopped at the check's limit; this is not a finding
+        result.update(reason=problem, failed=True, over_limit=problem == agentloop.STOPPED_AT_LIMIT)
         return result
     result.update(confidence=answer["confidence"] if answer["confidence"] in ("high", "medium", "low") else "low",
                   reason=answer["reason"][:500], caveat=answer["caveat"][:300])

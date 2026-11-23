@@ -14,12 +14,21 @@ import json
 MAX_RESULT_CHARS = 16000
 
 
-def run(system, task, tools, finish, backend="cli", model=None, max_calls=8, log=None):
-    """Returns (finish arguments or None, steps, problem). problem is None on a normal finish."""
+# What an agent stopped at its check's limit returns as its problem, when its one last call did not finish.
+STOPPED_AT_LIMIT = "Stopped at the check's limit before an answer."
+LIMIT_NOTE = "This check has reached its limit: no more tool calls. Finish now with what you have found."
+
+
+def run(system, task, tools, finish, backend="cli", model=None, max_calls=8, log=None, should_stop=None):
+    """Returns (finish arguments or None, steps, problem). problem is None on a normal finish.
+    should_stop: asked before each model call after the first; when it says so, the agent gets one last
+    call to finish with what it found, and no more tool calls (a check's limit, which a running agent
+    did not see before: on 24 Nov 2026 8 finders started under a 300,000 limit took a check to 474,000)."""
     log = log or (lambda message: None)
+    stop = should_stop or (lambda: False)
     if backend == "sdk":
-        return _run_sdk(system, task, tools, finish, model, max_calls, log)
-    return _run_cli(system, task, tools, finish, model, max_calls, log)
+        return _run_sdk(system, task, tools, finish, model, max_calls, log, stop)
+    return _run_cli(system, task, tools, finish, model, max_calls, log, stop)
 
 
 def _log_call(response, steps, log):
@@ -88,7 +97,7 @@ def _valid(spec, args):
 
 # ---- Claude API ----------------------------------------------------------------------------
 
-def _run_sdk(system, task, tools, finish, model, max_calls, log):
+def _run_sdk(system, task, tools, finish, model, max_calls, log, stop):
     import anthropic
     import claudeapi
 
@@ -97,8 +106,15 @@ def _run_sdk(system, task, tools, finish, model, max_calls, log):
               "input_schema": {"type": "object", "properties": t["properties"], "required": t["required"],
                                "additionalProperties": False}} for t in tools + [finish]]
     messages = [{"role": "user", "content": task + "\n\nYou may make up to %d tool calls before finish." % max_calls}]
-    steps, calls = [], 0
-    for _ in range(max_calls + 4):
+    steps, calls, stopping = [], 0, False
+    for turn in range(max_calls + 4):
+        if stopping:
+            return None, steps, STOPPED_AT_LIMIT       # the one last call did not finish
+        if turn and stop():
+            stopping, calls = True, max_calls          # no tool calls left: the next answer must finish
+            messages[-1]["content"] = (messages[-1]["content"] if isinstance(messages[-1]["content"], list)
+                                       else [{"type": "text", "text": messages[-1]["content"]}]) + [
+                {"type": "text", "text": LIMIT_NOTE}]
         try:
             response = claudeapi._create(
                 model=model or claudeapi.MODEL, max_tokens=16000, system=system, tools=specs,
@@ -174,15 +190,19 @@ def _protocol(tools, finish):
     return "\n".join(lines)
 
 
-def _run_cli(system, task, tools, finish, model, max_calls, log):
+def _run_cli(system, task, tools, finish, model, max_calls, log, stop):
     import sidecar
 
     by_name = {t["name"]: t for t in tools}
-    transcript, steps = [task], []
+    transcript, steps, stopping = [task], [], False
     full_system = system + _protocol(tools, finish)
     for step in range(1, max_calls + 2):
-        left = max_calls + 1 - step
-        prompt = "\n\n".join(transcript) + "\n\nTool calls left: %d.%s" % (left, " You must finish now." if left == 0 else "")
+        if stopping:
+            return None, steps, STOPPED_AT_LIMIT       # the one last call did not finish
+        stopping = step > 1 and stop()
+        left = 0 if stopping else max_calls + 1 - step
+        prompt = "\n\n".join(transcript) + "\n\nTool calls left: %d.%s" % (
+            left, (" " + LIMIT_NOTE) if stopping else " You must finish now." if left == 0 else "")
         try:
             action = sidecar.call_model(full_system, prompt, model)
         except Exception as exc:
