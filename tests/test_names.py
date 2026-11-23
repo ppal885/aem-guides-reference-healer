@@ -128,6 +128,14 @@ class Spellings(unittest.TestCase):
         self.assertEqual([f["form"] for f in found[0]["forms"]], ["pSeries", "P-Series"])
 
 
+class CodeThatClosesItself(unittest.TestCase):
+    def test_prose_after_an_empty_code_element_is_read(self):
+        spelled = names.spellings([topic(1, '<p><keyword>HX-200</keyword></p>'),
+                                   topic(2, '<p>Open <filepath keyref="dir"/> first.</p><p>The HX 200 runs.</p>'
+                                            '<p>Edit <filepath>conf.ini</filepath>.</p>')])
+        self.assertEqual([(f["form"], f["count"]) for f in spelled[0]["forms"]], [("HX-200", 1), ("HX 200", 1)])
+
+
 class SpellingsLine(unittest.TestCase):
     """The plan's line, which the editor counts from."""
 
@@ -139,6 +147,12 @@ class SpellingsLine(unittest.TestCase):
                          'Names written two ways: 2 names are written more than one way: 1 in 1 place, such as "HX 200" '
                          'for "HX-200" (1 place in 1 topic), and 1 only in capital letters. Open "Names written two ways" '
                          'to make each one spelling.')
+
+    def test_the_example_counts_only_its_own_spelling(self):
+        import refplan
+        spelled = names.spellings([topic(1, '<p><keyword>HX-200</keyword> HX-200 HX-200</p>'),
+                                   topic(2, '<p>HX200 and HX200</p>'), topic(3, '<p>HX 200</p>')])
+        self.assertIn('such as "HX200" for "HX-200" (2 places in 1 topic)', refplan.spellings_line(spelled))
 
     def test_the_sidecar_lists_the_names_with_the_titles_of_their_topics(self):
         sidecar.LAST_FILES["/m.ditamap"] = [topic(1, '<p><keyword>HX-200</keyword> HX-200</p>'), topic(2, '<p>HX 200</p>')]

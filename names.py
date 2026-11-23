@@ -180,7 +180,7 @@ NAME_TAGS = ("keyword", "tm", "wintitle")
 _NAMED = re.compile(r"<(%s)\b[^>]*>(.*?)</\1>" % "|".join(NAME_TAGS), re.S)
 # Text a reader does not read as prose: code, commands, screens; comments, CDATA and processing
 # instructions. The editor's writer leaves out the same (names_apply.ts NOT_PROSE).
-_NOT_PROSE = re.compile(r"<!--.*?-->|<!\[CDATA\[.*?\]\]>|<\?.*?\?>|<(codeblock|codeph|pre|screen|msgblock|cmdname|filepath|varname|userinput|systemoutput|apiname|parmname|option|synph|kwd|msgph|msgnum)\b[^>]*>.*?</\1>", re.S)
+_NOT_PROSE = re.compile(r"<!--.*?-->|<!\[CDATA\[.*?\]\]>|<\?.*?\?>|<(codeblock|codeph|pre|screen|msgblock|cmdname|filepath|varname|userinput|systemoutput|apiname|parmname|option|synph|kwd|msgph|msgnum)\b(?:[^>]*[^/>])?>.*?</\1\s*>", re.S)
 MIN_SAME = 5            # a name shorter than this, once spaces and dashes are taken out, is not compared
 
 

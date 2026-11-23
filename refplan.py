@@ -1738,7 +1738,7 @@ def spellings_line(spelled):
         first = spelling[0]
         parts.append("%s in %s, such as \"%s\" for \"%s\" (%s in %s)" % (
             format(len(spelling), ","), count(sum(s["places"] for s in spelling), "place"), first["forms"][1]["form"],
-            first["main"], count(first["places"], "place"), count(first["topics"], "topic")))
+            first["main"], count(first["forms"][1]["count"], "place"), count(len(first["forms"][1]["files"]), "topic")))
     if capitals:
         parts.append("%s only in capital letters" % format(capitals, ","))
     return ("Names written two ways: %s %s written more than one way: %s. Open \"Names written two ways\" to make "
