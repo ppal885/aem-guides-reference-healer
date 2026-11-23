@@ -9,7 +9,7 @@
       <title>Before you archive</title>
       <p>Close every period of the ledger.</p>
     </section>
-    <p><image href="archive-button.png" alt="The Archive button"/></p>
+    <p><image href="archive-button.png"><alt>The Archive button</alt></image></p>
     <ol>
       <li>Select <uicontrol>Archive</uicontrol>.</li>
       <li>Confirm.</li>

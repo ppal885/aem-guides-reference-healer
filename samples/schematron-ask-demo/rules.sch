@@ -6,13 +6,14 @@
         xmlns:sqf="http://www.schematron-quickfix.com/validator/process" queryBinding="xslt2">
   <pattern id="ask-the-author">
     <rule context="image">
-      <assert id="image-alt" test="@alt" role="warning" sqf:fix="image-add-alt">An image has alternative text (alt).</assert>
+      <assert id="image-alt" test="normalize-space(alt) or normalize-space(@alt)" role="warning" sqf:fix="image-add-alt">An image has alternative text (alt).</assert>
       <sqf:fix id="image-add-alt">
         <sqf:description><sqf:title>Add alternative text</sqf:title></sqf:description>
         <sqf:user-entry name="alt" default="replace(substring-before(tokenize(@href, '/')[last()], '.'), '[-_]', ' ')">
           <sqf:description><sqf:title>What does the image show?</sqf:title></sqf:description>
         </sqf:user-entry>
-        <sqf:add node-type="attribute" target="alt" select="$alt"/>
+        <!-- An <alt> element, as DITA 1.3 has it (the alt attribute is the older way), first in the image. -->
+        <sqf:add node-type="element" target="alt" position="first-child" select="$alt"/>
       </sqf:fix>
     </rule>
     <rule context="xref[@scope = 'external']">

@@ -8,7 +8,7 @@
    "starts_as": "",
    "value": "The Export dialog with CSV selected",
    "path": "/topic[1]/body[1]/p[2]/image[1]",
-   "after": "<image alt=\"The Export dialog with CSV selected\" href=\"export-dialog.png\"/>"
+   "after": "<image href=\"export-dialog.png\"><alt>The Export dialog with CSV selected</alt></image>"
   },
   {
    "file": "topics/export_ledger.dita",
