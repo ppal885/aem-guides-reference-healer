@@ -34,6 +34,11 @@ class FindingImagesWithoutAlt(unittest.TestCase):
         self.assertEqual(alttext.why_weak("diagram.svg", "img/x.svg"), "file name")
         self.assertEqual(alttext.why_weak("Screenshot", "img/x.png"), "generic")
         self.assertIsNone(alttext.why_weak("The Close period dialog", "img/x.png"))
+        self.assertEqual(alttext.why_weak("Enter alt text here", "img/x.png"), "placeholder")
+        self.assertEqual(alttext.why_weak("Please add alternative text for this image.", "img/x.png"), "placeholder")
+        self.assertEqual(alttext.why_weak("Figure 3", "img/x.png"), "generic")
+        self.assertIsNone(alttext.why_weak("Figure 3 wiring of the HX-200 relay", "img/x.png"))
+        self.assertIsNone(alttext.why_weak("Enter the alt key sequence on the console", "img/x.png"))
 
     def test_the_sentence_around_leaves_the_images_own_alt_out_and_reads_the_block_before(self):
         files = [topic("a", '<p>Open the report first.</p><p><image href="i/r.png"><alt>r.png</alt></image></p>'),

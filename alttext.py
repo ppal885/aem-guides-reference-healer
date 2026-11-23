@@ -22,7 +22,13 @@ import refcheck
 
 GENERIC = {"image", "picture", "screenshot", "screen shot", "screen", "figure", "graphic", "photo", "img", "icon",
            "diagram", "chart", "logo", "alt", "alt text", "placeholder", "tbd", "todo"}
-MAX_CHARS = 150          # what the suggestion may be; screen-reader guidance asks for short text
+# Text left to be replaced ("enter alt text here", as a template writes it), and a generic word with
+# only a number ("Figure 3", "Image 2"). Measured on a customer export (23 Nov 2026): 10 images said
+# "enter alt text here".
+_PLACEHOLDER = re.compile(r"(please )?(enter|add|insert|type|write|provide) (the |an? |your )?(alt|alternate|alternative)"
+                          r"( text)?( here)?( for (this|the) (image|figure|graphic))?|alt text (goes )?here")
+_NUMBERED = re.compile(r"(image|picture|screenshot|screen shot|figure|fig|graphic|photo|img|icon|diagram|chart) \d+")
+MAX_CHARS = 150         # what the suggestion may be; screen-reader guidance asks for short text
 BLOCKS = {"p", "li", "cmd", "info", "stepresult", "entry", "dd", "note", "section", "shortdesc", "title"}
 _PREFIX = re.compile(r"^\s*(an?\s+)?(image|picture|photo|screenshot|screen shot|graphic|illustration)\s+(of|showing|that shows)\s+", re.I)
 
@@ -56,7 +62,7 @@ def _inner_xml(alt_el):
 
 
 def why_weak(alt, image_path):
-    """None when the alt says something, else why it does not: 'none', 'file name', 'generic'. An
+    """None when the alt says something, else why it does not: 'none', 'file name', 'generic', 'placeholder'. An
     empty <alt/> is the author's word that the image is decorative (HTML alt=""), so it is not listed."""
     if alt is None:
         return "none"
@@ -68,8 +74,11 @@ def why_weak(alt, image_path):
         return "file name"
     if re.search(r"\.(png|jpe?g|gif|svg|bmp|tiff?)\s*$", alt.strip(), re.I):
         return "file name"
-    if " ".join(words) in GENERIC:
+    said = " ".join(words)
+    if said in GENERIC or _NUMBERED.fullmatch(said):
         return "generic"
+    if _PLACEHOLDER.fullmatch(said):
+        return "placeholder"
     return None
 
 
