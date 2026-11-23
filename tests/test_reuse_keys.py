@@ -46,6 +46,17 @@ class SharedPiecesPulledByKey(unittest.TestCase):
         files = self.files() + [entry("d/sub.ditamap", '<map><keydef keys="common" href="reuse/shared-content.dita"/></map>')]
         self.assertEqual(reuse.key_plan(files, "/d/guide.ditamap")["keys"]["/d/reuse/shared-content.dita"], "common")
 
+    def test_a_chapter_maps_own_shared_topic_is_not_the_books(self):
+        # The chapter was checked first and has its own reuse/shared-content.dita, by key: a key for the
+        # book's would come first in the book and take the chapter's pieces.
+        chapter = entry("d/ch1/ch1.ditamap", '<map><keydef keys="ch1-shared" href="./reuse/shared-content.dita"/></map>')
+        self.assertEqual(reuse.key_plan(self.files() + [chapter], "/d/guide.ditamap")["keys"]["/d/reuse/shared-content.dita"],
+                         "shared-content-2")
+        self.assertEqual(reuse.key_plan(self.files() + [chapter], "/d/ch1/ch1.ditamap")["keys"]["/d/ch1/reuse/shared-content.dita"],
+                         "ch1-shared")
+        book = entry("d/ch1/ch1.ditamap", '<map><keydef keys="common" href="../reuse/shared-content.dita#t"/></map>')
+        self.assertEqual(reuse.key_plan(self.files() + [book], "/d/guide.ditamap")["keys"]["/d/reuse/shared-content.dita"], "common")
+
     def test_a_bookmap_is_a_map_of_the_check_and_its_keys_are_read(self):
         book = [entry("d/guide.bookmap", '<bookmap><frontmatter><keydef keys="shared-content" href="elsewhere.dita"/>'
                                          '</frontmatter><chapter href="a.dita"/></bookmap>')] + self.files()[1:]

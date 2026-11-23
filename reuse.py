@@ -102,22 +102,25 @@ def key_plan(files, map_path):
     folder = os.path.dirname("/" + (map_path or "").lstrip("/"))
     use = any(re.search(r'\sconkeyref\s*=\s*"', entry.get("xml") or "") for entry in files)
     maps = sorted("/" + (e.get("path") or "").lstrip("/") for e in files if (e.get("path") or "").endswith(MAP_ENDINGS))
-    defined, outside = {}, {}         # key name -> href: every map of the check; and outside key scopes
+    # key name -> the file it names (its href from its own map's folder): every map of the check; and
+    # outside key scopes. A chapter map's "reuse/shared-content.dita" is not the book's.
+    defined, outside = {}, {}
     for entry in files:
         if not (entry.get("path") or "").endswith(MAP_ENDINGS):
             continue
         xml = entry.get("xml") or ""
+        here = os.path.dirname("/" + (entry.get("path") or "").lstrip("/"))
         for found, text in ((defined, xml), (outside, _without_scopes(xml))):
             for tag in _KEY_DEF.findall(text):
-                keys, href = re.search(r'\skeys="([^"]+)"', tag), re.search(r'\shref="([^"]*)"', tag)
+                keys, href = re.search(r'\skeys="([^"]+)"', tag), re.search(r'\shref="([^"#]*)', tag)
+                target = os.path.normpath(os.path.join(here, href.group(1))) if href and href.group(1) else ""
                 for key in (keys.group(1).split() if keys else []):
-                    found.setdefault(key, href.group(1) if href else "")
+                    found.setdefault(key, target)
     names = {}
     for rel, base in SHARED_TOPICS.items():
         path = "%s/%s" % (folder, rel)
-        name = os.path.basename(rel)
         # A key inside a key scope is not reached from outside it: it is not the shared topic's key.
-        own = next((k for k, href in outside.items() if href and (href == name or href.endswith("/" + name))), "")
+        own = next((k for k, target in outside.items() if target == os.path.normpath(path)), "")
         if not own:
             own, n = base, 2
             while own in defined:
