@@ -153,7 +153,7 @@ Read the "Measured" table and the limits in the README. The short version, to ke
 - On the 1,251-reference sample the planner made **no wrong repair in three runs**, with the same split every time: 710 repaired, 432 asked, 109 gone.
 - **The fixed pipeline without the planner was just as accurate and about twice as fast** on that sample. What the planner adds is the plan with reasons, the re-check on a copy, the memory, the look back at the last "Fix all", and the budget. Say that, not "more accurate".
 - Ranking: 9 of 9 on nine cases the authors of this project wrote themselves.
-- Real content: 15 of 15 seeded breaks in the public DITA-OT documentation, in 47 minutes before there was a budget. Not repeated since.
+- Real content: 15 of 15 seeded breaks in the public DITA-OT documentation, in 47 minutes before there was a budget. Run again on 24 Nov 2026 with the limit, on two public sets: DITA-OT docs 12 of 15 and the OASIS DITA 2.0 specification 51 of 54 references, **0 wrong** in both; the misses were not looked at because the check's limit was spent first, and the limit itself was overrun about 1.6 times.
 - Nobody has measured time saved for an author.
 
 ## State on 14 Nov 2026

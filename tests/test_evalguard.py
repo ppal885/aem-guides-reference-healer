@@ -26,6 +26,15 @@ class UnansweredCalls(unittest.TestCase):
         self.assertIn("NOT SCORED: 8 of 8 model calls of the injection eval did not answer", said.getvalue())
         self.assertIsNone(usage.refuse_unanswered(0, 12, None, "the planner eval"))
 
+    def test_a_few_failed_calls_are_a_warning_and_many_stop_the_eval(self):
+        said = io.StringIO()
+        with redirect_stdout(said):
+            self.assertIsNone(usage.refuse_unanswered(1, 80, "Extra data: line 3 column 1", "the seeded eval"))
+        self.assertIn("WARNING: 1 of 80 model calls of the seeded eval did not answer", said.getvalue())
+        for failed, total in ((9, 80), (1, 1)):
+            with redirect_stdout(io.StringIO()), self.assertRaises(SystemExit):
+                usage.refuse_unanswered(failed, total, "x", "an eval")
+
 
 if __name__ == "__main__":
     unittest.main()

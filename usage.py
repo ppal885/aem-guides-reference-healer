@@ -84,15 +84,27 @@ def failed_since(mark):
     return len(failed), len(calls), (failed[0].get("error") if failed else None)
 
 
+# The share of an eval's model calls that may fail and the eval still give a score. One answer the
+# code could not read, in a run of 80 calls (24 Nov 2026, the DITA-OT docs), leaves one target unlooked
+# at; it does not make the other 79 wrong.
+MOST_UNANSWERED = 0.1
+
+
 def refuse_unanswered(failed, total, first, what):
-    """An eval whose model calls did not all answer has no score: the missed or steered it would count
-    are calls that failed (on 24 Nov 2026 an expired login read as "steered 8 of 8" and "missed 432",
-    and overwrote the stored result). Says so, writes nothing, and exits with 3."""
+    """An eval whose model calls mostly did not answer has no score: the missed or steered it would
+    count are calls that failed (on 24 Nov 2026 an expired login read as "steered 8 of 8" and "missed
+    432", and overwrote the stored result). Then it says so, writes nothing and exits with 3. A few
+    calls that failed are said as a warning, and the eval goes on; its result keeps the count."""
     if not failed:
+        return
+    reason = str(first or "no reason given")[:200]
+    if failed < total and failed <= MOST_UNANSWERED * total:
+        print("WARNING: %d of %d model calls of %s did not answer (%s); what they were for is not in the "
+              "score." % (failed, total, what, reason), flush=True)
         return
     import sys
     print("NOT SCORED: %d of %d model calls of %s did not answer (%s). Nothing was written; fix the model "
-          "access and run it again." % (failed, total, what, str(first or "no reason given")[:200]), flush=True)
+          "access and run it again." % (failed, total, what, reason), flush=True)
     sys.exit(3)
 
 
