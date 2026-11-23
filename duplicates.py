@@ -94,10 +94,17 @@ def _parse(raw):
         return None
 
 
+# The attributes that hold a path to another file (or a place in this one).
+PATH_ATTRIBUTES = ("href", "conref", "conrefend")
+
+
 def _resolved_href(path, href):
-    """A relative href resolved against the file's folder, so the same target compares equal from
-    any folder; a GUID, a URL or an absolute path as it is."""
-    if re.match(r"^(GUID-|[a-z]+:|/|#)", href):
+    """A relative href (or conref) resolved against the file's folder, so the same target compares
+    equal from any folder; "#topic/fig1" is a place in this file, so it names the file. A GUID, a URL
+    or an absolute path as it is."""
+    if href.startswith("#"):
+        return os.path.normpath(path).lstrip("/") + href
+    if re.match(r"^(GUID-|[a-z]+:|/)", href):
         return href
     target, _, fragment = href.partition("#")
     return os.path.normpath(os.path.join(os.path.dirname(path), target)) + ("#" + fragment if fragment else "")
@@ -105,14 +112,14 @@ def _resolved_href(path, href):
 
 def markup_of(path, el):
     """The markup inside a block, without its text: '<b><xref href=content/a.dita>'. Ids are left out,
-    so are namespaced attributes; an href is resolved. Two copies with the same text and different
+    so are namespaced attributes; an href or conref is resolved. Two copies with the same text and different
     markup (bold here, not there; a link to another topic) are not the same piece. The editor
     computes the same string from the file (markup.ts)."""
     parts = []
     for d in el.iter():
         if d is el:
             continue
-        attrs = sorted((k, _resolved_href(path, v) if k == "href" else v) for k, v in d.attrib.items()
+        attrs = sorted((k, _resolved_href(path, v) if k in PATH_ATTRIBUTES else v) for k, v in d.attrib.items()
                        if k != "id" and not k.startswith("{") and ":" not in k)
         parts.append("<%s%s>" % (_local(d.tag), "".join(" %s=%s" % kv for kv in attrs)))
     return "".join(parts)

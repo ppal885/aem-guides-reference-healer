@@ -2375,6 +2375,14 @@ class CopiedText(unittest.TestCase):
         plain = duplicates.blocks_of("d/a.dita", "<topic id='t'><title>T</title><body><p>%s</p></body></topic>" % self.WARN)[0]
         self.assertEqual(plain["markup"], "")
 
+    def test_a_link_into_its_own_topic_and_a_conref_name_their_files(self):
+        # Two copies that each link to a figure of their own topic are not the same piece.
+        body = '<p>Read the steps in <xref href="#t/fig1"/> and <ph conref="lib.dita#lib/p1"/> before you close the period at the end of the month.</p>'
+        one = duplicates.blocks_of("content/dam/a/one.dita", '<topic id="t"><title>T</title><body>%s</body></topic>' % body)[0]
+        two = duplicates.blocks_of("content/dam/b/two.dita", '<topic id="t"><title>T</title><body>%s</body></topic>' % body)[0]
+        self.assertEqual(one["markup"], "<xref href=content/dam/a/one.dita#t/fig1><ph conref=content/dam/a/lib.dita#lib/p1>")
+        self.assertNotEqual(one["markup"], two["markup"])
+
     def test_short_text_and_copies_in_one_topic_are_left_out(self):
         files = [self.topic("a", "<p>Click Save.</p><p>%s</p><p>%s</p>" % (self.WARN, self.WARN)),
                  self.topic("b", "<p>Click Save.</p>")]
