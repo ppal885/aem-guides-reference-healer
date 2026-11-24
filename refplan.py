@@ -44,6 +44,11 @@ import wayout
 #   renames   [{"kind", "old", "new", ...}]        the rename behind an accepted answer, so that the
 #                                                  same old target reached through another attribute
 #                                                  or file needs no second question
+#   by_map    {map path: {"attribute|old value": new value}}   the map each answer was given for. An answer
+#                                                  is applied without asking only in its own map; in another
+#                                                  map it is a suggestion to review. 24 Nov 2026: an answer
+#                                                  given for one team's map was applied without asking in
+#                                                  another team's map that used the same shared keys.
 MEMORY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out", "author-answers.json")
 # What the editor applied with the last "Fix all", so the next check can see what became of it.
 APPLIED_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out", "last-fix-all.json")
@@ -57,6 +62,7 @@ def _memory(data):
     data.setdefault("answers", {})
     data.setdefault("rejected", {})
     data.setdefault("renames", [])
+    data.setdefault("by_map", {})
     data.setdefault("no_source_edit", [])   # "keys" / "id": edits at the source that did not hold in the repository
     return data
 
@@ -130,10 +136,13 @@ def _renames(attribute, old, new):
     return [dict(entry, source=source) for entry in found]
 
 
-def learned(memory, attribute, value):
+def learned(memory, attribute, value, map_path=None):
     """(new value, exact) from the renames authors accepted, or None. exact is False when the hint
-    is an element id that was renamed behind some key: it may be another file's element."""
+    is an element id that was renamed behind some key (it may be another file's element), or a
+    rename accepted in another map than map_path."""
     exact, new = True, value
+    if any(r.get("map") != map_path for r in memory["renames"] if _uses(r, attribute, value)):
+        exact = False
     if attribute in ("keyref", "conkeyref"):
         key, _, element_id = value.partition("/")
         for rename in memory["renames"]:
@@ -155,16 +164,29 @@ def learned(memory, attribute, value):
     return (new, exact) if new != value else None
 
 
-def remember(attribute, old, new, path=None, rejected=None):
-    """Records that an author accepted the repair old -> new, and which other candidates they
-    passed over. Returns how many answers are stored."""
+def _uses(rename, attribute, value):
+    """Whether learned() could follow this rename for attribute="value"."""
+    if attribute in ("keyref", "conkeyref"):
+        key, _, element_id = value.partition("/")
+        return (rename["kind"] == "key" and rename["old"] == key) or (
+            rename["kind"] == "element" and bool(element_id) and rename["old"] == element_id)
+    file_part = value.partition("#")[0]
+    return rename.get("old") in (value, file_part) or rename.get("file") == file_part
+
+
+def remember(attribute, old, new, path=None, rejected=None, map_path=None):
+    """Records that an author accepted the repair old -> new in map_path, and which other candidates
+    they passed over. Returns how many answers are stored."""
     if not all(isinstance(v, str) and v.strip() for v in (attribute, old, new)) or old == new:
         raise ValueError("attribute, old and new must be different, non-empty strings")
     path = path or MEMORY_PATH
     with _LOCK:
         memory, key = load_memory(path), "%s|%s" % (attribute, old)
         memory["answers"][key] = new
-        memory["renames"] = [r for r in memory["renames"] if r.get("source") != key] + _renames(attribute, old, new)
+        if map_path:
+            memory["by_map"].setdefault(map_path, {})[key] = new
+        memory["renames"] = [r for r in memory["renames"] if r.get("source") != key] + [
+            dict(r, map=map_path or "") for r in _renames(attribute, old, new)]
         declined = [v for v in (rejected or []) if isinstance(v, str) and v and v != new]
         kept = [v for v in memory["rejected"].get(key, []) if v != new]
         if kept or declined:
@@ -193,6 +215,8 @@ def forget(attribute, old, path=None):
     with _LOCK:
         memory, key = load_memory(path), "%s|%s" % (attribute, old)
         had = memory["answers"].pop(key, None) is not None
+        for answers in memory["by_map"].values():
+            had = answers.pop(key, None) is not None or had
         memory["renames"] = [r for r in memory["renames"] if r.get("source") != key]
         _write(path, memory)
         return had
@@ -427,8 +451,9 @@ class Session:
 
     def __init__(self, files, backend="cli", model=None, log=print, progress=None, memory=None, reported=None,
                  outside=None, timeline=None, cache=None, max_groups=None,
-                 choose=None, assets=None, missing=None, token_budget=None, trace_all=None):
+                 choose=None, assets=None, missing=None, token_budget=None, trace_all=None, map_path=None):
         self.backend, self.model, self.log = backend, model, log
+        self.map_path = map_path or None        # the map checked: an author's answer applies without asking only there
         self.trace_all = TRACE_ALL if trace_all is None else trace_all
         self.token_budget = TOKEN_BUDGET if token_budget is None else token_budget
         self.token_mark = usage.position()      # the tokens of this check are counted from here
@@ -548,17 +573,26 @@ class Session:
         """An author accepted this repair in an earlier check, or the rename behind it: use it, if
         it still resolves and nobody declined it since."""
         first = group["refs"][0]
-        new, exact = self.memory["answers"].get("%s|%s" % (first["attribute"], first["value"])), True
-        reason = "An author accepted this repair in an earlier check."
+        key = "%s|%s" % (first["attribute"], first["value"])
+        own = (self.memory["by_map"].get(self.map_path) or {}).get(key) if self.map_path else None
+        new, exact, caveat = own, True, ""
+        reason = "An author accepted this repair in an earlier check of this map."
+        if not new and self.memory["answers"].get(key):
+            # Given for another map (or before answers were kept per map): the same broken value can
+            # mean another thing there, so the author reads it first.
+            new, exact = self.memory["answers"][key], False
+            reason = "An author accepted this repair in an earlier check of another map."
+            caveat = "It was accepted for another map, which may mean something else by it; check that it is right here."
         if not new:
-            hint = learned(self.memory, first["attribute"], first["value"])
+            hint = learned(self.memory, first["attribute"], first["value"], self.map_path)
             if hint:
                 new, exact = hint
                 reason = "An author accepted the same rename for another reference in an earlier check."
+                caveat = "" if exact else ("The rename was accepted for an element reached another way, or in another "
+                                           "map; check that this is the same element.")
         if new and new not in self._declined(first) and repo.check(dict(first, value=new)) is None:
             group["known"] = {"new_value": new, "verdict": "fix" if exact else "review", "how": "author", "reason": reason,
-                              "caveat": "" if exact else "The rename was accepted for an element reached another way; "
-                                                         "check that this is the same element."}
+                              "caveat": caveat}
 
     def _drop_declined(self, ref, known):
         """Takes targets an author declined out of a finder's answer; the next candidate moves up."""
@@ -1837,7 +1871,7 @@ def _plan_files(payload, backend="cli", model=None, log=print, progress=None, me
     stored = memory is None
     session = Session(files, backend, model, log, progress, load_memory() if stored else memory,
                       reported=payload.get("reported"), outside=payload.get("used_outside"), timeline=timeline,
-                      assets=payload.get("assets"), missing=payload.get("missing_paths"))
+                      assets=payload.get("assets"), missing=payload.get("missing_paths"), map_path=payload.get("map"))
     log("planner input: %d files, %s references reported by the repository, %d files with users outside the map"
         % (len(files), len(payload["reported"]) if isinstance(payload.get("reported"), list) else "no",
            sum(1 for v in (payload.get("used_outside") or {}).values() if v)))

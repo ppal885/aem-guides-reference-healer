@@ -768,11 +768,16 @@ class Planner(unittest.TestCase):
 
     def test_an_answer_an_author_gave_before_is_used_again_without_an_agent(self):
         files = [dict(f) for f in self.session.original]
-        session = refplan.Session(files, log=lambda message: None,
-                                  memory={"conref|GUID-lib.dita#lib/help": "GUID-lib.dita#lib/support"})
+        answer = {"conref|GUID-lib.dita#lib/help": "GUID-lib.dita#lib/support"}
+        session = refplan.Session(files, log=lambda message: None, map_path="/d/m.ditamap",
+                                  memory={"answers": dict(answer), "by_map": {"/d/m.ditamap": dict(answer)}})
         group = next(g for g in session.tool_overview({})["groups"] if g["broken_value"] == "lib.dita#lib/help")
         self.assertEqual((group["repair"]["found_by"], group["repair"]["verdict"], group["repair"]["new_value"]),
                          ("author", "fix", "lib.dita#lib/support"))
+        # An answer kept before answers were kept per map is not applied unasked.
+        flat = refplan.Session([dict(f) for f in self.session.original], log=lambda message: None, memory=dict(answer))
+        group = next(g for g in flat.tool_overview({})["groups"] if g["broken_value"] == "lib.dita#lib/help")
+        self.assertEqual(group["repair"]["verdict"], "review")
 
     def test_a_remembered_answer_that_no_longer_resolves_is_ignored(self):
         session = refplan.Session([dict(f) for f in self.session.original], log=lambda message: None,
@@ -818,10 +823,30 @@ class Learning(unittest.TestCase):
 
     def test_an_accepted_rename_is_used_for_the_same_target_reached_by_another_attribute(self):
         path = self.path()
-        refplan.remember("conref", "GUID-lib.dita#lib/help", "GUID-lib.dita#lib/support", path)
-        session = self.session(self.files('<p>See <xref href="GUID-lib.dita#lib/help"/></p>'), memory=refplan.load_memory(path))
+        refplan.remember("conref", "GUID-lib.dita#lib/help", "GUID-lib.dita#lib/support", path, map_path="/d/m.ditamap")
+        files = self.files('<p>See <xref href="GUID-lib.dita#lib/help"/></p>')
+        session = self.session(files, memory=refplan.load_memory(path), map_path="/d/m.ditamap")
         repair = session.tool_overview({})["groups"][0]["repair"]
         self.assertEqual((repair["found_by"], repair["verdict"], repair["new_value"]), ("author", "fix", "lib.dita#lib/support"))
+        # Learned in another map: the author of this map reads it first.
+        other = self.session(files, memory=refplan.load_memory(path), map_path="/e/other.ditamap")
+        self.assertEqual(other.tool_overview({})["groups"][0]["repair"]["verdict"], "review")
+
+    def test_an_answer_is_applied_without_asking_only_in_the_map_it_was_given_for(self):
+        # 24 Nov 2026: an answer one team gave for its map was applied, unasked, in another team's map
+        # that used the same shared keys ("Install Atlas Cloud" in the Zephyr guide).
+        path = self.path()
+        refplan.remember("conref", "GUID-lib.dita#lib/help", "GUID-lib.dita#lib/support", path, map_path="/atlas/a.ditamap")
+        files = self.files('<note conref="GUID-lib.dita#lib/help"/>')
+
+        def answer(map_path):
+            group = self.session(files, memory=refplan.load_memory(path), map_path=map_path).tool_overview({})["groups"][0]
+            return group["repair"]["verdict"], group["repair"]["new_value"]
+        self.assertEqual(answer("/atlas/a.ditamap"), ("fix", "lib.dita#lib/support"))
+        self.assertEqual(answer("/zephyr/z.ditamap"), ("review", "lib.dita#lib/support"))
+        self.assertEqual(refplan.load_memory(path)["by_map"], {"/atlas/a.ditamap": {"conref|GUID-lib.dita#lib/help": "GUID-lib.dita#lib/support"}})
+        self.assertTrue(refplan.forget("conref", "GUID-lib.dita#lib/help", path))
+        self.assertEqual(refplan.load_memory(path)["by_map"], {"/atlas/a.ditamap": {}})
 
     def test_an_element_renamed_behind_a_key_is_only_a_hint_for_another_key(self):
         path = self.path()

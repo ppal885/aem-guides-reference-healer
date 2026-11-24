@@ -596,7 +596,7 @@ def serve(port, model=None):
                         self.send_json(200, {"forgotten": forgotten})
                     else:
                         stored = refplan.remember(body.get("attribute"), body.get("old"), body.get("new"),
-                                                  rejected=body.get("rejected"))
+                                                  rejected=body.get("rejected"), map_path=body.get("map"))
                         _log("author answer stored (%d in all)" % stored)
                         self.send_json(200, {"stored": stored})
                 except (ValueError, AttributeError, TypeError) as exc:
