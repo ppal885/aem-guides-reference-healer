@@ -100,10 +100,8 @@ def key_names(files):
     A key no map defines now, but an earlier version of a map did, gets the name it had then."""
     titles = _titles(files)
     names, earlier = {}, {}
-    for entry in files:
+    for entry in _maps_in_key_order(files):
         path = (entry.get("path") or "").lstrip("/")
-        if not path.endswith(MAP_ENDINGS):
-            continue
         for key, name in _definitions(path, entry.get("xml") or "", titles):
             if name:
                 names.setdefault(key, name)
@@ -114,6 +112,38 @@ def key_names(files):
     for key, name in earlier.items():
         names.setdefault(key, name)
     return names
+
+
+_HREF_TAG = re.compile(r"<[\w.-]+\b[^>]*\shref\s*=\s*\"([^\"]+)\"[^>]*>")
+
+
+def _maps_in_key_order(files):
+    """The maps among files in the order DITA reads key definitions (refcheck.breadth_first): a root
+    map's definition of a key wins over its submap's, whatever order the files came in."""
+    import refcheck
+    maps = [e for e in files if (e.get("path") or "").lstrip("/").endswith(MAP_ENDINGS)]
+    by_name = {}
+    for entry in maps:
+        path = (entry.get("path") or "").lstrip("/")
+        by_name[path] = entry
+        if entry.get("id"):
+            by_name[entry["id"] + os.path.splitext(path)[1]] = entry
+    children = {}
+    for entry in maps:
+        path = (entry.get("path") or "").lstrip("/")
+        kids = []
+        for found in _HREF_TAG.finditer(entry.get("xml") or ""):
+            link = found.group(1).split("#")[0]
+            submap = (_attribute(found.group(0), "format") == "ditamap" or link.lower().endswith(MAP_ENDINGS))
+            if not submap or refcheck.HAS_SCHEME.match(link) or _attribute(found.group(0), "scope") == "external":
+                continue
+            target = by_name.get(os.path.basename(link)) if os.path.basename(link).upper().startswith("GUID-") else \
+                by_name.get(os.path.normpath(os.path.join(os.path.dirname(path), link)))
+            if target is not None:
+                kids.append((target.get("path") or "").lstrip("/"))
+        children[path] = kids
+    order = refcheck.breadth_first([(e.get("path") or "").lstrip("/") for e in maps], children)
+    return [by_name[path] for path in order]
 
 
 # An element with an id and a title right inside it: a section, a table, a figure.

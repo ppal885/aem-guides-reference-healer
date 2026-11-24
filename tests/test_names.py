@@ -48,6 +48,16 @@ class KeyNames(unittest.TestCase):
         self.assertEqual(names.shown(text, found, links), "Use atlasctl, see Account limits. Ask [nope]; [varies]")
 
 
+class KeyNamesOfARootMap(unittest.TestCase):
+    def test_a_root_map_names_a_key_its_submap_also_defines(self):
+        sub = ('d/common.ditamap', '<map><keydef keys="product"><topicmeta><keywords><keyword>Atlas 1</keyword>'
+               '</keywords></topicmeta></keydef></map>')
+        root = ('d/main.ditamap', '<map><keydef keys="product"><topicmeta><keywords><keyword>Atlas 2</keyword>'
+                '</keywords></topicmeta></keydef><mapref href="common.ditamap"/></map>')
+        for order in ([sub, root], [root, sub]):
+            self.assertEqual(names.key_names([{"path": p, "xml": x} for p, x in order])["product"], "Atlas 2")
+
+
 class RepeatedTextAsReadersSeeIt(unittest.TestCase):
     """The Repeated Text card shows a copy's words with the names its keys and links show."""
 

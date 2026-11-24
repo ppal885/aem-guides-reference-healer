@@ -95,6 +95,27 @@ class ConrefendBesideAKeyAndLines(unittest.TestCase):
                          [("nokey", 1), ("nokey", 3), ("nokey2", 4)])
 
 
+class ARootMapsKeyWinsOverItsSubmaps(unittest.TestCase):
+    """A key that a root map defines again overrides its submap's definition, in whatever order
+    the files come (24 Nov 2026: the submap read first won and the key was reported broken)."""
+
+    def test_the_root_map_wins_in_any_order(self):
+        files = [("GUID-c", "/d/common.ditamap", '<map><keydef keys="install" href="install-old.dita"/></map>'),
+                 ("GUID-m", "/d/main.ditamap", '<map><keydef keys="install" href="install-v2.dita"/>'
+                                                '<mapref href="GUID-c.ditamap"/><topicref href="GUID-a.dita"/></map>'),
+                 ("GUID-a", "/d/a.dita", TOPIC % '<p>See <xref keyref="install"/>.</p>'),
+                 ("GUID-i", "/d/install-v2.dita", '<topic id="i"><title>Install</title></topic>')]
+        for order in (files, list(reversed(files))):
+            r = repo(*order)
+            self.assertEqual(r.keys["install"]["target"], "d/install-v2.dita")
+            self.assertNotIn(("keyref", "install"), broken(r))
+
+    def test_maps_are_read_level_by_level(self):
+        order = refcheck.breadth_first(["sub2", "sub1", "deep", "root", "loop"],
+                                       {"root": ["sub1", "sub2"], "sub1": ["deep"], "sub2": [], "deep": [], "loop": ["loop"]})
+        self.assertEqual(order, ["root", "sub1", "sub2", "deep", "loop"])
+
+
 class Samples(unittest.TestCase):
     def test_the_clean_sample_has_no_broken_references_and_the_changed_one_has_eleven(self):
         root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "samples", "ref-demo")

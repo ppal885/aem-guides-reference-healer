@@ -41,6 +41,31 @@ def conditions_of(el):
     return {name: " ".join(el.get(name).split()) for name in CONDITION_ATTRS if (el.get(name) or "").strip()}
 
 
+def breadth_first(maps, children):
+    """The maps in the order DITA reads key definitions: the maps no other map brings in first, then
+    the maps they bring in, level by level, each in the order it is brought in. The first definition
+    of a key in this order wins, so a root map that defines a key again overrides its submap's.
+    Read in file order, a submap that came first won (24 Nov 2026): the key went to the submap's
+    deleted file and was reported broken, and its name was the submap's. Maps that no root reaches
+    (a loop) follow in their own order. children: {map: [maps it brings in, in order]}."""
+    brought_in = {child for kids in children.values() for child in kids}
+    queue = [m for m in maps if m not in brought_in]
+    order, seen = [], set()
+    while queue:
+        current = queue.pop(0)
+        if current in seen or current not in children:
+            continue
+        seen.add(current)
+        order.append(current)
+        queue.extend(children[current])
+    return order + [m for m in maps if m not in seen]
+
+
+def is_submap_link(el, link):
+    return (bool(link) and not HAS_SCHEME.match(link) and el.get("scope") != "external"
+            and (el.get("format") == "ditamap" or link.split("#")[0].lower().endswith(".ditamap")))
+
+
 def local(tag):
     return tag.rsplit("}", 1)[-1] if isinstance(tag, str) else ""
 
@@ -167,8 +192,8 @@ class Repo:
                 self.other_files.add(path)
         for rel, (raw, tree) in parsed.items():
             self._index(rel, tree)
-        for rel, (raw, tree) in parsed.items():
-            self._collect_keys(rel, tree)
+        for rel in self._key_order(parsed):
+            self._collect_keys(rel, parsed[rel][1])
         self._scope_submap_keys()
         for rel, (raw, tree) in parsed.items():
             self._collect_refs(rel, raw, tree)
@@ -213,8 +238,8 @@ class Repo:
                 self.other_files.add(rel)
         for rel, (raw, tree) in parsed.items():
             self._index(rel, tree)
-        for rel, (raw, tree) in parsed.items():
-            self._collect_keys(rel, tree)
+        for rel in self._key_order(parsed):
+            self._collect_keys(rel, parsed[rel][1])
         self._scope_submap_keys()
         for rel, (raw, tree) in parsed.items():
             self._collect_refs(rel, raw, tree)
@@ -244,6 +269,16 @@ class Repo:
         walk(tree, None)
         self.files[rel] = entry
 
+    def _key_order(self, parsed):
+        """The maps among parsed (path -> (raw, tree)) in DITA's order for key definitions."""
+        maps = [rel for rel in parsed if rel.endswith(".ditamap")]
+        children = {}
+        for rel in maps:
+            tree = parsed[rel][1]
+            children[rel] = [self.resolve_path(rel, el.get("href").split("#")[0]) for el in tree.iter()
+                             if el is not tree and is_submap_link(el, el.get("href") or "")]
+        return breadth_first(maps, children)
+
     def _collect_keys(self, rel, tree):
         if not rel.endswith(".ditamap"):
             return
@@ -253,8 +288,7 @@ class Repo:
             if own:
                 scopes = scopes + [own[0]]
             link = el.get("href") or ""
-            if (el is not tree and link and not HAS_SCHEME.match(link) and el.get("scope") != "external"
-                    and (el.get("format") == "ditamap" or link.split("#")[0].lower().endswith(".ditamap"))):
+            if el is not tree and is_submap_link(el, link):
                 # A submap: its keys also live in the scopes of the element that brings it in.
                 self.submap_links.append((self.resolve_path(rel, link.split("#")[0]), list(scopes)))
             names = el.get("keys")
