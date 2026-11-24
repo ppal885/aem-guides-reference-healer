@@ -16,6 +16,7 @@ import refheal  # noqa: E402
 import audit  # noqa: E402
 import wayouteval  # noqa: E402
 import refplan  # noqa: E402
+import wayout  # noqa: E402
 import duplicates  # noqa: E402
 import reuse  # noqa: E402
 import subjectscheme  # noqa: E402
@@ -987,6 +988,16 @@ class WaysOut(unittest.TestCase):
                          (True, ["restore_at_source", "keep_text_in_topics"]))
         refused = session.tool_decide({"group_ids": [group["id"]], "decision": "remove_references", "reason": "Old."})
         self.assertIn("safety content", refused["rejected"][group["id"]])
+
+    def test_a_piece_that_holds_a_warning_is_safety_content_too(self):
+        # 24 Nov 2026: only the piece's own tag was read, so a section with a warning inside was offered for removal.
+        for piece in ('<section id="s"><title>Before you open it</title><note type="danger">High voltage.</note></section>',
+                      '<p id="p">Unplug it. <note type="caution">Sharp edges.</note></p>',
+                      '<steps id="st"><step><hazardstatement type="danger"/><cmd>Open it.</cmd></step></steps>',
+                      '<note id="n" type="other" othertype="Warning">Hot.</note>'):
+            self.assertTrue(wayout.is_safety(piece), piece)
+        for piece in ('<note id="n" type="tip">Tip.</note>', '<section id="s"><p>Plain.</p></section>'):
+            self.assertFalse(wayout.is_safety(piece), piece)
 
     def test_a_link_to_removed_content_can_only_be_put_back(self):
         session = self.session('<p>See <xref href="GUID-lib.dita#lib/notice"/></p>')

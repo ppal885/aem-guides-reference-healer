@@ -41,13 +41,25 @@ def element_xml(xml, element_id):
     return ""
 
 
+_NOTE = re.compile(r"<note(?=[\s/>])([^>]*)>")
+
+
+def _attribute(attributes, name):
+    found = re.search(r'\s%s\s*=\s*["\']([^"\']*)["\']' % name, attributes)
+    return found.group(1).strip().lower() if found else ""
+
+
 def is_safety(xml):
-    """True for a warning, danger or caution note and for a hazard statement."""
-    tag = re.match(r"<([A-Za-z_][\w.-]*)([^>]*)>", xml or "")
-    if not tag:
-        return False
-    kind = re.search(r'\stype\s*=\s*["\']([^"\']*)["\']', tag.group(2))
-    return tag.group(1) == "hazardstatement" or (tag.group(1) == "note" and bool(kind) and kind.group(1) in SAFETY_NOTE_TYPES)
+    """True when the piece is or holds a warning, danger or caution note (also type="other" with that
+    othertype) or a hazard statement. Only the piece's own tag was looked at before (24 Nov 2026): a
+    shared section, paragraph or steps with a warning inside was offered for removal."""
+    if re.search(r"<hazardstatement(?=[\s/>])", xml or ""):
+        return True
+    for attributes in _NOTE.findall(xml or ""):
+        kind = _attribute(attributes, "type")
+        if kind in SAFETY_NOTE_TYPES or (kind == "other" and _attribute(attributes, "othertype") in SAFETY_NOTE_TYPES):
+            return True
+    return False
 
 
 def anchor(old_xml, element_id, ids_now):
