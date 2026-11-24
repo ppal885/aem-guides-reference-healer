@@ -61,15 +61,23 @@ def _text(el):
 
 def _shown(el, path=""):
     """The text a reader sees, with a mark where an element says a key and holds no text of its own
-    (<keyword keyref="product-name"/>): names.shown puts the key's name there. _text drops those, so
+    (<keyword keyref="product-name"/>), or brings its text by conref or conkeyref: names.shown puts
+    the key's name, or the text reused, there. _text drops those, so
     the copies still compare as before; this is only for showing."""
     parts = []
 
     def go(node, top):
         key = None if top else (node.get("keyref") or "").split("/")[0]
         href = None if top or key else node.get("href")
+        conref, conkeyref = (None, None) if top else (node.get("conref"), node.get("conkeyref"))
         empty = not "".join(node.itertext()).strip()
-        if key and empty:
+        if conkeyref and empty:
+            # A phrase reused by key (<ph conkeyref="vars/product"/>): the mark names it by key and id;
+            # names.link_titles has the text it brings, so the sentence is not left with a gap.
+            parts.append(" \u27e6=~%s\u27e7 " % conkeyref)
+        elif conref and empty:
+            parts.append(" \u27e6=%s\u27e7 " % _resolved_href(path, conref))
+        elif key and empty:
             parts.append(" \u27e6%s\u27e7 " % key)
         elif href and empty and _local(node.tag) == "xref":
             # A link that shows its target's title: the mark names the target, resolved from this file.

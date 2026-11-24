@@ -19,7 +19,8 @@ def files(*topics):
     return [{"path": "d/m.ditamap", "xml": MAP, "previous": [OLD_MAP]},
             {"path": "d/a.dita", "xml": '<topic id="a"><title>Getting started</title></topic>'},
             {"path": "d/b.dita", "id": "GUID-b", "xml": '<topic id="b"><title>Set up the account</title>'
-             '<body><section id="limits"><title>Account limits</title></section></body></topic>'}] + [
+             '<body><section id="limits"><title>Account limits</title></section>'
+             '<p><ph id="plan"><xref href="a.dita">plan<desc>The plans and what each costs</desc></xref> limits</ph></p></body></topic>'}] + [
         {"path": "d/t%d.dita" % n, "xml": '<topic id="t%d"><title>T</title><body>%s</body></topic>' % (n, body)}
         for n, body in enumerate(topics, 1)]
 
@@ -68,6 +69,24 @@ class RepeatedTextAsReadersSeeIt(unittest.TestCase):
         say = '<p>Install <keyword keyref="%s"/> before you start the long migration of every account.</p>'
         out = self.group_of(say % "cli", say % "product")
         self.assertIn("[varies]", out["shown"])
+
+    def test_a_phrase_reused_by_conref_or_conkeyref_shows_the_text_it_brings(self):
+        # The OASIS DITA source showed "available on this element: , , , and keyref." (24 Nov 2026).
+        say = '<p>Read the rules in %s before you start the long migration of every account.</p>'
+        by_conref = self.group_of(say % '<ph conref="b.dita#b/limits"/>', say % '<ph conref="b.dita#b/limits"/>')
+        self.assertIn("rules in Account limits before", by_conref["shown"])
+        by_key = self.group_of(say % '<ph conkeyref="setup/limits"/>', say % '<ph conkeyref="setup/limits"/>')
+        self.assertIn("rules in Account limits before", by_key["shown"])
+        # A link's hover text is not in the sentence a reader sees.
+        hover = self.group_of(say % '<ph conkeyref="setup/plan"/>', say % '<ph conkeyref="setup/plan"/>')
+        self.assertIn("rules in plan limits before", hover["shown"])
+
+    def test_a_reused_phrase_not_found_and_copies_that_reuse_different_ones(self):
+        say = '<p>Read the rules in %s before you start the long migration of every account.</p>'
+        unknown = self.group_of(say % '<ph conkeyref="nokey/limits"/>', say % '<ph conkeyref="nokey/limits"/>')
+        self.assertIn("rules in [shared text] before", unknown["shown"])
+        mixed = self.group_of(say % '<ph conref="b.dita#b/limits"/>', say % '<ph conkeyref="setup/other"/>')
+        self.assertIn("[varies]", mixed["shown"])
 
 
 if __name__ == "__main__":

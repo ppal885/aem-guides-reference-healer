@@ -130,7 +130,76 @@ def link_titles(files):
     for entry in files:
         for old in entry.get("previous") or []:
             _titles_of(entry, old or "", out)
+    _reused_into(files, out)
     return out
+
+
+# Inside a reused phrase, what a reader does not see in the sentence: a link's hover text, index
+# entries, comments to the writers, footnotes (shown apart), data. On the OASIS source a conkeyref
+# brought "universal attributes" and, with the link's <desc>, a list of 20 attribute names.
+_UNSEEN = {"desc", "indexterm", "draft-comment", "fn", "data", "required-cleanup"}
+
+
+def _read(el, top=False):
+    """The text of an element as a reader sees it in a sentence; the tail is the caller's."""
+    if not top and el.tag.rsplit("}", 1)[-1] in _UNSEEN:
+        return ""
+    return (el.text or "") + "".join(_read(child) + (child.tail or "") for child in el)
+
+
+_REUSE = re.compile(r"\s(conref|conkeyref)\s*=\s*\"([^\"]+)\"")
+
+
+def _reused_into(files, out):
+    """Adds what a phrase that reuses text brings: "=<file>#<topic>/<id>" for a conref (resolved as
+    duplicates._shown marks it), "=~<key>/<id>" for a conkeyref. Only the targets that are reused
+    are read. On the OASIS DITA source (24 Nov 2026) 22 of 212 groups of repeated text showed
+    "available on this element: , , , and keyref." where three conkeyrefs bring the names."""
+    import duplicates
+    import xml.etree.ElementTree as ET
+    wanted = set()
+    for entry in files:
+        path = (entry.get("path") or "").lstrip("/")
+        for kind, value in _REUSE.findall(entry.get("xml") or ""):
+            wanted.add((kind, path, value))
+    if not wanted:
+        return
+    by_path, keys = {}, {}
+    for entry in files:
+        path = (entry.get("path") or "").lstrip("/")
+        by_path[path] = entry
+        if entry.get("id"):
+            by_path["%s.dita" % entry["id"]] = entry
+        if path.endswith(MAP_ENDINGS):
+            for found in _KEY_DEF.finditer(entry.get("xml") or ""):
+                href = _attribute(found.group(2), "href").split("#")[0]
+                for key in _attribute(found.group(2), "keys").split():
+                    if href:
+                        keys.setdefault(key, duplicates._resolved_href(path, href))
+    parsed = {}
+
+    def text_of(file, element):
+        if file not in parsed:
+            entry = by_path.get(file)
+            try:
+                parsed[file] = ET.fromstring(re.sub(r"<!DOCTYPE[^>\[]*(\[[^\]]*\])?[^>]*>", "", entry.get("xml") or "",
+                                                    count=1)) if entry else None
+            except ET.ParseError:
+                parsed[file] = None
+        root = parsed[file]
+        found = next((el for el in root.iter() if el.get("id") == element), None) if root is not None and element else None
+        return " ".join(_read(found, True).split()) if found is not None else ""
+    for kind, path, value in wanted:
+        if kind == "conref":
+            mark = duplicates._resolved_href(path, value)
+            file, _, fragment = mark.partition("#")
+        else:
+            mark = "~" + value
+            key, _, fragment = value.partition("/")
+            file = keys.get(key)
+        text = text_of(file, fragment.split("/")[-1]) if file and fragment else ""
+        if text:
+            out.setdefault("=" + mark, text)
 
 
 def _titles_of(entry, xml, out):
@@ -153,6 +222,8 @@ def _titles_of(entry, xml, out):
 def _name_for(mark, names, links):
     if mark == "*":
         return "[varies]"
+    if mark.startswith("="):
+        return links.get(mark) or "[shared text]"
     if mark.startswith("@"):
         target = mark[1:]
         return links.get(target) or links.get(target.split("#")[0]) or "[%s]" % os.path.basename(target.split("#")[0])
