@@ -71,6 +71,30 @@ class Index(unittest.TestCase):
                          "wifi_settings.dita#wifi_settings/wifi-password")
 
 
+class ConrefendBesideAKeyAndLines(unittest.TestCase):
+    """A conrefend beside a conkeyref is looked for in the key's target (DITA 1.3), and each reference
+    says its own line (24 Nov 2026, the DITA-OT docs and the OASIS source)."""
+
+    LIB = '<topic id="lib"><title>Lib</title><body><dl><dlentry id="first"><dt>a</dt></dlentry>' \
+          '<dlentry id="last"><dt>b</dt></dlentry></dl></body></topic>'
+    MAP = '<map><keydef keys="lib" href="GUID-lib.dita"/></map>'
+
+    def test_the_key_names_the_file_of_the_range_end(self):
+        r = repo(("GUID-a", "/d/a.dita", TOPIC % '<dl><dlentry conkeyref="lib/first" conrefend="default.dita#ID/last"><dt/>'
+                                                 '</dlentry><dlentry conkeyref="lib/first" conrefend="default.dita#ID/gone"><dt/>'
+                                                 '</dlentry></dl>'),
+                 ("GUID-lib", "/d/lib.dita", self.LIB), ("GUID-m", "/d/m.ditamap", self.MAP))
+        self.assertEqual({key: ref["reason"] for key, ref in broken(r).items()},
+                         {("conrefend", "default.dita#ID/gone"): "element-missing"})
+
+    def test_each_reference_has_its_own_line(self):
+        body = '<p><xref keyref="nokey"/></p>\n<p>Write <codeph>nokey2</codeph> here.</p>\n<p><xref keyref="nokey"/></p>' \
+               '\n<p><ph keyref="nokey2"/></p>'
+        r = repo(("GUID-a", "/d/a.dita", TOPIC % body))
+        self.assertEqual(sorted((ref["value"], ref["line"]) for ref in r.broken()),
+                         [("nokey", 1), ("nokey", 3), ("nokey2", 4)])
+
+
 class Samples(unittest.TestCase):
     def test_the_clean_sample_has_no_broken_references_and_the_changed_one_has_eleven(self):
         root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "samples", "ref-demo")
