@@ -989,6 +989,27 @@ class WaysOut(unittest.TestCase):
         refused = session.tool_decide({"group_ids": [group["id"]], "decision": "remove_references", "reason": "Old."})
         self.assertIn("safety content", refused["rejected"][group["id"]])
 
+    def test_in_a_file_of_two_topics_the_piece_is_read_from_its_own_topic(self):
+        # 24 Nov 2026: the first element with the id in the file was taken, another topic's plain note,
+        # so a removed danger note was offered for removal.
+        old = ('<dita><topic id="install"><title>Install</title><body><note id="power" type="note">Plug it in.</note></body>'
+               '</topic><topic id="remove"><title>Remove</title><body><p id="open">Open the case.</p>'
+               '<note id="power" type="danger">Unplug it first.</note></body></topic></dita>')
+        new = old.replace('<note id="power" type="danger">Unplug it first.</note>', '')
+        ref = '<topic id="t"><title>T</title><body><note conref="lib.dita#remove/power"/></body></topic>'
+
+        def ways(now, before):
+            repo = refcheck.Repo(files=[{"path": "lib.dita", "xml": now}, {"path": "t.dita", "xml": ref}])
+            return wayout.ways_out(repo, repo.broken(), {"lib.dita": [before]})
+        same_id = ways(new, old)
+        self.assertEqual((same_id["was"], same_id["safety"]), ('<note id="power" type="danger">Unplug it first.</note>', True))
+        # The id is still in the other topic: the editor, which finds a place by id, could put it there.
+        self.assertEqual([o["kind"] for o in same_id["options"]], ["inline"])
+        renamed = ways(new.replace('id="power" type="note"', 'id="plug" type="note"'),
+                       old.replace('id="power" type="note"', 'id="plug" type="note"'))
+        self.assertEqual([(o["kind"], o.get("anchor")) for o in renamed["options"]],
+                         [("restore", {"after": "open"}), ("inline", None)])
+
     def test_a_piece_that_holds_a_warning_is_safety_content_too(self):
         # 24 Nov 2026: only the piece's own tag was read, so a section with a warning inside was offered for removal.
         for piece in ('<section id="s"><title>Before you open it</title><note type="danger">High voltage.</note></section>',

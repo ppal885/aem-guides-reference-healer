@@ -23,22 +23,39 @@ SAFETY_NOTE_TYPES = ("warning", "danger", "caution")
 KINDS = {"restore_at_source": "restore", "remove_references": "remove", "keep_text_in_topics": "inline"}
 
 
-def element_xml(xml, element_id):
-    """The source text of the element with this id, or "" when it cannot be cut out cleanly."""
-    start = re.search(r'<([A-Za-z_][\w.-]*)(?=[\s/>])[^<>]*?\sid\s*=\s*(["\'])%s\2[^<>]*?(/?)>' % re.escape(element_id), xml or "")
-    if not start:
-        return ""
-    if start.group(3):
-        return start.group(0)
-    depth, tags = 1, re.compile(r"<(/?)%s(?=[\s/>])[^<>]*?(/?)>" % re.escape(start.group(1)))
-    for tag in tags.finditer(xml, start.end()):
+def _span(xml, element_id, start=0, end=None):
+    """(start, end) of the source text of the first element with this id between start and end, or None."""
+    end = len(xml or "") if end is None else end
+    pattern = re.compile(r'<([A-Za-z_][\w.-]*)(?=[\s/>])[^<>]*?\sid\s*=\s*(["\'])%s\2[^<>]*?(/?)>' % re.escape(element_id))
+    found = pattern.search(xml or "", start, end)
+    if not found:
+        return None
+    if found.group(3):
+        return found.start(), found.end()
+    depth, tags = 1, re.compile(r"<(/?)%s(?=[\s/>])[^<>]*?(/?)>" % re.escape(found.group(1)))
+    for tag in tags.finditer(xml, found.end(), end):
         if tag.group(1):
             depth -= 1
         elif not tag.group(2):
             depth += 1
         if depth == 0:
-            return xml[start.start():tag.end()]
-    return ""
+            return found.start(), tag.end()
+    return None
+
+
+def element_xml(xml, element_id, topic_id=None):
+    """The source text of the element with this id, or "" when it cannot be cut out cleanly. With
+    topic_id, only inside that topic: ids are unique per topic, and a file with two topics may use
+    one id in both. Without it the first in the file was taken (24 Nov 2026): a danger note removed
+    from one topic was read as the other topic's plain note, and removing it was offered."""
+    start, end = 0, None
+    if topic_id:
+        topic = _span(xml, topic_id)
+        if not topic:
+            return ""
+        start, end = topic
+    found = _span(xml, element_id, start, end)
+    return xml[found[0]:found[1]] if found else ""
 
 
 _NOTE = re.compile(r"<note(?=[\s/>])([^>]*)>")
@@ -62,14 +79,21 @@ def is_safety(xml):
     return False
 
 
-def anchor(old_xml, element_id, ids_now):
+def anchor(old_xml, element_id, ids_now, topic_id=None):
     """Where the piece goes back: after or before a neighbour that still exists, else at the end
-    of its parent. {"after": id} | {"before": id} | {"into": id} | {"into_tag": tag}."""
+    of its parent. {"after": id} | {"before": id} | {"into": id} | {"into_tag": tag}. With topic_id,
+    only inside that topic. ids_now: the ids the editor can find in the file today (it looks an id up
+    in the whole file, so only ids that are there once)."""
     try:
         tree = ET.fromstring(re.sub(r"<!DOCTYPE[^>\[]*(\[[^\]]*\])?[^>]*>", "", old_xml, count=1))
     except ET.ParseError:
         return None
-    for parent in tree.iter():
+    scope = tree
+    if topic_id:
+        scope = next((el for el in tree.iter() if el.get("id") == topic_id), None)
+        if scope is None:
+            return None
+    for parent in scope.iter():
         children = list(parent)
         index = next((i for i, child in enumerate(children) if child.get("id") == element_id), None)
         if index is None:
@@ -80,8 +104,8 @@ def anchor(old_xml, element_id, ids_now):
         after = next((c.get("id") for c in children[index + 1:] if c.get("id") in ids_now), None)
         if after:
             return {"before": after}
-        if parent.get("id") in ids_now or parent is tree:
-            return {"into": parent.get("id")} if parent.get("id") else {"into_tag": refcheck.local(parent.tag)}
+        if parent.get("id") in ids_now:
+            return {"into": parent.get("id")}
         return {"into_tag": refcheck.local(parent.tag)}
     return None
 
@@ -92,12 +116,13 @@ def without_id(xml):
 
 
 def target_of(repo, ref):
-    """(file, element id, renamed key) a broken reference points at; file is None when the target
-    is not an element. renamed key: the key's name today, when version history shows that the key
-    of the reference was renamed as well; the reference then has to follow it."""
+    """(file, topic id, element id, renamed key) a broken reference points at; file is None when the
+    target is not an element. topic id: the topic the reference names, None when it names none (a key
+    whose definition names no topic). renamed key: the key's name today, when version history shows
+    that the key of the reference was renamed as well; the reference then has to follow it."""
     if ref["attribute"] in refcheck.PATH_ATTRS:
-        target, _topic, element_id = repo.split_target(ref)
-        return (target, element_id, None) if element_id else (None, None, None)
+        target, topic_id, element_id = repo.split_target(ref)
+        return (target, topic_id, element_id, None) if element_id else (None, None, None, None)
     import refheal
     key, _, element_id = ref["value"].partition("/")
     renamed = None
@@ -106,8 +131,9 @@ def target_of(repo, ref):
         renamed = found[0] if found else None
     definition = repo.definition_of(renamed or key)
     if definition and definition["target"] and element_id:
-        return definition["target"], element_id, renamed
-    return None, None, None
+        topic_id = ((definition.get("href") or "").partition("#")[2]).split("/")[0] or None
+        return definition["target"], topic_id, element_id, renamed
+    return None, None, None, None
 
 
 def ways_out(repo, refs, previous_xml):
@@ -118,17 +144,30 @@ def ways_out(repo, refs, previous_xml):
     old piece cannot be found in an earlier version, or the target is not an element.
     """
     first = refs[0]
-    target, element_id, renamed_key = target_of(repo, first)
+    target, topic_id, element_id, renamed_key = target_of(repo, first)
     found = {"was": "", "safety": False, "options": [], "renamed_key": renamed_key}
     if not target or target not in repo.files:
         return found
-    old_file = next((xml for xml in previous_xml.get(target, []) if element_xml(xml, element_id)), None)
+    old_file = next((xml for xml in previous_xml.get(target, []) if element_xml(xml, element_id, topic_id)), None)
     if not old_file:
         return found
-    piece = element_xml(old_file, element_id)
+    piece = element_xml(old_file, element_id, topic_id)
     found.update(was=piece, safety=is_safety(piece))
     files = len({r["file"] for r in refs})
-    where = anchor(old_file, element_id, {eid for (_topic, eid) in repo.files[target]["elements"]} | set(repo.files[target]["topics"]))
+    now = repo.files[target]
+    # The editor finds a place, and whether the piece is back, by an id in the whole file: an id that
+    # is in the file more than once (in two topics) could put it in the other topic, or say it is back.
+    counts = {}
+    for (_topic, eid) in now["elements"]:
+        counts[eid] = counts.get(eid, 0) + 1
+    for (_topic, eid), more in now.get("copies", {}).items():
+        counts[eid] = counts.get(eid, 0) + more - 1
+    for tid in now["topics"]:
+        counts[tid] = counts.get(tid, 0) + 1
+    once = {eid for eid, n in counts.items() if n == 1}
+    where = None if element_id in counts else anchor(old_file, element_id, once, topic_id)
+    if where and "into_tag" in where and len(now["topics"]) > 1:
+        where = None    # "at the end of a <body>" is in whichever topic comes last
     if where:
         found["options"].append({
             "kind": "restore", "file": "/" + target, "xml": piece, "anchor": where,
