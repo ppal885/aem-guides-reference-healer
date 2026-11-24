@@ -30,6 +30,15 @@ class EdgeCases(unittest.TestCase):
         group = duplicates.find(files)[0]
         self.assertEqual(group["copies"][0]["markup"], "<ph keyref=product>")
 
+    def test_a_copy_with_a_phrase_something_links_to_is_not_offered(self):
+        # 24 Nov 2026: a paragraph whose <ph id> another topic linked to was shared, and the link broke.
+        p = '<p>Save the <ph id="cfg">running configuration</ph> and %s</p>' % WORDS
+        linked = topic("/d/d.dita", '<p>See the <xref href="a.dita#a/cfg">configuration</xref>.</p>')
+        files = [topic("/d/%s.dita" % n, p) for n in "abc"] + [linked]
+        self.assertEqual(sorted(c["file"] for c in duplicates.find(files)[0]["copies"]), ["d/b.dita", "d/c.dita"])
+        by_key = topic("/d/d.dita", '<p>Use <ph conkeyref="vars/cfg"/> here.</p>')
+        self.assertEqual(duplicates.find([topic("/d/%s.dita" % n, p) for n in "abc"] + [by_key]), [])
+
     def test_one_sentence_twice_in_one_topic_both_copies_are_in_the_group(self):
         files = [topic("/d/a.dita", "<p>%s</p><p>%s</p>" % (WORDS, WORDS.replace("database", "database and the attachments"))),
                  topic("/d/b.dita", "<p>%s</p>" % WORDS)]

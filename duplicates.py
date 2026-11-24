@@ -191,7 +191,8 @@ def blocks_of(path, raw):
                 text = _text(child)
                 if len(text) >= MIN_CHARS:
                     found.append({"file": path, "location": here, "tag": name, "text": text, "id": child.get("id") or "",
-                                  "shown": _shown(child, path), "markup": markup_of(path, child), "own": own_attributes(child)})
+                                  "shown": _shown(child, path), "markup": markup_of(path, child), "own": own_attributes(child),
+                                  "inner_ids": sorted({d.get("id") for d in child.iter() if d is not child and d.get("id")})})
             else:
                 walk(child, here)
 
@@ -331,6 +332,13 @@ def find(files):
         if path.endswith(".dita"):
             blocks.extend(blocks_of(path, entry.get("xml") or ""))
     whole_groups, blocks = _whole(files, blocks)
+    # A copy with an element inside it that something links to (a <ph id> other topics conref, a
+    # footnote an xref points at) is not offered: a conref to the shared piece would take that id away.
+    # Only whole lists and steps were held back so (24 Nov 2026); a paragraph with such a phrase was
+    # shared and the link to the phrase broke.
+    by_file, anywhere = _linked_ids(files)
+    blocks = [b for b in blocks
+              if not any((b["file"], i) in by_file or i in anywhere for i in b.get("inner_ids") or [])]
     # Units: the blocks with the same text (case, spaces and punctuation aside) of one element type
     # and the same own attributes (conditions).
     by_text = collections.defaultdict(list)
@@ -501,6 +509,10 @@ def _linked_ids(files):
                 anywhere.add(element)
             else:
                 by_file.add((_resolved_href(path, target) if target else path, element))
+        # By key ("product-vars/name"): the key's file is not worked out here, so any element with
+        # that id counts as linked.
+        for value in re.findall(r'\s(?:conkeyref|keyref)\s*=\s*"[^"/]+/([^"]+)"', entry.get("xml") or ""):
+            anywhere.add(value.split("/")[-1])
     return by_file, anywhere
 
 
