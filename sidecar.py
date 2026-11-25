@@ -11,6 +11,7 @@
     POST /applied     what "Fix all" wrote
     GET  /progress    what the agents are doing right now; ?map=<path> for one map's check
     POST /audit       the references an author changed, and who accepted them
+    POST /cancel      {map}: the author cancelled that map's check; its agents finish as at the limit
     GET  /audit       the audit record; ?map=<path>, &format=csv for a download
     GET  /memory      what the planner remembers of authors' answers
     GET  /copies      ?map=<path>[&judge=<n>][&ids=g1,g7]: the text copied across the map's topics (most
@@ -602,6 +603,18 @@ def serve(port, model=None):
                 except (ValueError, AttributeError, TypeError) as exc:
                     self.send_json(400, {"error": str(exc)})
                 return
+            if self.path == "/cancel":
+                # From AEM: the author cancelled the check of this map; its agents finish as at the limit.
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                    body = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
+                    import refplan
+                    refplan.cancel_map(body.get("map"))
+                    _log("check cancelled: %s" % (body.get("map") or "(no map)"))
+                    self.send_json(200, {"cancelled": body.get("map") or ""})
+                except (ValueError, AttributeError, TypeError) as exc:
+                    self.send_json(400, {"error": str(exc)})
+                return
             if self.path != "/heal-refs":
                 self.send_json(404, {"error": "not found"})
                 return
@@ -614,6 +627,7 @@ def serve(port, model=None):
                     self.send_json(200, refheal.heal_files(payload, BACKEND, model, _log))
                     return
                 import refplan
+                refplan.clear_cancel(payload.get("map"))     # a cancel of an earlier check does not stop this one
                 LAST_FILES[payload.get("map") or ""] = payload.get("files") or []
                 SPELLED.pop(payload.get("map") or "", None)   # it holds the previous check's files
                 LAST_ASSETS[payload.get("map") or ""] = (payload.get("assets"), payload.get("missing_paths"))

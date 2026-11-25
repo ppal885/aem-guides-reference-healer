@@ -1359,6 +1359,48 @@ class EntitiesTheDtdWouldDeclare(unittest.TestCase):
         self.assertEqual(text, "<p>         &amp;&#160;</p>")
 
 
+class ACancelledCheckStopsItsAgents(unittest.TestCase):
+    """26 Nov 2026: AEM stopped waiting when the author cancelled, but the agents went on and spent a
+    whole check that nobody read."""
+
+    def session(self, map_path="/d/m.ditamap"):
+        files = [{"id": "GUID-t", "path": "/d/t.dita", "previous": [], "xml": TOPIC % '<note conref="GUID-lib.dita#lib/gone"/>'},
+                 {"id": "GUID-lib", "path": "/d/lib.dita", "previous": [], "xml": '<topic id="lib"><title>L</title></topic>'}]
+        return refplan.Session(files, log=lambda message: None, map_path=map_path, token_budget=0)
+
+    def tearDown(self):
+        refplan.clear_cancel("/d/m.ditamap")
+
+    def test_a_cancel_stops_the_planner_and_says_so_once(self):
+        session = self.session()
+        self.assertFalse(session.at_limit())
+        refplan.cancel_map("/d/other.ditamap")
+        self.assertFalse(session.at_limit())          # another map's cancel
+        refplan.cancel_map("/d/m.ditamap")
+        self.assertTrue(session.at_limit())
+        self.assertTrue(session.at_limit())
+        self.assertEqual(len([line for line in session.plan if "was cancelled" in line]), 1)
+        refplan.clear_cancel("/d/other.ditamap")
+
+    def test_no_finder_starts_after_a_cancel(self):
+        session = self.session()
+        refplan.cancel_map("/d/m.ditamap")
+        started = []
+        original = refplan.agentloop.run
+        refplan.agentloop.run = lambda *args, **kwargs: started.append(1) or (None, [], "stopped")
+        try:
+            session.tool_investigate({"group_ids": ["all"]})
+        finally:
+            refplan.agentloop.run = original
+        self.assertEqual(started, [])
+        self.assertTrue(any("cancelled before their finder agents started" in line for line in session.plan), session.plan)
+
+    def test_a_new_check_of_the_map_is_not_stopped_by_an_earlier_cancel(self):
+        refplan.cancel_map("/d/m.ditamap")
+        refplan.clear_cancel("/d/m.ditamap")          # what /heal-refs does when a check starts
+        self.assertFalse(self.session().at_limit())
+
+
 class FirstGuessAndPlannerAtTheLimit(unittest.TestCase):
     """25 Nov 2026, the DITA-OT docs: 8 finders started on a flat guess of 7,000 each and spent 43,000 to
     60,000, and the planner went on after the limit; the check spent about 470,000 of 300,000."""

@@ -272,6 +272,27 @@ FINDER_TOKENS_PER_BYTE = float(os.environ.get("REFHEAL_FINDER_TOKENS_PER_BYTE", 
 # finder check was about 14,000 tokens in, so 20,000 is the guess for a content's first check.
 # After a check the planner's own figure is kept in the findings cache and used instead.
 PLANNER_CLOSING_TOKENS = int(os.environ.get("REFHEAL_PLANNER_CLOSING_TOKENS", "20000"))
+# Maps whose check the author cancelled in AEM (POST /cancel): the agents of that check finish as at
+# the limit. AEM stopped waiting at once (26 Nov 2026), but the agents went on and spent a whole check.
+_CANCELLED_MAPS = set()
+_CANCEL_LOCK = threading.Lock()
+
+
+def cancel_map(map_path):
+    """The author cancelled the check of this map."""
+    with _CANCEL_LOCK:
+        _CANCELLED_MAPS.add(map_path or "")
+
+
+def clear_cancel(map_path):
+    """A new check of this map starts: an earlier cancel does not stop it."""
+    with _CANCEL_LOCK:
+        _CANCELLED_MAPS.discard(map_path or "")
+
+
+def is_cancelled(map_path):
+    with _CANCEL_LOCK:
+        return (map_path or "") in _CANCELLED_MAPS
 PLANNER_CLOSING_KEY = "planner-closing-tokens"
 OVERVIEW_PAGE_CHARS = 14000   # one overview page, under agentloop.MAX_RESULT_CHARS (16,000)
 # decide and apply_and_recheck name at most this many group ids and give the full count. Every
@@ -460,6 +481,7 @@ class Session:
                  choose=None, assets=None, missing=None, token_budget=None, trace_all=None, map_path=None):
         self.backend, self.model, self.log = backend, model, log
         self.map_path = map_path or None        # the map checked: an author's answer applies without asking only there
+        self.said_cancelled = False             # the author cancelled this check (cancelled())
         lengths = [len(entry.get("xml") or "") for entry in files or [] if isinstance(entry, dict)]
         self.average_file = sum(lengths) / len(lengths) if lengths else 0   # characters: what a finder reads
         self.trace_all = TRACE_ALL if trace_all is None else trace_all
@@ -576,8 +598,16 @@ class Session:
                 self.cache[self._mine(PLANNER_CLOSING_KEY)] = {"when": time.time(), "spent": round(spent)}
 
     def at_limit(self):
-        """Whether this check has spent its whole limit."""
-        return bool(self.token_budget) and usage.cost_since(self.token_mark) >= self.token_budget
+        """Whether this check has spent its whole limit, or the author cancelled it."""
+        return self.cancelled() or (bool(self.token_budget) and usage.cost_since(self.token_mark) >= self.token_budget)
+
+    def cancelled(self):
+        """Whether the author cancelled this check in AEM (POST /cancel)."""
+        if is_cancelled(self.map_path) and not self.said_cancelled:
+            self.said_cancelled = True
+            self.plan.append("The check was cancelled; the agents stopped. What they had not decided got the safe "
+                             "default: repair when proven, otherwise ask you.")
+        return self.said_cancelled
 
     def _mine(self, key):
         """A key of the findings cache for this map: what one map's check spent says little about
@@ -967,14 +997,16 @@ class Session:
             """Whether the check has spent its limit, the planner's part kept: a finder still running then
             finishes with what it found (agentloop should_stop). Starting a finder looks ahead; this does
             not, so a running finder is stopped only at the limit itself."""
-            return bool(self.token_budget) and usage.cost_since(self.token_mark) >= self.token_budget - reserve
+            return self.cancelled() or (bool(self.token_budget)
+                                        and usage.cost_since(self.token_mark) >= self.token_budget - reserve)
 
         def run(group):
             with self.count_lock:
                 projected = projected_unlocked() if self.token_budget else 0
                 # The finder about to start counts too: without it the last one started just under the
                 # limit and took a customer check to 316,935 of 300,000 (21 Nov 2026), about one finder over.
-                over = bool(self.token_budget) and projected + finder_guess() > self.token_budget - reserve
+                over = self.cancelled() or (bool(self.token_budget)
+                                            and projected + finder_guess() > self.token_budget - reserve)
                 if over and not running.get("held"):
                     # The first finder held back: what the limit was made of, to see which part stops it.
                     running["held"] = True
@@ -1068,7 +1100,12 @@ class Session:
                              "counting the finders still running; %s started." % (
                 format(self.token_budget, ","), _count(len([g for g in fresh if g not in self.over_budget]), "finder agent")))
         stopped = [g for g in fresh if g in self.over_budget]
-        if stopped:
+        if stopped and self.said_cancelled:
+            self.plan.append("%s wait for the next check (%s): the check was cancelled before their finder agents "
+                             "started." % (_count(len(stopped), "broken target"),
+                                           _count(sum(len(g["refs"]) for g in stopped), "reference")))
+            fresh = [g for g in fresh if g not in self.over_budget]
+        elif stopped:
             self.plan.append("%s wait for the next check (%s): this check reached its limit of %s in cost terms, so I "
                              "started no more finder agents." % (
                                  _count(len(stopped), "broken target"), _count(sum(len(g["refs"]) for g in stopped), "reference"),
