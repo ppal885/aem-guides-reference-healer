@@ -1583,6 +1583,9 @@ class RememberedDecisions(unittest.TestCase):
         self.assertEqual(again.current["groups"], {})
         self.assertIn("Decided to ask you about 2 references (1 question). Why: The note was split in two.", again.plan)
         self.assertEqual({r["verdict"] for r in again.result()["repairs"]}, {"review"})
+        # The finder's answer was reused too; the caller's line about the reused decisions says so once
+        # (seen 25 Nov 2026: "15 broken targets" told twice in a row).
+        self.assertEqual([line for line in again.plan if "since an earlier check" in line], [])
 
     def test_a_first_check_has_nothing_to_use_again(self):
         session = self.session({})

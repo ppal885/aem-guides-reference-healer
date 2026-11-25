@@ -85,5 +85,15 @@ class AfterAFix(unittest.TestCase):
         self.assertEqual(out["code"], 2)
 
 
+
+class OutputName(unittest.TestCase):
+    def test_maps_of_one_name_in_two_folders_get_two_files(self):
+        # Seen 25 Nov 2026: large-demo-test/atlas_guide wrote over large-demo/atlas_guide's rows.
+        self.assertEqual(aftercheck.out_name("/content/dam/large-demo/atlas_guide.ditamap"),
+                         "aftercheck-large-demo-atlas_guide.json")
+        self.assertNotEqual(aftercheck.out_name("/content/dam/dupes-lang/en/ledger_guide.ditamap"),
+                            aftercheck.out_name("/content/dam/dupes-lang/fr/ledger_guide.ditamap"))
+
+
 if __name__ == "__main__":
     unittest.main()

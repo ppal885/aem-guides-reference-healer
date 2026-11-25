@@ -17,7 +17,7 @@ A conkeyref to a key the same press added is listed as broken by AEM until it re
 
 Exit 0: none of the written references is broken. 1: some are (listed). 2: nothing to check.
 AEM_URL (default http://127.0.0.1:4502) and AEM_USER / AEM_PASSWORD (default: the local
-author's default login) say which AEM. The rows go to out/aftercheck-<map name>.json.
+author's default login) say which AEM. The rows go to out/aftercheck-<folders>-<map name>.json, e.g. aftercheck-large-demo-atlas_guide.json.
 """
 import argparse
 import base64
@@ -152,6 +152,14 @@ def check(aem, map_path, since=None, preset=None, rows=None, wait=KEY_WAIT, slee
             "new_keys": new_keys, "waited_s": waited, "checked": result.get("startTime")}
 
 
+def out_name(map_path):
+    """The rows' file name: the map's folders under /content/dam and its name, so maps of one name
+    in two folders (a language copy, a test copy) do not write over each other's rows."""
+    rest = map_path.strip("/")
+    rest = rest[len("content/dam/"):] if rest.startswith("content/dam/") else rest
+    return "aftercheck-%s.json" % os.path.splitext(rest)[0].replace("/", "-")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--map", required=True)
@@ -164,8 +172,7 @@ def main():
         print("  broken: %s  %s=\"%s\"" % (ref["file"], ref["attribute"], ref["value"]))
     if len(out.get("broken", [])) > 10:
         print("  … and %d more" % (len(out["broken"]) - 10))
-    name = os.path.splitext(os.path.basename(args.map))[0]
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out", "aftercheck-%s.json" % name)
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out", out_name(args.map))
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as handle:
         json.dump(out, handle, indent=1)

@@ -471,6 +471,7 @@ class Session:
         self.count_lock = threading.Lock()
         self.decided_keys = set()               # what the decisions of this check rest on (see _decision_key)
         self.replaying = False                  # True while earlier decisions are used again
+        self.reuse_line = None                  # where the plan says finders' answers were reused
         self.memory = _memory(memory or {})
         # What the repository itself reports as broken: {(file, attribute, value)}, or None when not told.
         self.reported = None if reported is None else {
@@ -1033,6 +1034,7 @@ class Session:
         self.finders_done = usage.position()
         self.reused += len(remembered)
         if remembered:
+            self.reuse_line = len(self.plan)
             self.plan.append("%s: nothing changed since an earlier check, so I used what the agents found then." % (
                 _count(len(remembered), "broken target")))
         if fresh and self.token_budget:
@@ -1223,11 +1225,17 @@ class Session:
             if any(g["known"] and not self._earlier_decision(g) for g in groups.values()):
                 break
             unknown = [g["id"] for g in groups.values() if not g["known"]]
+            self.reuse_line = None
             if unknown:
                 self.tool_investigate({"group_ids": unknown})
             earlier = {g["id"]: self._earlier_decision(g) for g in groups.values()}
             if not all(earlier.values()):
                 break
+            if self.reuse_line is not None:
+                # The finders' answers were reused for groups whose decisions are reused too: the line
+                # the caller writes for the decisions says it; the finders' own line would say it again.
+                del self.plan[self.reuse_line]
+                self.reuse_line = None
             self.replaying = True
             by_decision = {}
             for group_id, entry in earlier.items():
