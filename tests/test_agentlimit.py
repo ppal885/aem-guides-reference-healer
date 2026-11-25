@@ -30,7 +30,8 @@ class StopAtTheLimit(unittest.TestCase):
     def test_an_agent_told_the_limit_is_reached_finishes_with_what_it_found(self):
         (answer, steps, problem), prompts = self.run_cli(
             [{"action": "search", "q": "a"}, {"action": "finish", "answer": "the target"}], stop_after=1)
-        self.assertEqual((answer, problem, len(steps)), ({"answer": "the target"}, None, 1))
+        # Marked as cut short: what it did not find it may not have looked for yet.
+        self.assertEqual((answer, problem, len(steps)), ({"answer": "the target", agentloop.CUT_SHORT: True}, None, 1))
         self.assertIn(agentloop.LIMIT_NOTE, prompts[1])
         self.assertIn("Tool calls left: 0", prompts[1])
 

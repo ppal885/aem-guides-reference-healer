@@ -1359,6 +1359,39 @@ class EntitiesTheDtdWouldDeclare(unittest.TestCase):
         self.assertEqual(text, "<p>         &amp;&#160;</p>")
 
 
+class AnAnswerCutShortIsNotRemembered(unittest.TestCase):
+    """26 Nov 2026: a finder told at the limit to finish said "nothing replaces it" before it had looked,
+    and later checks used that answer for good."""
+
+    def check(self, outcome):
+        files = [{"id": "GUID-t", "path": "/d/t.dita", "previous": [], "xml": TOPIC % '<note conref="GUID-lib.dita#lib/gone"/>'},
+                 {"id": "GUID-lib", "path": "/d/lib.dita", "previous": [], "xml": '<topic id="lib"><title>L</title></topic>'}]
+        cache = {}
+        session = refplan.Session(files, log=lambda message: None, cache=cache, token_budget=0)
+        def finder(*args, **kwargs):
+            return dict({"stage": "finder", "steps": [], "candidates": [], "caveat": "", "reason": "Found nothing.",
+                         "confidence": "low", "review": None}, **outcome)
+        original = refplan.refheal.heal_one
+        refplan.refheal.heal_one = finder
+        try:
+            session.tool_investigate({"group_ids": ["all"]})
+        finally:
+            refplan.refheal.heal_one = original
+        group = next(iter(session.current["groups"].values()))
+        return group["known"], cache
+
+    def test_nothing_found_when_cut_short_waits_for_the_next_check_and_is_not_cached(self):
+        known, cache = self.check({"verdict": "none", "new_value": None, "cut_short": True})
+        self.assertIn("Not finished in this check", known["reason"])
+        self.assertFalse(any(isinstance(v, dict) and "known" in v for v in cache.values()))
+
+    def test_a_full_answer_of_nothing_found_is_remembered_as_before(self):
+        known, cache = self.check({"verdict": "none", "new_value": None})
+        self.assertEqual(known["verdict"], "none")
+        self.assertNotIn("Not finished", known["reason"])
+        self.assertTrue(any(isinstance(v, dict) and "known" in v for v in cache.values()))
+
+
 class ACancelledCheckStopsItsAgents(unittest.TestCase):
     """26 Nov 2026: AEM stopped waiting when the author cancelled, but the agents went on and spent a
     whole check that nobody read."""

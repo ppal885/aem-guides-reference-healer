@@ -1070,12 +1070,24 @@ class Session:
                     self.unanswered.append(group)
                 self.step(group["id"], "done", "Finder agent", "%s: the model did not answer" % self._short(group))
                 return group
+            if outcome.get("cut_short") and not outcome.get("new_value"):
+                # Told to finish at the limit (or by a cancel) before it found anything: what it did not
+                # find it may not have looked for yet. It waits for the next check, as one that did not
+                # start, and is not remembered as "nothing replaces it".
+                group["known"] = {"new_value": None, "verdict": "none", "how": "planner", "caveat": "", "reason":
+                                  "Not finished in this check: its finder was stopped at the check's limit before it "
+                                  "found a target. Run the check again to continue."}
+                with self.count_lock:
+                    self.over_budget.append(group)
+                self.step(group["id"], "done", "Finder agent", "%s: stopped at the token limit" % self._short(group))
+                return group
             group["known"] = {"new_value": outcome["new_value"], "verdict": outcome["verdict"], "how": "finder",
                               "candidates": outcome["candidates"], "searched": searched,
                               "closest": outcome.get("closest"),
                               "reason": outcome["reason"], "caveat": outcome["caveat"],
                               "reviewer": (outcome["review"] or {}).get("agree")}
-            self._to_cache(repo, group, failed=bool(outcome.get("failed")))
+            # An answer given at the limit is used in this check, not remembered for the next.
+            self._to_cache(repo, group, failed=bool(outcome.get("failed") or outcome.get("cut_short")))
             self._settle(repo, group)
             self._keep_second_opinion(repo, group)
             finished.append(group["id"])

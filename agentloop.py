@@ -17,6 +17,14 @@ MAX_RESULT_CHARS = 16000
 # What an agent stopped at its check's limit returns as its problem, when its one last call did not finish.
 STOPPED_AT_LIMIT = "Stopped at the check's limit before an answer."
 LIMIT_NOTE = "This check has reached its limit: no more tool calls. Finish now with what you have found."
+# Set on an answer given after LIMIT_NOTE: the agent was cut short, so what it did not find it may
+# not have looked for yet. Such an answer is not remembered as a finding (26 Nov 2026: a finder cut
+# short at the limit or by a cancel said "nothing replaces it", and later checks used that for good).
+CUT_SHORT = "_cut_short"
+
+
+def _finished(answer, stopping):
+    return dict(answer, **{CUT_SHORT: True}) if stopping else answer
 
 
 def run(system, task, tools, finish, backend="cli", model=None, max_calls=8, log=None, should_stop=None):
@@ -151,7 +159,7 @@ def _run_sdk(system, task, tools, finish, model, max_calls, log, stop):
         for block in uses:
             if block.name == finish["name"]:
                 if _valid(finish, block.input):
-                    return block.input, steps, None
+                    return _finished(block.input, stopping), steps, None
                 results.append({"type": "tool_result", "tool_use_id": block.id, "is_error": True,
                                 "content": "Invalid finish input."})
                 continue
@@ -213,7 +221,8 @@ def _run_cli(system, task, tools, finish, model, max_calls, log, stop):
             for key in finish["required"]:
                 action.setdefault(key, "")
             action = {k: _coerce(finish["properties"].get(k, {}), v) for k, v in action.items()}
-            return (action, steps, None) if _valid(finish, action) else (None, steps, "The agent's answer was malformed.")
+            return ((_finished(action, stopping), steps, None) if _valid(finish, action)
+                    else (None, steps, "The agent's answer was malformed."))
         tool = by_name.get(name)
         if tool is None or left == 0:
             transcript.append("Step %d: unknown or unavailable action %r. Finish now." % (step, name))

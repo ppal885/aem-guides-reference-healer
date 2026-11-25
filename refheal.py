@@ -664,6 +664,8 @@ def heal_one(repo, ref, backend, model, with_history, log, declined=(), should_s
         # the search broke down, or stopped at the check's limit; this is not a finding
         result.update(reason=problem, failed=True, over_limit=problem == agentloop.STOPPED_AT_LIMIT)
         return result
+    if answer.get(agentloop.CUT_SHORT):
+        result["cut_short"] = True     # answered at the check's limit: not a finding to remember
     result.update(confidence=answer["confidence"] if answer["confidence"] in ("high", "medium", "low") else "low",
                   reason=answer["reason"][:500], caveat=answer["caveat"][:300])
     if answer["decision"] != "replace":
