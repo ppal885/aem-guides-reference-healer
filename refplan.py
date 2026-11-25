@@ -1068,6 +1068,7 @@ class Session:
                 group["known"] = {"new_value": None, "verdict": "none", "how": "planner", "caveat": "", "reason":
                                   "Not looked at in this check: it reached its limit of %s in cost terms. Run the check "
                                   "again to continue." % format(self.token_budget, ",")}
+                group["stopped_midway"] = True
                 with self.count_lock:
                     self.over_budget.append(group)
                 self.step(group["id"], "done", "Finder agent", "%s: stopped at the token limit" % self._short(group))
@@ -1087,6 +1088,7 @@ class Session:
                 group["known"] = {"new_value": None, "verdict": "none", "how": "planner", "caveat": "", "reason":
                                   "Not finished in this check: its finder was stopped at the check's limit before it "
                                   "found a target. Run the check again to continue."}
+                group["stopped_midway"] = True
                 with self.count_lock:
                     self.over_budget.append(group)
                 self.step(group["id"], "done", "Finder agent", "%s: stopped at the token limit" % self._short(group))
@@ -1121,17 +1123,18 @@ class Session:
                              "counting the finders still running; %s started." % (
                 format(self.token_budget, ","), _count(len([g for g in fresh if g not in self.over_budget]), "finder agent")))
         stopped = [g for g in fresh if g in self.over_budget]
-        if stopped and self.said_cancelled:
-            self.plan.append("%s wait for the next check (%s): the check was cancelled before their finder agents "
-                             "started." % (_count(len(stopped), "broken target"),
-                                           _count(sum(len(g["refs"]) for g in stopped), "reference")))
-            fresh = [g for g in fresh if g not in self.over_budget]
-        elif stopped:
-            self.plan.append("%s wait for the next check (%s): this check reached its limit of %s in cost terms, so I "
-                             "started no more finder agents." % (
-                                 _count(len(stopped), "broken target"), _count(sum(len(g["refs"]) for g in stopped), "reference"),
-                                 format(self.token_budget, ",")))
-            fresh = [g for g in fresh if g not in self.over_budget]
+        # Their finder did not start, or started and was told to finish before it found a target.
+        not_started = [g for g in stopped if not g.get("stopped_midway")]
+        midway = [g for g in stopped if g.get("stopped_midway")]
+        why = "the check was cancelled" if self.said_cancelled else \
+            "this check reached its limit of %s in cost terms" % format(self.token_budget, ",")
+        for groups, what in ((not_started, "their finder agents did not start"),
+                             (midway, "their finder agents were stopped before they found a target")):
+            if groups:
+                self.plan.append("%s wait for the next check (%s): %s; %s." % (
+                    _count(len(groups), "broken target"), _count(sum(len(g["refs"]) for g in groups), "reference"),
+                    why, what))
+        fresh = [g for g in fresh if g not in self.over_budget]
         if waiting:
             self.plan.append("%s with fewer references wait for the next check (%s): I look at %d per check, the ones "
                              "that break the most references first." % (

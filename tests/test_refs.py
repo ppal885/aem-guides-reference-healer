@@ -1397,11 +1397,14 @@ class AnAnswerCutShortIsNotRemembered(unittest.TestCase):
         finally:
             refplan.refheal.heal_one = original
         group = next(iter(session.current["groups"].values()))
+        self.plan = session.plan
         return group["known"], cache
 
     def test_nothing_found_when_cut_short_waits_for_the_next_check_and_is_not_cached(self):
         known, cache = self.check({"verdict": "none", "new_value": None, "cut_short": True})
         self.assertIn("Not finished in this check", known["reason"])
+        # Its finder started: the plan does not say it did not (26 Nov 2026: "started no more finder agents").
+        self.assertTrue(any("were stopped before they found a target" in line for line in self.plan), self.plan)
         self.assertFalse(any(isinstance(v, dict) and "known" in v for v in cache.values()))
 
     def test_a_full_answer_of_nothing_found_is_remembered_as_before(self):
@@ -1441,7 +1444,8 @@ class ACancelledCheckStopsItsAgents(unittest.TestCase):
         finally:
             refplan.agentloop.run = original
         self.assertEqual(started, [])
-        self.assertTrue(any("cancelled before their finder agents started" in line for line in session.plan), session.plan)
+        self.assertTrue(any("the check was cancelled; their finder agents did not start" in line for line in session.plan),
+                        session.plan)
 
     def test_a_new_check_of_the_map_is_not_stopped_by_an_earlier_cancel(self):
         refplan.cancel_map("/d/m.ditamap")
