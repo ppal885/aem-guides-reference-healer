@@ -1582,11 +1582,40 @@ class TokenLimitCountsARunningFinderOnce(unittest.TestCase):
         # 25,000 for the second one = 50,000, under 55,000. Counting the 10,000 twice made it 60,000.
         self.assertEqual(self.started(55000, 25000, 10000), 2)
 
-    def test_a_costly_running_finder_counts_at_its_own_spend(self):
-        # 30,000 spent, guess 5,000: it counts at its 30,000, not 30,000 + 30,000; with 5,000 for the
-        # second one that is 35,000.
-        self.assertEqual(self.started(34000, 5000, 30000), 1)
-        self.assertEqual(self.started(36000, 5000, 30000), 2)
+    def test_a_costly_running_finder_counts_to_spend_as_much_again(self):
+        # 30,000 spent, guess 5,000: it is counted to spend 30,000 more, as the long finders did (26 Nov
+        # 2026, OASIS); with 5,000 for the second one that is 65,000. It was counted at its 30,000 alone.
+        self.assertEqual(self.started(64000, 5000, 30000), 1)
+        self.assertEqual(self.started(66000, 5000, 30000), 2)
+
+
+class RunningFindersStopOnTheProjection(unittest.TestCase):
+    """26 Nov 2026, OASIS: the finders running were told to finish only at the limit itself, and spent
+    their whole rest past it. They are told when what they will likely still spend would pass it."""
+
+    def told_to_finish(self, budget, spends=30000):
+        lib = '<topic id="lib"><title>Lib</title><body><note id="kept">Kept.</note></body></topic>'
+        files = [{"id": "GUID-lib", "path": "/d/lib.dita", "xml": lib, "previous": []},
+                 {"id": "GUID-t1", "path": "/d/t1.dita", "previous": [],
+                  "xml": '<topic id="t1"><title>T1</title><body><p><ph conref="GUID-lib.dita#lib/gone"/></p></body></topic>'}]
+        session = refplan.Session(files, log=lambda message: None, token_budget=budget)
+        seen = []
+
+        def finder(*args, **kwargs):
+            usage.note(True, spends, 0)
+            seen.append(kwargs["should_stop"]())
+            return {"new_value": None, "verdict": "none", "candidates": [], "reason": "x", "caveat": "", "review": None}
+        with mock.patch.object(refplan, "FINDER_TOKENS", 5000), mock.patch.object(refplan, "PLANNER_CLOSING_TOKENS", 0), \
+                mock.patch.object(refplan.refheal, "heal_one", side_effect=finder), \
+                mock.patch.object(refplan.concurrent.futures, "ThreadPoolExecutor", lambda max_workers: _OneAtATime()):
+            session.tool_investigate({"group_ids": ["all"]})
+        return seen[0]
+
+    def test_a_finder_that_would_pass_the_limit_is_told_to_finish_before_it_does(self):
+        # 30,000 spent, counted to spend 30,000 more: 60,000. Under 64,000 it goes on; with 59,000 it
+        # is told now, though only 30,000 is spent.
+        self.assertFalse(self.told_to_finish(64000))
+        self.assertTrue(self.told_to_finish(59000))
 
 
 class _OneAtATime:

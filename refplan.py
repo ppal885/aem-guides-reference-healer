@@ -271,7 +271,10 @@ FINDER_TOKENS_PER_BYTE = float(os.environ.get("REFHEAL_FINDER_TOKENS_PER_BYTE", 
 # and 28,257. Since its overview leaves out the groups already decided, the planner's whole share of a
 # finder check was about 14,000 tokens in, so 20,000 is the guess for a content's first check.
 # After a check the planner's own figure is kept in the findings cache and used instead.
-PLANNER_CLOSING_TOKENS = int(os.environ.get("REFHEAL_PLANNER_CLOSING_TOKENS", "20000"))
+# Measured again on 26 Nov 2026 on two public sets: after its finders the planner spent 60,000 to 100,000
+# (each call sends every tool result again), and with 20,000 kept the checks ended at 317,000 and
+# 330,000 of 300,000. 60,000 is the guess for a content's first check now.
+PLANNER_CLOSING_TOKENS = int(os.environ.get("REFHEAL_PLANNER_CLOSING_TOKENS", "60000"))
 # Maps whose check the author cancelled in AEM (POST /cancel): the agents of that check finish as at
 # the limit. AEM stopped waiting at once (26 Nov 2026), but the agents went on and spent a whole check.
 # A cancel stops the checks of the map that started before it, not one started after: a map's mark
@@ -982,10 +985,13 @@ class Session:
             8 finders at a time took a 300,000 limit to 638,663 on a customer export. The finders that
             end first are the cheap ones (21 Nov 2026: the first three about 24,000, the last three
             about 34,500), so the average of the finished alone took a check to 357,422.
+            A running finder is counted to spend at least as much again as it has so far: the long ones
+            are the costly ones (26 Nov 2026, OASIS: 7 finders running at the limit had spent 120,768 and
+            spent about 111,000 more, where the average left 65,701).
             Called with count_lock held."""
             average = finder_guess()
-            return usage.cost_since(self.token_mark) + sum(
-                max(average - usage.cost_since(mark, thread=thread), 0) for thread, mark in started_at.items())
+            own = [usage.cost_since(mark, thread=thread) for thread, mark in started_at.items()]
+            return usage.cost_since(self.token_mark) + sum(max(average - spent, spent) for spent in own)
 
         def finder_guess():
             """What one finder will likely spend in all: the average of the finders done in this check,
@@ -993,11 +999,15 @@ class Session:
             return max(running["spent"] / running["done"], first_guess) if running["done"] else first_guess
 
         def at_limit():
-            """Whether the check has spent its limit, the planner's part kept: a finder still running then
-            finishes with what it found (agentloop should_stop). Starting a finder looks ahead; this does
-            not, so a running finder is stopped only at the limit itself."""
-            return self.cancelled() or (bool(self.token_budget)
-                                        and usage.cost_since(self.token_mark) >= self.token_budget - reserve)
+            """Whether the finders still running would take the check past its limit, the planner's part
+            kept: each then finishes with what it found (agentloop should_stop). It was the limit itself,
+            so the finders running then spent their whole rest past it (26 Nov 2026: OASIS at 359,000)."""
+            if self.cancelled():
+                return True
+            if not self.token_budget:
+                return False
+            with self.count_lock:
+                return projected_unlocked() >= self.token_budget - reserve
 
         def run(group):
             with self.count_lock:
