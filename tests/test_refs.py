@@ -1343,6 +1343,46 @@ class TokenLimitAverageOfFinishedFinders(unittest.TestCase):
         self.assertEqual(len(started), 10)
 
 
+class FirstGuessAndPlannerAtTheLimit(unittest.TestCase):
+    """25 Nov 2026, the DITA-OT docs: 8 finders started on a flat guess of 7,000 each and spent 43,000 to
+    60,000, and the planner went on after the limit; the check spent about 470,000 of 300,000."""
+
+    def session(self, length, cache=None, map_path=None):
+        body = "<p>%s</p>" % ("x" * length)
+        files = [{"id": "GUID-t%d" % n, "path": "/d/t%d.dita" % n, "previous": [],
+                  "xml": '<topic id="t%d"><title>T</title><body>%s</body></topic>' % (n, body)} for n in range(3)]
+        return refplan.Session(files, log=lambda message: None, cache=cache, map_path=map_path)
+
+    def test_a_first_check_guesses_a_finder_from_the_length_of_the_files(self):
+        self.assertEqual(self.session(100).finder_first_guess(), refplan.FINDER_TOKENS)
+        long = self.session(6300).finder_first_guess()
+        self.assertTrue(48000 < long < 54000, long)
+
+    def test_what_one_maps_check_spent_is_not_the_guess_for_another_map(self):
+        cache = {refplan.FINDER_TOKENS_KEY + "|/d/a.ditamap": {"when": time.time(), "average": 9900}}
+        self.assertEqual(self.session(6300, cache, "/d/a.ditamap").finder_first_guess(), 9900)
+        self.assertGreater(self.session(6300, cache, "/d/b.ditamap").finder_first_guess(), 40000)
+
+    def test_the_planner_is_told_to_finish_at_the_limit(self):
+        session = self.session(100)
+        session.token_budget = 1000
+        seen = {}
+
+        def run(*args, **kwargs):
+            seen["should_stop"] = kwargs.get("should_stop")
+            return None, [], "stopped"
+        original = refplan.agentloop.run
+        refplan.agentloop.run = run
+        try:
+            refplan._ask_planner(session, "cli", None, lambda message: None, lambda message: None)
+        finally:
+            refplan.agentloop.run = original
+        self.assertEqual(seen["should_stop"], session.at_limit)
+        self.assertFalse(session.at_limit())
+        session.token_budget = 0
+        self.assertFalse(session.at_limit())     # no limit: never at it
+
+
 class TokenLimitKeepsRoomForThePlanner(unittest.TestCase):
     """Finders stop early enough that the planner's own calls after them still fit in the limit, and
     what the planner spent after its finders is kept for the next check."""
@@ -1369,16 +1409,16 @@ class TokenLimitKeepsRoomForThePlanner(unittest.TestCase):
 
     def test_the_planners_share_is_kept_out_of_the_finders_limit(self):
         # 100,000 limit, half kept for the planner at most: 5 finders of 10,000 fit.
-        self.assertEqual(self.started({refplan.PLANNER_CLOSING_KEY: {"spent": 80000}})[1], 5)
+        self.assertEqual(self.started({refplan.PLANNER_CLOSING_KEY + "|": {"spent": 80000}})[1], 5)
         # The planner's own figure from the last check: 30,000 kept, 7 finders fit.
-        self.assertEqual(self.started({refplan.PLANNER_CLOSING_KEY: {"spent": 30000}})[1], 7)
+        self.assertEqual(self.started({refplan.PLANNER_CLOSING_KEY + "|": {"spent": 30000}})[1], 7)
 
     def test_what_the_planner_spent_after_its_finders_is_kept(self):
         cache = {}
         session, _ = self.started(cache)
         usage.note(True, 4000, 100)
         session.keep_planner_closing(threading.get_ident())
-        self.assertEqual(cache[refplan.PLANNER_CLOSING_KEY]["spent"], 4500)
+        self.assertEqual(cache[refplan.PLANNER_CLOSING_KEY + "|"]["spent"], 4500)
 
 
 class TokenLimitCountsARunningFinderOnce(unittest.TestCase):
@@ -1512,7 +1552,7 @@ class OverviewInPages(unittest.TestCase):
         self.assertEqual(result["waiting_for_the_next_check"], 120)
 
     def test_the_first_guess_for_a_finder_is_the_last_checks_average(self):
-        cache = {refplan.FINDER_TOKENS_KEY: {"when": time.time(), "average": 30000}}
+        cache = {refplan.FINDER_TOKENS_KEY + "|": {"when": time.time(), "average": 30000}}
         session = self.session(5, cache=cache, token_budget=100000)
         started, gate = [], threading.Event()
 
@@ -1525,7 +1565,7 @@ class OverviewInPages(unittest.TestCase):
             threading.Timer(0.3, gate.set).start()
             session.tool_investigate({"group_ids": ["all"]})
         self.assertEqual(len(started), 3)         # each start counts itself: 30,000, 60,000, 90,000; a fourth would make 120,000
-        self.assertEqual(cache[refplan.FINDER_TOKENS_KEY]["average"], 30000)
+        self.assertEqual(cache[refplan.FINDER_TOKENS_KEY + "|"]["average"], 30000)
 
 
 class FindersTheModelDidNotAnswer(unittest.TestCase):
@@ -1547,7 +1587,7 @@ class FindersTheModelDidNotAnswer(unittest.TestCase):
         self.assertIn("3 broken targets wait for the next check (3 references): the model did not answer", plan)
         self.assertNotIn("not found in these files", plan)
         self.assertTrue(all(g["known"].get("failed") for g in session.current["groups"].values()))
-        self.assertNotIn(refplan.FINDER_TOKENS_KEY, cache)
+        self.assertNotIn(refplan.FINDER_TOKENS_KEY + "|", cache)
 
 
 class KeyFindingsAfterFixAll(unittest.TestCase):

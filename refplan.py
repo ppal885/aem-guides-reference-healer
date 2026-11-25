@@ -257,7 +257,13 @@ TRACE_ALL = os.environ.get("REFHEAL_TRACE_ALL", "") not in ("", "0", "false")
 # What one finder agent is guessed to spend before any finder of the check is done (the first estimate,
 # about 7,000 tokens a target; on a customer export with long topics it was about 30,000).
 FINDER_TOKENS = int(os.environ.get("REFHEAL_FINDER_TOKENS", "7000"))
-FINDER_TOKENS_KEY = "finder-tokens"     # in the findings cache: what a finder spent on average in the last check
+FINDER_TOKENS_KEY = "finder-tokens"     # in the findings cache, per map: what a finder spent on average in its last check
+# A finder reads files, so what it spends grows with how long they are: measured 25 Nov 2026, about 8 in
+# cost terms per byte of the content's average file (the large sample: 1,217 bytes, 9,900 a finder;
+# the DITA-OT docs: 6,388 bytes, 43,000 to 60,000). The first check of a content guesses from this:
+# on the DITA-OT docs the flat 7,000 let 8 finders start at once, and the check spent about 470,000
+# of 300,000.
+FINDER_TOKENS_PER_BYTE = float(os.environ.get("REFHEAL_FINDER_TOKENS_PER_BYTE", "8"))
 # What the planner is guessed to spend after its finder agents are done (deciding, checking again), kept
 # out of the limit for finders so the check ends near the limit, not past it. On a customer export
 # (21 Nov 2026) it was about 72,000 in cost terms and the check ended at 338,860 against 300,000; in the
@@ -454,6 +460,8 @@ class Session:
                  choose=None, assets=None, missing=None, token_budget=None, trace_all=None, map_path=None):
         self.backend, self.model, self.log = backend, model, log
         self.map_path = map_path or None        # the map checked: an author's answer applies without asking only there
+        lengths = [len(entry.get("xml") or "") for entry in files or [] if isinstance(entry, dict)]
+        self.average_file = sum(lengths) / len(lengths) if lengths else 0   # characters: what a finder reads
         self.trace_all = TRACE_ALL if trace_all is None else trace_all
         self.token_budget = TOKEN_BUDGET if token_budget is None else token_budget
         self.token_mark = usage.position()      # the tokens of this check are counted from here
@@ -558,14 +566,31 @@ class Session:
     def planner_closing(self):
         """What the planner is guessed to spend after its finders are done: its own figure from the
         last check, else PLANNER_CLOSING_TOKENS."""
-        return ((self.cache or {}).get(PLANNER_CLOSING_KEY) or {}).get("spent") or PLANNER_CLOSING_TOKENS
+        return ((self.cache or {}).get(self._mine(PLANNER_CLOSING_KEY)) or {}).get("spent") or PLANNER_CLOSING_TOKENS
 
     def keep_planner_closing(self, thread):
         """After the planner is done: keeps what it spent, in its own thread, after its last finders."""
         if self.cache is not None and self.finders_done is not None:
             spent = usage.cost_since(self.finders_done, thread=thread)
             if spent:
-                self.cache[PLANNER_CLOSING_KEY] = {"when": time.time(), "spent": round(spent)}
+                self.cache[self._mine(PLANNER_CLOSING_KEY)] = {"when": time.time(), "spent": round(spent)}
+
+    def at_limit(self):
+        """Whether this check has spent its whole limit."""
+        return bool(self.token_budget) and usage.cost_since(self.token_mark) >= self.token_budget
+
+    def _mine(self, key):
+        """A key of the findings cache for this map: what one map's check spent says little about
+        another's (25 Nov 2026: the large sample's 9,900 a finder was the guess for any map)."""
+        return "%s|%s" % (key, self.map_path or "")
+
+    def finder_first_guess(self):
+        """What one finder is guessed to spend before any finder of this check is done: what a finder
+        spent on average in this map's last check, else a guess from the length of its files."""
+        known = ((self.cache or {}).get(self._mine(FINDER_TOKENS_KEY)) or {}).get("average")
+        if known:
+            return known
+        return max(FINDER_TOKENS, round(FINDER_TOKENS_PER_BYTE * self.average_file))
 
     def _declined(self, ref):
         return set(self.memory["rejected"].get("%s|%s" % (ref["attribute"], ref["value"]), []))
@@ -913,7 +938,7 @@ class Session:
         # Before any finder of this check is done: what a finder spent on average in an earlier check of
         # this content, else FINDER_TOKENS. On long topics a finder spent about 30,000, not 7,000, and
         # 8 finders started on the low guess took a 300,000 limit to 373,000.
-        first_guess = ((self.cache or {}).get(FINDER_TOKENS_KEY) or {}).get("average") or FINDER_TOKENS
+        first_guess = self.finder_first_guess()
         # The planner still decides and checks again after the finders: that part of the limit is kept
         # for it. At most half the limit, so a small limit still lets finders start.
         reserve = min(self.planner_closing(), self.token_budget // 2)
@@ -1030,7 +1055,8 @@ class Session:
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
             done = list(pool.map(run, fresh)) + remembered
         if self.cache is not None and running["done"]:
-            self.cache[FINDER_TOKENS_KEY] = {"when": time.time(), "average": round(running["spent"] / running["done"])}
+            self.cache[self._mine(FINDER_TOKENS_KEY)] = {"when": time.time(),
+                                                         "average": round(running["spent"] / running["done"])}
         self.finders_done = usage.position()
         self.reused += len(remembered)
         if remembered:
@@ -1772,8 +1798,11 @@ def _ask_planner(session, backend, model, log, progress):
     task = ("The map has %d broken references in %d groups. Repair what can be repaired safely and tell the author "
             "what is left. Start with overview." % (sum(len(g["refs"]) for g in groups.values()), len(groups)))
     with usage.as_agent("planner"):
+        # At the check's limit the planner too gets one last call to finish; what it has not decided gets
+        # the safe default below. Only finders were stopped before: on the DITA-OT docs (25 Nov 2026) the
+        # planner went on for 107,000 in cost terms after the limit was reached.
         answer, steps, problem = agentloop.run(PLANNER_SYSTEM, task, session.tools(), FINISH, backend=backend, model=model,
-                                               max_calls=MAX_PLANNER_CALLS, log=log)
+                                               max_calls=MAX_PLANNER_CALLS, log=log, should_stop=session.at_limit)
     if not problem:
         session.keep_planner_closing(threading.get_ident())
     if problem:
