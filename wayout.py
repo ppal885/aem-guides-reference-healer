@@ -111,8 +111,41 @@ def anchor(old_xml, element_id, ids_now, topic_id=None):
 
 
 def without_id(xml):
-    """The element as plain content of a topic: without the id it had in the shared file."""
-    return re.sub(r'^(<[A-Za-z_][\w.-]*[^>]*?)\sid\s*=\s*(["\'])[^"\']*\2', r"\1", xml, count=1)
+    """The element as plain content of a topic: without the id it had in the shared file. For a
+    range of elements (a conref with a conrefend), each element of the range loses its id."""
+    out, depth, at = [], 0, 0
+    for tag in re.finditer(r"<(/?)([A-Za-z_][\w.-]*)(?=[\s/>])[^<>]*?(/?)>", xml or ""):
+        if not tag.group(1) and depth == 0:
+            out.append(xml[at:tag.start()])
+            out.append(re.sub(r'\sid\s*=\s*(["\'])[^"\']*\1', "", tag.group(0), count=1))
+            at = tag.end()
+        if tag.group(1):
+            depth -= 1
+        elif not tag.group(3):
+            depth += 1
+    return "".join(out) + (xml or "")[at:]
+
+
+def range_xml(xml, first_id, last_id, topic_id=None):
+    """The source text from the element with first_id to the end of the one with last_id, its sibling
+    later in the file: what a conref with a conrefend reuses. "" when it cannot be cut out cleanly."""
+    start, end = 0, None
+    if topic_id:
+        topic = _span(xml, topic_id)
+        if not topic:
+            return ""
+        start, end = topic
+    first = _span(xml, first_id, start, end)
+    last = _span(xml, last_id, first[1], end) if first else None
+    return xml[first[0]:last[1]] if first and last else ""
+
+
+def _range_end(repo, ref):
+    """The element id the conrefend beside this conref names, or None when it has none."""
+    for other in getattr(repo, "refs", []):
+        if (other["file"], other["location"], other["attribute"]) == (ref["file"], ref["location"], "conrefend"):
+            return other["value"].rpartition("#")[2].rpartition("/")[2] or None
+    return None
 
 
 def target_of(repo, ref):
@@ -146,12 +179,22 @@ def ways_out(repo, refs, previous_xml):
     first = refs[0]
     target, topic_id, element_id, renamed_key = target_of(repo, first)
     found = {"was": "", "safety": False, "options": [], "renamed_key": renamed_key}
-    if not target or target not in repo.files:
+    # The end of a range is put back, kept or removed together with its start (the conref group):
+    # alone it is only part of what the topics reused.
+    if not target or target not in repo.files or first["attribute"] == "conrefend":
         return found
     old_file = next((xml for xml in previous_xml.get(target, []) if element_xml(xml, element_id, topic_id)), None)
     if not old_file:
         return found
-    piece = element_xml(old_file, element_id, topic_id)
+    # A conref with a conrefend reused a range of elements, not one: every one of them comes back
+    # or is kept (25 Nov 2026: only the first of three steps was, and the card said all worked again).
+    ends = {_range_end(repo, ref) for ref in refs} if first["attribute"] == "conref" else {None}
+    if len(ends) > 1:
+        return found    # topics reuse different ranges from here: no one piece fits them all
+    last_id = ends.pop()
+    piece = range_xml(old_file, element_id, last_id, topic_id) if last_id else element_xml(old_file, element_id, topic_id)
+    if not piece:
+        return found
     found.update(was=piece, safety=is_safety(piece))
     files = len({r["file"] for r in refs})
     now = repo.files[target]

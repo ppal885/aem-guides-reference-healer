@@ -1017,6 +1017,34 @@ class WaysOut(unittest.TestCase):
         refused = session.tool_decide({"group_ids": [group["id"]], "decision": "remove_references", "reason": "Old."})
         self.assertIn("safety content", refused["rejected"][group["id"]])
 
+    def test_a_range_of_steps_comes_back_or_stays_whole(self):
+        # 25 Nov 2026: a conref with a conrefend reused three steps; only the first was put back or kept,
+        # and the card said all references worked again.
+        old = ('<task id="lib"><title>Lib</title><taskbody><steps>'
+               '<step id="s1"><cmd>Stop the service.</cmd></step><step id="s2"><cmd>Back up the data.</cmd></step>'
+               '<step id="s3"><cmd>Start the service.</cmd></step><step id="keep"><cmd>Done.</cmd></step>'
+               '</steps></taskbody></task>')
+        new = '<task id="lib"><title>Lib</title><taskbody><steps><step id="keep"><cmd>Done.</cmd></step></steps></taskbody></task>'
+        task = '<task id="t%d"><title>T</title><taskbody><steps>%s</steps></taskbody></task>'
+        ranged = '<step conref="lib.dita#lib/s1" conrefend="lib.dita#lib/s3"><cmd/></step>'
+
+        def ways(*steps):
+            topics = [{"path": "t%d.dita" % n, "xml": task % (n, step)} for n, step in enumerate(steps)]
+            repo = refcheck.Repo(files=[{"path": "lib.dita", "xml": new}] + topics)
+            broken = repo.broken()
+            return [wayout.ways_out(repo, [r for r in broken if r["attribute"] == attribute], {"lib.dita": [old]})
+                    for attribute in ("conref", "conrefend")]
+        start, end = ways(ranged)
+        options = {o["kind"]: o for o in start["options"]}
+        self.assertEqual(options["restore"]["xml"].count("<step id="), 3)
+        self.assertEqual(options["inline"]["xml"], '<step><cmd>Stop the service.</cmd></step>'
+                         '<step><cmd>Back up the data.</cmd></step><step><cmd>Start the service.</cmd></step>')
+        # The end of the range goes with its start: alone it would put back or keep only part of it.
+        self.assertEqual(end["options"], [])
+        # Topics that reuse different ranges from here: no one piece fits them all.
+        mixed, _end = ways(ranged, '<step conref="lib.dita#lib/s1"><cmd/></step>')
+        self.assertEqual(mixed["options"], [])
+
     def test_in_a_file_of_two_topics_the_piece_is_read_from_its_own_topic(self):
         # 24 Nov 2026: the first element with the id in the file was taken, another topic's plain note,
         # so a removed danger note was offered for removal.
