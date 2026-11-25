@@ -1393,8 +1393,9 @@ class Session:
         still = sum(len(g["refs"]) for g in remaining.values())
         left = len(self.left)
         handed_over = sum(len(g["refs"]) for g in groups.values() if g["decision"] in HANDED_OVER)
-        self.plan.append("Tried the plan on a copy and checked again: %s work now, %s left for you%s." % (
-            _count(before - still - handed_over, "reference"), format(handed_over, ","),
+        working = before - still - handed_over
+        self.plan.append("Tried the plan on a copy and checked again: %s %s now, %s left for you%s." % (
+            _count(working, "reference"), "works" if working == 1 else "work", format(handed_over, ","),
             ", %s still open" % format(still, ",") if still else ""))
         self.step("recheck-%d" % number, "done", "Planner agent", "Tried the plan on a copy: %s %s, %s left for the author%s" % (
             _count(before - still - handed_over, "reference"), "works" if before - still - handed_over == 1 else "work",
@@ -1976,8 +1977,10 @@ def _plan_files(payload, backend="cli", model=None, log=print, progress=None, me
                             "No previous version proves these." % (
                                 by_rule, " more" if proven else " of those %d" % len(first), "was" if by_rule == 1 else "were"))
     if recalled:
-        session.plan.append("%d more %s answered by an author in an earlier check; I used %s again." % (
-            recalled, "was" if recalled == 1 else "were", "that answer" if recalled == 1 else "those answers"))
+        # "more" only after a line that counted some of them already, as for the rule above.
+        session.plan.append("%d%s %s answered by an author in an earlier check; I used %s again." % (
+            recalled, " more" if proven or by_rule else " of those %d" % len(first), "was" if recalled == 1 else "were",
+            "that answer" if recalled == 1 else "those answers"))
     session.step("scan", "done", "Scanner", "Found %s in %d files, from %d renamed, moved or removed ids and keys" % (
         _count(sum(len(g["refs"]) for g in first.values()), "broken reference"), len(session.rounds[0]["repo"].files), len(first)))
     if proven:

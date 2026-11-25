@@ -1841,6 +1841,8 @@ class LiveView(unittest.TestCase):
         self.assertEqual(last["planner"], ("done", "Planner agent", "Planned"))
         self.assertEqual(last["decide-1"], ("done", "Planner agent", "Decided: repair 1"))
         self.assertEqual(last["recheck-1"][2], "Tried the plan on a copy: 1 reference works, 0 left for the author")
+        # The plan's own line says it the same way (25 Nov 2026 it read "1 reference work now").
+        self.assertIn("Tried the plan on a copy and checked again: 1 reference works now, 0 left for you.", session.plan)
         self.assertEqual([row["id"] for row in seen[-1]], ["planner", "decide-1", "recheck-1"])
 
 
