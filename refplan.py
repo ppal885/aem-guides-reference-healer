@@ -274,25 +274,23 @@ FINDER_TOKENS_PER_BYTE = float(os.environ.get("REFHEAL_FINDER_TOKENS_PER_BYTE", 
 PLANNER_CLOSING_TOKENS = int(os.environ.get("REFHEAL_PLANNER_CLOSING_TOKENS", "20000"))
 # Maps whose check the author cancelled in AEM (POST /cancel): the agents of that check finish as at
 # the limit. AEM stopped waiting at once (26 Nov 2026), but the agents went on and spent a whole check.
-_CANCELLED_MAPS = set()
+# A cancel stops the checks of the map that started before it, not one started after: a map's mark
+# was cleared when its next check started, and a check cancelled and run again at once went on
+# spending when its agents had not looked yet (26 Nov 2026).
+_CANCELLED_MAPS = {}    # map path -> time.monotonic() of the last cancel
 _CANCEL_LOCK = threading.Lock()
 
 
 def cancel_map(map_path):
-    """The author cancelled the check of this map."""
+    """The author cancelled the check of this map: the checks of it running now stop."""
     with _CANCEL_LOCK:
-        _CANCELLED_MAPS.add(map_path or "")
+        _CANCELLED_MAPS[map_path or ""] = time.monotonic()
 
 
-def clear_cancel(map_path):
-    """A new check of this map starts: an earlier cancel does not stop it."""
+def is_cancelled(map_path, started):
+    """Whether the map's check that started at `started` (time.monotonic()) was cancelled since."""
     with _CANCEL_LOCK:
-        _CANCELLED_MAPS.discard(map_path or "")
-
-
-def is_cancelled(map_path):
-    with _CANCEL_LOCK:
-        return (map_path or "") in _CANCELLED_MAPS
+        return _CANCELLED_MAPS.get(map_path or "", float("-inf")) > started
 PLANNER_CLOSING_KEY = "planner-closing-tokens"
 OVERVIEW_PAGE_CHARS = 14000   # one overview page, under agentloop.MAX_RESULT_CHARS (16,000)
 # decide and apply_and_recheck name at most this many group ids and give the full count. Every
@@ -482,6 +480,7 @@ class Session:
         self.backend, self.model, self.log = backend, model, log
         self.map_path = map_path or None        # the map checked: an author's answer applies without asking only there
         self.said_cancelled = False             # the author cancelled this check (cancelled())
+        self.started = time.monotonic()         # a cancel of the map after this stops this check
         lengths = [len(entry.get("xml") or "") for entry in files or [] if isinstance(entry, dict)]
         self.average_file = sum(lengths) / len(lengths) if lengths else 0   # characters: what a finder reads
         self.trace_all = TRACE_ALL if trace_all is None else trace_all
@@ -603,7 +602,7 @@ class Session:
 
     def cancelled(self):
         """Whether the author cancelled this check in AEM (POST /cancel)."""
-        if is_cancelled(self.map_path) and not self.said_cancelled:
+        if not self.said_cancelled and is_cancelled(self.map_path, self.started):
             self.said_cancelled = True
             self.plan.append("The check was cancelled; the agents stopped. What they had not decided got the safe "
                              "default: repair when proven, otherwise ask you.")

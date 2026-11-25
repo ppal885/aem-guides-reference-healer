@@ -627,7 +627,6 @@ def serve(port, model=None):
                     self.send_json(200, refheal.heal_files(payload, BACKEND, model, _log))
                     return
                 import refplan
-                refplan.clear_cancel(payload.get("map"))     # a cancel of an earlier check does not stop this one
                 LAST_FILES[payload.get("map") or ""] = payload.get("files") or []
                 SPELLED.pop(payload.get("map") or "", None)   # it holds the previous check's files
                 LAST_ASSETS[payload.get("map") or ""] = (payload.get("assets"), payload.get("missing_paths"))

@@ -1368,9 +1368,6 @@ class ACancelledCheckStopsItsAgents(unittest.TestCase):
                  {"id": "GUID-lib", "path": "/d/lib.dita", "previous": [], "xml": '<topic id="lib"><title>L</title></topic>'}]
         return refplan.Session(files, log=lambda message: None, map_path=map_path, token_budget=0)
 
-    def tearDown(self):
-        refplan.clear_cancel("/d/m.ditamap")
-
     def test_a_cancel_stops_the_planner_and_says_so_once(self):
         session = self.session()
         self.assertFalse(session.at_limit())
@@ -1380,7 +1377,6 @@ class ACancelledCheckStopsItsAgents(unittest.TestCase):
         self.assertTrue(session.at_limit())
         self.assertTrue(session.at_limit())
         self.assertEqual(len([line for line in session.plan if "was cancelled" in line]), 1)
-        refplan.clear_cancel("/d/other.ditamap")
 
     def test_no_finder_starts_after_a_cancel(self):
         session = self.session()
@@ -1397,8 +1393,14 @@ class ACancelledCheckStopsItsAgents(unittest.TestCase):
 
     def test_a_new_check_of_the_map_is_not_stopped_by_an_earlier_cancel(self):
         refplan.cancel_map("/d/m.ditamap")
-        refplan.clear_cancel("/d/m.ditamap")          # what /heal-refs does when a check starts
         self.assertFalse(self.session().at_limit())
+
+    def test_a_check_cancelled_and_run_again_at_once_still_stops(self):
+        # 26 Nov 2026: the second check cleared the map's mark before the first one's agents looked.
+        first = self.session()
+        refplan.cancel_map("/d/m.ditamap")
+        second = self.session()
+        self.assertEqual((first.at_limit(), second.at_limit()), (True, False))
 
 
 class FirstGuessAndPlannerAtTheLimit(unittest.TestCase):
