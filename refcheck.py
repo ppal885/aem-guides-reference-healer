@@ -157,6 +157,9 @@ class Repo:
         self.assets = None if assets is None else set()
         self.alias = {}      # stored file name -> path
         self.submap_links = []  # (submap path, key scopes it is brought in under), see _scope_submap_keys
+        # Key scopes of other deliverables: <mapref scope="peer" keyscope="admin">. Their keys
+        # ("admin.install") live in that deliverable's map, which a check of this map never has.
+        self.peer_scopes = set()
         self.previous = {}   # path -> earlier versions of the file, newest first, indexed like self.files
         self.stored_name = {}  # path -> stored file name
         for asset in assets or ():
@@ -300,6 +303,9 @@ class Repo:
             if own:
                 scopes = scopes + [own[0]]
             link = el.get("href") or ""
+            if el is not tree and el.get("scope") == "peer" and own:
+                for depth in range(len(scopes), 0, -1):
+                    self.peer_scopes.add(".".join(scopes[-depth:]))
             if el is not tree and is_submap_link(el, link):
                 # A submap: its keys also live in the scopes of the element that brings it in.
                 self.submap_links.append((self.resolve_path(rel, link.split("#")[0]), list(scopes)))
@@ -449,6 +455,9 @@ class Repo:
             key, _, element_id = ref["value"].partition("/")
             definition = self.definition_of(key)
             if definition is None:
+                # A key of another deliverable, brought in by a peer map reference: not ours to check.
+                if any(key.startswith(scope + ".") for scope in self.peer_scopes):
+                    return None
                 return None if self._fallback_works(ref) else "key-undefined"
             if definition["external"] or not definition["target"]:
                 return None

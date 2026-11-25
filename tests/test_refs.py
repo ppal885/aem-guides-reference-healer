@@ -1353,6 +1353,14 @@ class KeysToAnotherDeliverable(unittest.TestCase):
         self.assertEqual([(r["value"], r["reason"]) for r in repo.broken() if r["attribute"] == "keyref"],
                          [("setup", "key-target-missing")])
 
+    def test_a_key_in_the_scope_of_a_peer_map_is_not_broken(self):
+        # DITA 1.3 cross-deliverable links: <mapref scope="peer" keyscope="admin"/> and keyref="admin.install".
+        m = ('<map><title>M</title><mapref href="../admin/admin_guide.ditamap" scope="peer" format="ditamap" '
+             'keyscope="admin"/><topicref href="t.dita"/></map>')
+        t = '<topic id="t"><title>T</title><body><p><xref keyref="admin.install"/> <xref keyref="adminx"/></p></body></topic>'
+        repo = refcheck.Repo(files=[{"path": "m.ditamap", "xml": m}, {"path": "t.dita", "xml": t}])
+        self.assertEqual([(r["value"], r["reason"]) for r in repo.broken()], [("adminx", "key-undefined")])
+
 
 class EntitiesTheDtdWouldDeclare(unittest.TestCase):
     """26 Nov 2026: a topic that writes a name as "&product;" (an entity its DTD declares) was skipped
