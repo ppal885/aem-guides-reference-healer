@@ -1343,6 +1343,17 @@ class TokenLimitAverageOfFinishedFinders(unittest.TestCase):
         self.assertEqual(len(started), 10)
 
 
+class KeysToAnotherDeliverable(unittest.TestCase):
+    def test_a_key_with_scope_peer_is_not_broken_and_a_key_that_lost_its_file_still_is(self):
+        # 26 Nov 2026: a key to another guide (scope="peer") had every keyref counted as broken.
+        m = ('<map><title>M</title><keydef keys="admin-guide" href="../admin/admin_guide.ditamap" scope="peer" '
+             'format="ditamap"/><keydef keys="setup" href="setup.dita"/><topicref href="t.dita"/></map>')
+        t = '<topic id="t"><title>T</title><body><p><xref keyref="admin-guide"/> <xref keyref="setup"/></p></body></topic>'
+        repo = refcheck.Repo(files=[{"path": "m.ditamap", "xml": m}, {"path": "t.dita", "xml": t}])
+        self.assertEqual([(r["value"], r["reason"]) for r in repo.broken() if r["attribute"] == "keyref"],
+                         [("setup", "key-target-missing")])
+
+
 class EntitiesTheDtdWouldDeclare(unittest.TestCase):
     """26 Nov 2026: a topic that writes a name as "&product;" (an entity its DTD declares) was skipped
     whole, so its broken reference was not counted."""

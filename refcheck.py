@@ -306,7 +306,9 @@ class Repo:
             names = el.get("keys")
             if names:
                 href = el.get("href")
-                external = el.get("scope") == "external" or bool(href and HAS_SCHEME.match(href))
+                # A key to another deliverable (scope="peer") is outside this map's files on purpose, as a
+                # link with that scope is (26 Nov 2026: its every keyref was counted as broken).
+                external = el.get("scope") in ("external", "peer") or bool(href and HAS_SCHEME.match(href))
                 target = self.resolve_path(rel, href.split("#")[0]) if href and not external else None
                 keyword = next((text_of(k) for k in el.iter() if local(k.tag) in ("keyword", "linktext")), "")
                 # AEM Guides reads keys="a b" as one key named "a b" (seen 14 Nov 2026), so behind AEM
