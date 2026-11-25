@@ -187,6 +187,7 @@ def _reused_into(files, out):
     "available on this element: , , , and keyref." where three conkeyrefs bring the names."""
     import duplicates
     import xml.etree.ElementTree as ET
+    import refcheck
     wanted = set()
     for entry in files:
         path = (entry.get("path") or "").lstrip("/")
@@ -212,8 +213,7 @@ def _reused_into(files, out):
         if file not in parsed:
             entry = by_path.get(file)
             try:
-                parsed[file] = ET.fromstring(re.sub(r"<!DOCTYPE[^>\[]*(\[[^\]]*\])?[^>]*>", "", entry.get("xml") or "",
-                                                    count=1)) if entry else None
+                parsed[file] = ET.fromstring(refcheck.readable(entry.get("xml") or "")) if entry else None
             except ET.ParseError:
                 parsed[file] = None
         root = parsed[file]

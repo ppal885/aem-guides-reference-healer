@@ -1343,6 +1343,22 @@ class TokenLimitAverageOfFinishedFinders(unittest.TestCase):
         self.assertEqual(len(started), 10)
 
 
+class EntitiesTheDtdWouldDeclare(unittest.TestCase):
+    """26 Nov 2026: a topic that writes a name as "&product;" (an entity its DTD declares) was skipped
+    whole, so its broken reference was not counted."""
+
+    def test_a_topic_with_an_entity_is_read_and_its_reference_counted_on_its_own_line(self):
+        topic = ('<?xml version="1.0"?>\n<!DOCTYPE topic PUBLIC "-//OASIS//DTD DITA Topic//EN" "topic.dtd">\n'
+                 '<topic id="t"><title>T</title><body><p>&product; and&nbsp;more &amp; &#160;</p>\n'
+                 '<p conref="lib.dita#lib/gone"/></body></topic>')
+        repo = refcheck.Repo(files=[{"path": "lib.dita", "xml": "<topic id='lib'><title>L</title></topic>"},
+                                    {"path": "t.dita", "xml": topic}])
+        self.assertEqual([(r["value"], r["line"]) for r in repo.broken()], [("lib.dita#lib/gone", 4)])
+        # Same length, so places stay; the five XML entities and character references stay as they are.
+        text = refcheck.readable("<p>&product;&amp;&#160;</p>")
+        self.assertEqual(text, "<p>         &amp;&#160;</p>")
+
+
 class FirstGuessAndPlannerAtTheLimit(unittest.TestCase):
     """25 Nov 2026, the DITA-OT docs: 8 finders started on a flat guess of 7,000 each and spent 43,000 to
     60,000, and the planner went on after the limit; the check spent about 470,000 of 300,000."""

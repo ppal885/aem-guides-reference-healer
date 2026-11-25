@@ -85,7 +85,7 @@ def anchor(old_xml, element_id, ids_now, topic_id=None):
     only inside that topic. ids_now: the ids the editor can find in the file today (it looks an id up
     in the whole file, so only ids that are there once)."""
     try:
-        tree = ET.fromstring(re.sub(r"<!DOCTYPE[^>\[]*(\[[^\]]*\])?[^>]*>", "", old_xml, count=1))
+        tree = ET.fromstring(refcheck.readable(old_xml))
     except ET.ParseError:
         return None
     scope = tree

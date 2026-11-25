@@ -24,6 +24,8 @@ import re
 import time
 import xml.etree.ElementTree as ET
 
+import refcheck
+
 import alttext
 import duplicates
 
@@ -38,7 +40,7 @@ def cases(folder, files, vocab, wanted):
         if not path.endswith(".dita") or path not in vocab["alts"]:
             continue
         try:
-            root = ET.fromstring(re.sub(r"<!DOCTYPE[^>\[]*(\[[^\]]*\])?[^>]*>", "", entry["xml"], count=1))
+            root = ET.fromstring(refcheck.readable(entry["xml"]))
         except ET.ParseError:
             continue
         parents = {child: parent for parent in root.iter() for child in parent}

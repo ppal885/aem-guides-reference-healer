@@ -25,6 +25,8 @@ import difflib
 import re
 import xml.etree.ElementTree as ET
 
+import refcheck
+
 STAGE = "subject scheme rule"
 
 
@@ -34,7 +36,7 @@ def _local(tag):
 
 def _parse(raw):
     try:
-        return ET.fromstring(re.sub(r"<!DOCTYPE[^>\[]*(\[[^\]]*\])?[^>]*>", "", raw or "", count=1))
+        return ET.fromstring(refcheck.readable(raw or ""))
     except ET.ParseError:
         return None
 

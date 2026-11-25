@@ -99,11 +99,23 @@ def text_of(el, limit=200):
     return re.sub(r"\s+", " ", "".join(parts)).strip()[:limit]
 
 
+_ENTITY = re.compile(r"&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)[A-Za-z_][\w.-]*;")
+
+
+def readable(raw):
+    """The source text as the parser can read it: without its DOCTYPE, and with every entity the DTD
+    would have declared (a "&product;" an older content uses for a name, "&nbsp;" from HTML) as
+    many spaces. The parser knows no DTD, and failed on the whole file (26 Nov 2026): its broken
+    references were not counted at all. The length stays, so lines and places stay right."""
+    text = re.sub(r"<!DOCTYPE[^>\[]*(\[[^\]]*\])?[^>]*>", "", raw or "", count=1)
+    return _ENTITY.sub(lambda found: " " * len(found.group(0)), text)
+
+
 def parse(path):
     try:
         with open(path, encoding="utf-8", errors="replace") as handle:
             raw = handle.read()
-        return raw, ET.fromstring(re.sub(r"<!DOCTYPE[^>\[]*(\[[^\]]*\])?[^>]*>", "", raw, count=1))
+        return raw, ET.fromstring(readable(raw))
     except (ET.ParseError, OSError):
         return None, None
 
@@ -181,7 +193,7 @@ class Repo:
             if not path:
                 continue
             try:
-                tree = ET.fromstring(re.sub(r"<!DOCTYPE[^>\[]*(\[[^\]]*\])?[^>]*>", "", raw, count=1))
+                tree = ET.fromstring(readable(raw))
             except ET.ParseError:
                 self.other_files.add(path)
                 continue
@@ -204,7 +216,7 @@ class Repo:
             if not old or old == raw:
                 continue
             try:
-                tree = ET.fromstring(re.sub(r"<!DOCTYPE[^>\[]*(\[[^\]]*\])?[^>]*>", "", old, count=1))
+                tree = ET.fromstring(readable(old))
             except ET.ParseError:
                 continue
             current_files, current_keys, current_links = self.files, self.keys, self.submap_links

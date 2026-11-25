@@ -28,6 +28,8 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 
+import refcheck
+
 BLOCK_TAGS = {"p", "note", "step", "cmd", "li", "shortdesc", "section", "info", "stepresult", "context", "dd",
               "example", "lq", "postreq", "prereq", "result", "abstract",
               # A table cell: on a customer export (20 Nov 2026) 161 groups, 417 copies, were in cells.
@@ -97,7 +99,7 @@ _MARK = re.compile(r"\u27e6[^\u27e7]+\u27e7")
 
 def _parse(raw):
     try:
-        return ET.fromstring(re.sub(r"<!DOCTYPE[^>\[]*(\[[^\]]*\])?[^>]*>", "", raw or "", count=1))
+        return ET.fromstring(refcheck.readable(raw or ""))
     except ET.ParseError:
         return None
 

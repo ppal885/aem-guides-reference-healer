@@ -156,7 +156,7 @@ def images(files, assets=None, missing=None):
         if not path.endswith(".dita"):
             continue
         try:
-            root = ET.fromstring(re.sub(r"<!DOCTYPE[^>\[]*(\[[^\]]*\])?[^>]*>", "", entry.get("xml") or "", count=1))
+            root = ET.fromstring(refcheck.readable(entry.get("xml") or ""))
         except ET.ParseError:
             continue
         parents = {child: parent for parent in root.iter() for child in parent}
