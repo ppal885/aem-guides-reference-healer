@@ -1428,10 +1428,13 @@ class Session:
             keys = [(e["file"].lstrip("/"), e["attribute"], e["old"], e["new"]) for e in edits]
             unsaved = [k for k in keys if (k[0], k[1], k[2]) in broken]
             still = [k for k in keys if (k[0], k[1], k[3]) in self.aem_only]
-            held = sum(1 for k in keys if (k[0], k[1], k[3]) in present) - len(still)
+            # Saved: the new value is in the file and resolves here. Whether AEM's report already says
+            # so is told apart below; counting only those would read as if the others had failed.
+            saved = sum(1 for k in keys if (k[0], k[1], k[3]) in present)
+            held = saved - len(still)
             if any(k[1] not in ("keys", "id") for k in keys):
-                lines.append("Since the last Fix all: %s saved and %s." % (
-                    _count(held, "repair"), "resolves" if held == 1 else "resolve"))
+                lines.append("Since the last Fix all: %s saved and %s in the files." % (
+                    _count(saved, "repair"), "resolves" if saved == 1 else "resolve"))
             if unsaved:
                 lines.append("%s from the last Fix all did not reach the repository (%s); they are in this list again."
                              % (_count(len(unsaved), "repair"), _count(len({k[0] for k in unsaved}), "file")))
@@ -1443,8 +1446,9 @@ class Session:
                              "there; I will not propose those repairs again." % _count(len(still), "reference"))
             elif still:
                 self.waiting |= {(k[0], k[1], k[3]) for k in still}
-                lines.append("AEM still lists %s just repaired. It has not indexed the change yet; counted as "
-                             "waiting, not as findings." % _count(len(still), "reference"))
+                lines.append("%sAEM still lists %s just repaired. It has not indexed the change yet; counted as "
+                             "waiting, not as findings." % ("AEM's report already agrees for %d of them. " % held
+                                                            if held else "", _count(len(still), "reference")))
                 # While AEM has not indexed the saved files, it may list their other references too, ones this
                 # Fix did not touch. Seen once on 22 Nov 2026: 95 such rows right after a Fix all, gone in the
                 # next check; most likely the same indexing. They wait too; the next check, made after AEM has

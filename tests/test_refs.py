@@ -899,8 +899,11 @@ class Learning(unittest.TestCase):
         applied = {"when": 1000, "checks": 0, "edits": [edit(1, "support"), edit(2, "support"), edit(3, "other")]}
         lines, failed, finished = self.session(files, reported=reported).look_back(applied, now=1010)
         self.assertEqual((failed, finished), ([], False))
-        self.assertIn("1 repair saved and resolves", lines[0])
+        # t2 and t3 are saved; AEM's report still lists t3. Both count as saved, so the author does not
+        # read the one AEM has not indexed yet as a failure (seen 25 Nov 2026: "355 saved" of 710).
+        self.assertIn("2 repairs saved and resolve in the files", lines[0])
         self.assertIn("1 repair from the last Fix all did not reach the repository", lines[1])
+        self.assertIn("AEM's report already agrees for 1 of them. AEM still lists 1 reference just repaired", lines[2])
         self.assertIn("has not indexed the change yet", lines[2])
         session = self.session(files, reported=reported)
         lines, failed, finished = session.look_back(dict(applied, checks=1), now=1000 + refplan.SETTLE_SECONDS)
