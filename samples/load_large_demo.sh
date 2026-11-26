@@ -33,6 +33,11 @@ save_map() {
   curl -s -o /dev/null -u $AUTH -F "file=@/tmp/atlas_guide.$$.gz;type=application/gzip" -F "resourceType=GUIDES_RESOURCE" \
     -F "path=$ROOT/atlas_guide.ditamap" "$A/bin/guides/v1/asset/update"
   rm -f /tmp/atlas_guide.$$.gz
+  # The Broken links report (and so Health check) reads the map's keys from a cache that lives 10
+  # minutes and is not cleared when the map is saved. After a check of the set before the break, the
+  # check after it still saw the old keys and left out 40 broken keyrefs (sso-product, renamed in v2);
+  # they showed up only after "Fix all". Reading the keys here builds them afresh and fills that cache.
+  curl -s -o /dev/null -u $AUTH "$A/bin/guides/v1/map/keys/space?rootMapPath=$ROOT/atlas_guide.ditamap"
 }
 
 if [ $STEP = break ]; then
