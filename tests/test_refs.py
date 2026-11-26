@@ -911,11 +911,12 @@ class Learning(unittest.TestCase):
         only = [r for r in session.result()["repairs"] if r["stage"] == "planner"]
         self.assertEqual([(r["file"], r["verdict"]) for r in only], [("/d/t3.dita", "none")])
 
-    def test_other_references_of_a_file_just_saved_wait_while_aem_has_not_indexed_it(self):
+    def test_other_references_wait_while_aem_has_not_indexed_the_fix(self):
         files = self.files('<note conref="GUID-lib.dita#lib/support"/><note conref="GUID-lib.dita#lib/other"/>',
                            '<note conref="GUID-lib.dita#lib/other"/>')
         # t1 was saved by the Fix (its first note); AEM still lists that repair and t1's untouched note.
-        # t2 was not saved: what AEM lists there stays a finding.
+        # t2 was not saved, and AEM lists its note too, which resolves: it waits as well (27 Nov 2026, an
+        # xref in a file the Fix did not save was "No repair found" in the check right after it).
         reported = [{"file": "/d/t1.dita", "attribute": "conref", "value": "GUID-lib.dita#lib/support"},
                     {"file": "/d/t1.dita", "attribute": "conref", "value": "GUID-lib.dita#lib/other"},
                     {"file": "/d/t2.dita", "attribute": "conref", "value": "GUID-lib.dita#lib/other"}]
@@ -924,12 +925,24 @@ class Learning(unittest.TestCase):
         session = self.session(files, reported=reported)
         lines, failed, finished = session.look_back(applied, now=1010)
         self.assertEqual((failed, finished), ([], False))
-        self.assertIn("AEM also lists 1 other reference of the files just saved", " ".join(lines))
-        self.assertIn("AEM also reports 1 reference as broken that resolve", lines[-1])
+        self.assertIn("AEM also lists 2 other references that resolve here; counted as waiting", " ".join(lines))
+        self.assertNotIn("without a repair", " ".join(lines))
         verdicts = sorted((r["file"], r["old"].split("/")[-1], r["verdict"]) for r in session.result()["repairs"]
                           if r["stage"] in ("planner", "rule"))
         self.assertEqual(verdicts, [("/d/t1.dita", "other", "pending"), ("/d/t1.dita", "support", "pending"),
-                                    ("/d/t2.dita", "other", "none")])
+                                    ("/d/t2.dita", "other", "pending")])
+
+    def test_once_aem_has_caught_up_a_reference_it_still_lists_is_a_finding_again(self):
+        files = self.files('<note conref="GUID-lib.dita#lib/support"/>', '<note conref="GUID-lib.dita#lib/other"/>')
+        reported = [{"file": "/d/t2.dita", "attribute": "conref", "value": "GUID-lib.dita#lib/other"}]
+        applied = {"when": 1000, "checks": 0, "edits": [
+            {"file": "/d/t1.dita", "attribute": "conref", "old": "GUID-lib.dita#lib/help", "new": "GUID-lib.dita#lib/support"}]}
+        session = self.session(files, reported=reported)
+        lines, failed, finished = session.look_back(applied, now=1010)
+        # AEM agrees with the repair already: nothing waits, and t2 is listed as AEM reports it.
+        self.assertNotIn("counted as waiting", " ".join(lines))
+        verdicts = [r["verdict"] for r in session.result()["repairs"] if r["stage"] == "planner"]
+        self.assertEqual(verdicts, ["none"])
 
     def test_an_edit_at_the_source_that_the_repository_does_not_honour_is_not_chosen_again(self):
         files = self.files('<ph keyref="old-name"/>') + [

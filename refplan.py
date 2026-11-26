@@ -1553,16 +1553,17 @@ class Session:
                 lines.append("%sAEM still lists %s just repaired. It has not indexed the change yet; counted as "
                              "waiting, not as findings." % ("AEM's report already agrees for %d of them. " % held
                                                             if held else "", _count(len(still), "reference")))
-                # While AEM has not indexed the saved files, it may list their other references too, ones this
-                # Fix did not touch. Seen once on 22 Nov 2026: 95 such rows right after a Fix all, gone in the
-                # next check; most likely the same indexing. They wait too; the next check, made after AEM has
+                # While AEM has not indexed the saved files, it may list other references that resolve here,
+                # ones this Fix did not touch: 95 rows in saved files on 22 Nov 2026, and on 27 Nov an xref in
+                # a file the Fix did not save (to an id that never changed), in two Fix alls of the large
+                # sample; both gone in the next check. They wait too; the next check, made after AEM has
                 # caught up, lists any that are really broken.
-                saved = {k[0] for k in keys}
-                lagging = {key for key in self.aem_only if key[0] in saved and key not in self.waiting}
+                lagging = {key for key in self.aem_only if key not in self.waiting}
                 self.waiting |= lagging
                 if lagging:
-                    lines.append("AEM also lists %s of the files just saved that resolve here; counted as waiting "
-                                 "until it has indexed them." % _count(len(lagging), "other reference"))
+                    lines.append("AEM also lists %s that %s here; counted as waiting until it has indexed the "
+                                 "Fix." % (_count(len(lagging), "other reference"),
+                                          "resolves" if len(lagging) == 1 else "resolve"))
             # An edit at the source (a key or an id put back) changes no reference, so whether it held
             # shows only in what the repository still reports for references that resolve here.
             kinds = {"keys" if key[1] in ("keyref", "conkeyref") else "id" for key in self.aem_only
