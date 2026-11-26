@@ -378,13 +378,21 @@ def refcheck_escape(value):
     return value.replace("&", "&amp;").replace("<", "&lt;").replace('"', "&quot;")
 
 
-def _one_sentence(text, limit=170):
-    """The first sentence of a reason, without the planner's internal group ids."""
+def _one_sentence(text, limit=240):
+    """The first sentence of a reason, without the planner's internal group ids. A sentence longer
+    than the limit ends at its last clause (a semicolon, colon, dash or comma) inside the limit, so
+    the plan never shows a line broken off mid-thought; "…" only when it has no clause to end at."""
     text = re.sub(r"\s*\((?:r\d+-)?g\d+(?:[^)]*)\)", "", text)
     text = re.sub(r"\b(?:r\d+-)?g\d+\b,?\s*", "", text)
     text = re.sub(r"\s+", " ", text).strip()
     first = re.split(r"(?<=[.!?])\s", text, 1)[0]
-    return first if len(first) <= limit else first[:limit].rsplit(" ", 1)[0] + "…"
+    if len(first) <= limit:
+        return first
+    cut = first[:limit]
+    end = max(cut.rfind(mark) for mark in ("; ", ": ", " - ", " — ", ", "))
+    if end > limit // 2:
+        return cut[:end].rstrip(" ,;:-—") + "."
+    return cut.rsplit(" ", 1)[0] + "…"
 
 
 def _plain(text):
@@ -2031,16 +2039,16 @@ def _plan_files(payload, backend="cli", model=None, log=print, progress=None, me
                   and not g["known"].get("never_defined"))
     proven -= recalled + by_rule
     if proven:
-        session.plan.append("%d of those %d were only renamed: the file's previous version proves it, no AI needed."
+        session.plan.append("%d of the %d broken targets were only renamed: the file's previous version proves it, no AI needed."
                             % (proven, len(first)))
     if by_rule:
         session.plan.append("%d%s %s settled by a rule in code that reads the files as they are now, no AI needed. "
                             "No previous version proves these." % (
-                                by_rule, " more" if proven else " of those %d" % len(first), "was" if by_rule == 1 else "were"))
+                                by_rule, " more" if proven else " of the %d broken targets" % len(first), "was" if by_rule == 1 else "were"))
     if recalled:
         # "more" only after a line that counted some of them already, as for the rule above.
         session.plan.append("%d%s %s answered by an author in an earlier check; I used %s again." % (
-            recalled, " more" if proven or by_rule else " of those %d" % len(first), "was" if recalled == 1 else "were",
+            recalled, " more" if proven or by_rule else " of the %d broken targets" % len(first), "was" if recalled == 1 else "were",
             "that answer" if recalled == 1 else "those answers"))
     session.step("scan", "done", "Scanner", "Found %s in %d files, from %d renamed, moved or removed ids and keys" % (
         _count(sum(len(g["refs"]) for g in first.values()), "broken reference"), len(session.rounds[0]["repo"].files), len(first)))

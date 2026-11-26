@@ -2999,3 +2999,18 @@ class ReuseAgent(unittest.TestCase):
         self.assertEqual(answer["unjudged"], 6)                  # 5 and 1 "says more"; judge=0: no model call, nothing judged
         sidecar.LAST_FILES.clear()
         sidecar.COPIES.clear()
+
+
+class PlanLineEndsCleanly(unittest.TestCase):
+    def test_a_long_reason_ends_at_a_clause_not_mid_word(self):
+        import refplan
+        reason = ("The moved section now lives in the shared setup topic, which every chapter of the guide already "
+                  "includes through a key reference, so repairing the references to point at it keeps the text authors "
+                  "see exactly as it was before, and no topic needs a rewrite after the move. Second sentence.")
+        line = refplan._one_sentence(reason)
+        self.assertTrue(line.endswith("before."), line)
+        self.assertNotIn("…", line)
+
+    def test_the_counts_name_what_they_count(self):
+        source = open(os.path.join(os.path.dirname(__file__), "..", "refplan.py")).read()
+        self.assertNotIn("of those %d", source)
