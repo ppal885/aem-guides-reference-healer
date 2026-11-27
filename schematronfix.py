@@ -61,6 +61,20 @@ def _tag(xml):
         return None
 
 
+# Code is shown as written: a fix that changes text inside these changes an example or a command
+# (27 Nov 2026, the DITA-OT docs: "important note!" became "important note." inside a codeblock).
+CODE = ("codeblock", "codeph", "pre", "screen", "msgblock", "msgph", "syntaxdiagram", "coderef")
+
+
+def code_text(xml):
+    """The text inside the element's code elements, in order; None when it does not parse."""
+    try:
+        root = ET.fromstring(xml)
+    except ET.ParseError:
+        return None
+    return [(e.tag, "".join(e.itertext())) for e in root.iter() if e.tag in CODE]
+
+
 def clean(answer, findings):
     """{id: {"element", "note"}} for the answers that are an element of the same tag as the one the
     rule fired on. Anything else becomes "no fix" with the reason; AEM checks the rest."""
@@ -76,6 +90,9 @@ def clean(answer, findings):
             element, note = "", "The model's answer is not well-formed XML."
         elif element and want and _tag(element) != want:
             element, note = "", "The model returned <%s> where <%s> was asked for." % (_tag(element), want)
+        elif element and code_text(element) != code_text(asked[fix["id"]].get("element") or ""):
+            element, note = "", "The fix changes text inside code (%s), which stays as written." % ", ".join(
+                sorted({tag for tag, _ in (code_text(asked[fix["id"]].get("element") or "") or [])}) or ["code"])
         out[fix["id"]] = {"element": element, "note": note}
     for fid in asked:
         out.setdefault(fid, {"element": "", "note": "The model gave no answer for this finding."})

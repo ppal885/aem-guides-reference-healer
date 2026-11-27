@@ -48,6 +48,17 @@ class SchematronFix(unittest.TestCase):
         self.assertIn("<p> where <title>", by_id["f2"]["note"])
         self.assertIn("no answer", by_id["f3"]["note"])
 
+    def test_a_fix_that_changes_text_inside_code_is_no_fix_but_text_around_it_may_change(self):
+        para = '<p>Assume the note is defined as follows! <codeblock>&lt;note&gt;An important note!&lt;/note&gt;</codeblock></p>'
+        finding = {"id": "f1", "rule": "t-no-exclamation", "message": "No !", "test": "not(contains(., '!'))", "element": para}
+        out = schematronfix.suggest({"findings": [finding, dict(finding, id="f2")]}, self.model([
+            {"id": "f1", "element": para.replace("note!&lt;", "note.&lt;"), "note": "Replaced the mark."},
+            {"id": "f2", "element": para.replace("follows!", "follows:"), "note": "Replaced the mark."}]))
+        by_id = {f["id"]: f for f in out["fixes"]}
+        self.assertEqual(by_id["f1"]["element"], "")
+        self.assertIn("inside code (codeblock)", by_id["f1"]["note"])
+        self.assertIn("follows:", by_id["f2"]["element"])
+
     def test_the_same_finding_asked_again_costs_no_call_but_a_failed_check_asks_again(self):
         model = self.model([{"id": "f1", "element": '<note type="caution">Back up the ledger.</note>', "note": "x"}])
         schematronfix.suggest({"findings": [NOTE]}, model)
