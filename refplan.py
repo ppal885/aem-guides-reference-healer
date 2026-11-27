@@ -2019,8 +2019,10 @@ def _plan_files(payload, backend="cli", model=None, log=print, progress=None, me
               " They all come from %d ids and keys that were renamed, moved or removed." % changed if not undefined else
               " %s from %d ids and keys that were renamed, moved or removed." % (
                   "%s of them %s" % (format(renamed, ","), "comes" if renamed == 1 else "come"), changed))
-    session.plan.append("Found %s in %d files.%s" % (
-        _count(references, "broken reference"), len(session.rounds[0]["repo"].files), origin))
+    # The files the broken references are in, not every file of the map (27 Nov 2026: "524 broken
+    # references in 227 files" after a Fix all, when they were in 215).
+    holding = len({r["file"] for g in first.values() for r in g["refs"]})
+    session.plan.append("Found %s in %s.%s" % (_count(references, "broken reference"), _count(holding, "file"), origin))
     if undefined:
         session.plan.append("%s to %s that this map does not define: the map defines no keys at all, now or in an earlier "
                             "version. Nothing was renamed, so there is nothing to repair and no agent searched for them. "
@@ -2051,8 +2053,8 @@ def _plan_files(payload, backend="cli", model=None, log=print, progress=None, me
         session.plan.append("%d%s %s answered by an author in an earlier check; I used %s again." % (
             recalled, " more" if proven or by_rule else " of the %d broken targets" % len(first), "was" if recalled == 1 else "were",
             "that answer" if recalled == 1 else "those answers"))
-    session.step("scan", "done", "Scanner", "Found %s in %d files, from %d renamed, moved or removed ids and keys" % (
-        _count(sum(len(g["refs"]) for g in first.values()), "broken reference"), len(session.rounds[0]["repo"].files), len(first)))
+    session.step("scan", "done", "Scanner", "Found %s in %s, from %d renamed, moved or removed ids and keys" % (
+        _count(references, "broken reference"), _count(holding, "file"), len(first)))
     if proven:
         session.step("history", "done", "Version history", "Proved %s from the previous versions, no AI" % _count(proven, "rename"))
     if by_rule:

@@ -3027,3 +3027,18 @@ class PlanLineEndsCleanly(unittest.TestCase):
     def test_the_counts_name_what_they_count(self):
         source = open(os.path.join(os.path.dirname(__file__), "..", "refplan.py")).read()
         self.assertNotIn("of those %d", source)
+
+
+class FoundLineCountsFilesWithBreaks(unittest.TestCase):
+    def test_the_first_line_counts_the_files_that_hold_broken_references_not_every_file(self):
+        old = '<topic id="lib"><title>Lib</title><body><section id="old"><title>Escalation</title><p>Call the desk.</p></section></body></topic>'
+        files = [{"id": "GUID-lib", "path": "/d/lib.dita", "xml": old.replace('id="old"', 'id="new"'), "previous": [old]}]
+        for n in (1, 2):
+            files.append({"id": "GUID-t%d" % n, "path": "/d/t%d.dita" % n,
+                          "xml": TOPIC % '<p><xref href="GUID-lib.dita#lib/old"/></p><p><xref href="GUID-lib.dita#lib/old"/></p>'})
+        for n in (3, 4, 5):
+            files.append({"id": "GUID-t%d" % n, "path": "/d/t%d.dita" % n, "xml": TOPIC % "<p>Nothing broken here.</p>"})
+        # No model: the line is written before any agent is asked.
+        out = refplan.plan_files({"files": files}, model="no-such-model", log=lambda message: None, memory={})
+        found = next(line for line in out["plan"] if line.startswith("Found "))
+        self.assertTrue(found.startswith("Found 4 broken references in 2 files."), found)
