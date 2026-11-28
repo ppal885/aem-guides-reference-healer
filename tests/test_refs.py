@@ -3052,3 +3052,27 @@ class CardsWithoutTheMapsFiles(unittest.TestCase):
             self.assertIn("Press Regenerate", note)
             self.assertNotIn("Run the health check first", note)
         self.assertIn('"Repeated text"', sidecar.copies_of("/content/dam/never.ditamap")["note"])
+
+
+class RepeatedTextInKeepMode(unittest.TestCase):
+    TOPIC = '<topic id="%s"><title>T</title><body><note>Backups are kept for %d days and then deleted for good.</note>' \
+            '<p>Back up the payroll database before you close the pay period, every time.</p></body></topic>'
+
+    def plan_line(self, state):
+        files = [{"path": "/d/%s.dita" % n, "xml": self.TOPIC % (n, d)} for n, d in (("a", 30), ("b", 30), ("c", 60))]
+        with tempfile.TemporaryDirectory() as folder:
+            keep, refplan.KEEP_PATH = refplan.KEEP_PATH, os.path.join(folder, "keep.json")
+            try:
+                if state is not None:
+                    with open(refplan.KEEP_PATH, "w") as f:
+                        json.dump({"/d/m.ditamap": state}, f)
+                out = refplan.plan_files({"files": files, "map": "/d/m.ditamap"}, model="no-such-model",
+                                         log=lambda message: None, memory={})
+            finally:
+                refplan.KEEP_PATH = keep
+        return next(line for line in out["plan"] if line.startswith("Repeated text: "))
+
+    def test_a_map_that_keeps_its_copies_counts_only_the_copies_that_differ(self):
+        self.assertTrue(self.plan_line(None).startswith("Repeated text: 2 texts are repeated"), self.plan_line(None))
+        line = self.plan_line({"mode": "keep", "kept": []})
+        self.assertTrue(line.startswith("Repeated text: 1 text no longer says the same everywhere; this map keeps its copies."), line)

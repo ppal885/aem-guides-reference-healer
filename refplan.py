@@ -413,6 +413,21 @@ def carries_whole(old_text, new_text):
     return sum(1 for word in old if word in new) / len(old) >= WHOLE
 
 
+KEEP_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out", "keep-copies.json")
+
+
+def _kept_copies_drifted(map_path, copied):
+    """None when the map reuses repeated text (the default); with "Keep the copies" chosen for it
+    (sidecar.set_keep), how many repeated texts have copies that no longer say the same, the ones the
+    author has kept as they are left out, as the tab counts them."""
+    entry = (_read(KEEP_PATH) or {}).get(map_path) or {}
+    if entry.get("mode") != "keep":
+        return None
+    import reuse
+    kept = set(entry.get("kept") or [])
+    return sum(1 for g in copied if g["kind"] in ("numbers", "wording", "maybe") and reuse.decision_key(g) not in kept)
+
+
 def _count(number, word):
     return "%s %s%s" % (format(number, ","), word, "" if number == 1 else "s")
 
@@ -1925,11 +1940,18 @@ def plan_files(payload, backend="cli", model=None, log=print, progress=None, mem
         copies = sum(len(g["copies"]) for g in everything)
         maps = " (%s of them groups of references in maps)" % format(len(copied_maps), ",") if copied_maps else ""
         # Said in the words of the tab the author opens; the editor counts from "Repeated text: N".
-        out["plan"] = list(out.get("plan") or []) + ["Repeated text: %s %s repeated in several topics or maps%s: %s copies, "
-                                                     "%s could be reused instead. Open \"Repeated text\" "
-                                                     "to see which." % (
-                                                         format(len(everything), ","), "text is" if len(everything) == 1 else "texts are",
-                                                         maps, format(copies, ","), format(copies - len(everything), ","))]
+        drifted = _kept_copies_drifted(payload.get("map") or "", copied)
+        if drifted is not None:
+            # The map keeps its copies ("Keep the copies" in the tab): what is left to do is the copies
+            # that no longer say the same, not every repeated text (28 Nov 2026: 64 shown, 0 to do).
+            line = "Repeated text: %s no longer %s the same everywhere; this map keeps its copies. Open \"Repeated text\" " \
+                   "to see which." % (_count(drifted, "text"), "says" if drifted == 1 else "say")
+        else:
+            line = "Repeated text: %s %s repeated in several topics or maps%s: %s copies, %s could be reused instead. " \
+                   "Open \"Repeated text\" to see which." % (
+                       format(len(everything), ","), "text is" if len(everything) == 1 else "texts are",
+                       maps, format(copies, ","), format(copies - len(everything), ","))
+        out["plan"] = list(out.get("plan") or []) + [line]
         out.setdefault("stats", {}).update(copied_groups=len(copied), copied_map_groups=len(copied_maps))
     # Images whose alt text says nothing to a screen reader: found by code on every check; a model
     # sees an image only when the author asks for its alt in "Images without alt text" (POST /alt-suggest).
