@@ -113,7 +113,7 @@ class SuggestingAnAlt(unittest.TestCase):
             self.assertEqual(out["alt"], "The Ledgerline sign-in dialog with email and password")
             with self.assertRaises(ValueError):
                 sidecar.suggest_alt({"map": "/alt.ditamap", "id": "i1", "media_type": "text/html", "image_base64": "eA=="})
-            self.assertIn("Run the health check first", sidecar.alt_of("/other.ditamap")["note"])
+            self.assertIn("Press Regenerate", sidecar.alt_of("/other.ditamap")["note"])
         finally:
             sidecar.LAST_FILES.clear()
 
@@ -314,7 +314,7 @@ class TheListIsFoundOnceACheck(unittest.TestCase):
     def test_no_check_yet(self):
         import sidecar
         with mock.patch.dict(sidecar.LAST_FILES, {}, clear=True):
-            self.assertIn("Run the health check first", sidecar.alt_of("/none.ditamap")["note"])
+            self.assertIn("Press Regenerate", sidecar.alt_of("/none.ditamap")["note"])
 
 
 if __name__ == "__main__":

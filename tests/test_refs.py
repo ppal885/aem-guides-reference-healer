@@ -2971,7 +2971,7 @@ class ReuseAgent(unittest.TestCase):
 
     def test_the_sidecar_asks_once_per_wording_and_says_when_it_has_none(self):
         import sidecar
-        self.assertIn("Run the health check first", sidecar.copies_of("/m.ditamap")["note"])
+        self.assertIn("Press Regenerate", sidecar.copies_of("/m.ditamap")["note"])
         calls = []
 
         def model(system, user, model=None):
@@ -3042,3 +3042,13 @@ class FoundLineCountsFilesWithBreaks(unittest.TestCase):
         out = refplan.plan_files({"files": files}, model="no-such-model", log=lambda message: None, memory={})
         found = next(line for line in out["plan"] if line.startswith("Found "))
         self.assertTrue(found.startswith("Found 4 broken references in 2 files."), found)
+
+
+class CardsWithoutTheMapsFiles(unittest.TestCase):
+    def test_a_card_after_a_restart_says_to_regenerate_not_to_run_a_check(self):
+        import sidecar
+        sidecar.LAST_FILES.pop("/content/dam/never.ditamap", None)
+        for note in (sidecar.copies_of("/content/dam/never.ditamap")["note"], sidecar.alt_of("/content/dam/never.ditamap")["note"]):
+            self.assertIn("Press Regenerate", note)
+            self.assertNotIn("Run the health check first", note)
+        self.assertIn('"Repeated text"', sidecar.copies_of("/content/dam/never.ditamap")["note"])

@@ -108,6 +108,14 @@ IDLE = {"running": False, "lines": [], "timeline": []}
 # The files of the last check of each map, for the reuse agent to read when the author opens
 # "Repeated text" (GET /copies), and what it decided, kept until the files change.
 LAST_FILES = {}
+
+
+def no_files(what):
+    """What a card says when this service has no files of the map: it was started after the check the
+    report shows (a restart), or the map was never checked here. The report still has its counts, so
+    "run the check first" read as if no check had run (28 Nov 2026)."""
+    return ("The repair service does not have this map's files: it was started after the check you see. "
+            "Press Regenerate, then open %s again." % what)
 LAST_ASSETS = {}     # map path: (the assets that are not DITA, the paths dangling names stood for)
 # map path: (the check's files, its assets, the images found in them). Reading every topic of a large
 # map takes seconds (12 s for the 4,000 topics of the large sample), and the card and each alt text
@@ -181,7 +189,7 @@ def copies_of(map_path, model=None, judge=None, ids=None):
     import reuse
     files = LAST_FILES.get(map_path or "")
     if not files:
-        return {"groups": [], "note": "Run the health check first: the agents have not seen this map's files."}
+        return {"groups": [], "note": no_files('"Repeated text"')}
     fingerprint = hashlib.sha1("".join(f.get("path", "") + (f.get("xml") or "") for f in files).encode("utf-8")).hexdigest()
     judge = 0 if judge is None else max(0, int(judge))
     cached = COPIES.get(map_path)
@@ -242,7 +250,7 @@ def spellings_of(map_path):
     import reuse
     files = LAST_FILES.get(map_path or "")
     if not files:
-        return {"names": [], "titles": {}, "note": "Run the health check first: the agents have not seen this map's files."}
+        return {"names": [], "titles": {}, "note": no_files('"Names written two ways"')}
     kept = SPELLED.get(map_path or "")
     if not (kept and kept[0] is files):
         kept = SPELLED[map_path or ""] = (files, names.spellings(files), [])
@@ -345,7 +353,7 @@ def alt_of(map_path):
     """The images of a map's last check whose alt text says nothing (alttext.py). No model."""
     found = _alt_images(map_path)
     if found is None:
-        return {"images": [], "note": "Run the health check first: the agents have not seen this map's files."}
+        return {"images": [], "note": no_files('"Images without alt text"')}
     return {"images": found, "uses": sum(len(g["uses"]) for g in found), "weak_uses": sum(g["weak_uses"] for g in found)}
 
 
